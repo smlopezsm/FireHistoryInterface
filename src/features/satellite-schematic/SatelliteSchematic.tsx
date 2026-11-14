@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Layers,
   Compass,
@@ -78,6 +79,9 @@ const SUBSYSTEMS: SubsystemInfo[] = [
 ];
 
 export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D }) => {
+  const { t, i18n } = useTranslation();
+  const isEn = !Boolean(i18n?.language?.startsWith('es'));
+
   const [isExploded, setIsExploded] = useState(false);
   const [instrument, setInstrument] = useState<InstrumentMode>('modis');
   const [activeCallout, setActiveCallout] = useState<string | null>(null);
@@ -88,25 +92,25 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
   const telemetry = isModis
     ? {
         altitude: '705 km',
-        orbitType: 'Heliosincrónica (98.2°)',
-        passTime: '10:30 AM (Terra) / 13:30 PM (Aqua)',
-        swath: '2.330 km (±55° transversal)',
-        resolution: '1.000 m (Bandas térmicas 21/22)',
-        revisit: '1 a 2 días (Cobertura global)',
+        orbitType: isEn ? 'Sun-synchronous (98.2°)' : 'Heliosincrónica (98.2°)',
+        passTime: isEn ? '10:30 AM (Terra) / 1:30 PM (Aqua)' : '10:30 AM (Terra) / 13:30 PM (Aqua)',
+        swath: isEn ? '2,330 km (±55° cross-track)' : '2.330 km (±55° transversal)',
+        resolution: isEn ? '1,000 m (Thermal bands 21/22)' : '1.000 m (Bandas térmicas 21/22)',
+        revisit: isEn ? '1 to 2 days (Global coverage)' : '1 a 2 días (Cobertura global)',
       }
     : {
         altitude: '824 km',
-        orbitType: 'Heliosincrónica (98.7°)',
-        passTime: '13:30 PM (Suomi-NPP / NOAA-20)',
-        swath: '3.040 km (Sin huecos inter-órbita)',
-        resolution: '375 m (Banda térmica I4 a 3.9 µm)',
-        revisit: '12 h (Día + Noche combinados)',
+        orbitType: isEn ? 'Sun-synchronous (98.7°)' : 'Heliosincrónica (98.7°)',
+        passTime: isEn ? '1:30 PM (Suomi-NPP / NOAA-20)' : '13:30 PM (Suomi-NPP / NOAA-20)',
+        swath: isEn ? '3,040 km (No orbital gap)' : '3.040 km (Sin huecos inter-órbita)',
+        resolution: isEn ? '375 m (I4 thermal band at 3.9 µm)' : '375 m (Banda térmica I4 a 3.9 µm)',
+        revisit: isEn ? '12 h (Day + Night combined)' : '12 h (Día + Noche combinados)',
       };
 
   return (
     <section
       id="la-mision"
-      aria-label="Anatomía orbital de satélites e instrumentos de observación terrestre"
+      aria-label={t('schematic.title')}
       className="relative w-full rounded-2xl border border-[#21312D] bg-[#07100F] p-4 md:p-8 shadow-2xl overflow-hidden scroll-mt-20"
     >
       {/* Encabezado de la lámina técnica */}
@@ -115,17 +119,17 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
           <div className="flex items-center gap-2.5">
             <span className="flex h-2.5 w-2.5 rounded-full bg-[#B8EE68] animate-pulse" />
             <span className="font-mono text-xs uppercase tracking-widest text-[#B8EE68]">
-              Lámina de Misión · Arquitectura Orbital
+              {t('schematic.missionBadge')}
             </span>
             <span className="rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 font-mono text-[10px] text-[#93A39C]">
-              NASA EOS & JPSS
+              {t('schematic.missionTag')}
             </span>
           </div>
           <h2 className="mt-1 font-title text-xl md:text-2xl font-bold tracking-tight text-[#EFF5ED]">
-            Anatomía del Instrumento y Plataforma Satelital
+            {t('schematic.title')}
           </h2>
           <p className="mt-0.5 text-xs text-[#93A39C]">
-            Explorá cómo la instrumentación orbital detecta anomalías térmicas y armoniza 24 años de historia.
+            {t('schematic.subtitle')}
           </p>
         </div>
 
@@ -176,7 +180,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
             }`}
           >
             <Layers className="h-3.5 w-3.5" />
-            <span>{isExploded ? 'Rearmar Nave' : 'Desarmar Subsistemas'}</span>
+            <span>{isExploded ? t('schematic.assemble') : t('schematic.disassemble')}</span>
           </button>
 
           {/* Acción directa al Visor 3D NASA Three.js */}
@@ -185,10 +189,10 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
               type="button"
               onClick={onOpen3D}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#B8EE68]/50 bg-[#B8EE68]/15 px-3.5 py-1.5 text-xs font-mono font-bold text-[#B8EE68] hover:bg-[#B8EE68]/25 hover:border-[#B8EE68] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] transition-all"
-              title="Abrir Visor 3D Oficial de Satélites NASA con Three.js"
+              title="Official NASA 3D Satellite Viewer with Three.js"
             >
               <Box className="h-3.5 w-3.5" />
-              <span>Inspeccionar 3D NASA</span>
+              <span>{t('schematic.inspect3d')}</span>
             </button>
           )}
         </div>
@@ -197,22 +201,22 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
       {/* Franja de Microdatos de Telemetría Orbital */}
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">Altitud Orbital</span>
+          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.altitude')}</span>
           <span className="font-bold text-[#EFF5ED] text-sm">{telemetry.altitude}</span>
           <span className="block text-[10px] text-[#93A39C] truncate">{telemetry.orbitType}</span>
         </div>
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">Hora de Paso</span>
+          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.passTime')}</span>
           <span className="font-bold text-[#EFF5ED] text-sm">{telemetry.passTime.split('(')[0]}</span>
           <span className="block text-[10px] text-[#93A39C] truncate">{telemetry.passTime}</span>
         </div>
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">Ancho de Barrido</span>
+          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.swath')}</span>
           <span className="font-bold text-[#EFF5ED] text-sm">{telemetry.swath.split('(')[0]}</span>
           <span className="block text-[10px] text-[#93A39C] truncate">{telemetry.swath}</span>
         </div>
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">Resolución de Detección</span>
+          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.resolution')}</span>
           <span
             className="font-bold text-sm"
             style={{ color: isModis ? '#68D9D0' : '#FF9C55' }}
@@ -576,19 +580,29 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
           <div className="flex items-center gap-2">
             <Box className="h-4 w-4 text-[#B8EE68]" />
             <span className="font-mono font-semibold text-[#EFF5ED]">
-              {isModis ? 'Instrumento MODIS (Terra/Aqua)' : 'Instrumento VIIRS (Suomi-NPP)'}
+              {isModis
+                ? isEn
+                  ? 'MODIS Instrument (Terra/Aqua)'
+                  : 'Instrumento MODIS (Terra/Aqua)'
+                : isEn
+                ? 'VIIRS Instrument (Suomi-NPP)'
+                : 'Instrumento VIIRS (Suomi-NPP)'}
             </span>
           </div>
           <p className="mt-1 font-mono text-[11px] text-[#93A39C]">
             {isModis
-              ? 'Escaneo transversal ±55° · 36 bandas · Registro 2000–hoy'
+              ? isEn
+                ? 'Cross-track swath ±55° · 36 bands · Record 2000–present'
+                : 'Escaneo transversal ±55° · 36 bandas · Registro 2000–hoy'
+              : isEn
+              ? 'Bilateral rotating scan · I4/I5 thermal bands at 375m · Record 2012–present'
               : 'Escaneo rotativo bilateral · Bandas térmicas I4/I5 a 375m · Registro 2012–hoy'}
           </p>
         </div>
 
         {/* Indicador de modo interactivo */}
         <div className="absolute top-3 right-3 z-10 rounded-lg border border-[#21312D] bg-[#07100F]/80 px-2.5 py-1 text-[11px] font-mono text-[#93A39C]">
-          {isExploded ? 'Vista: Despiece Técnico' : 'Vista: Ensamblado Orbital'}
+          {isExploded ? t('schematic.viewDisassembled') : t('schematic.viewAssembled')}
         </div>
       </div>
 
@@ -596,6 +610,10 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {SUBSYSTEMS.map((sub) => {
           const isActive = activeCallout === sub.id;
+          const subName = t(`schematic.subsystems.${sub.id}.name`, { defaultValue: sub.name });
+          const subSpecs = t(`schematic.subsystems.${sub.id}.specs`, { defaultValue: sub.specs });
+          const subDesc = t(`schematic.subsystems.${sub.id}.desc`, { defaultValue: sub.description });
+
           return (
             <div
               key={sub.id}
@@ -610,11 +628,11 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {sub.icon}
-                    <h3 className="text-xs font-bold text-[#EFF5ED]">{sub.name}</h3>
+                    <h3 className="text-xs font-bold text-[#EFF5ED]">{subName}</h3>
                   </div>
                 </div>
-                <div className="mt-1 font-mono text-[10px] text-[#93A39C]">{sub.specs}</div>
-                <p className="mt-2 text-xs leading-relaxed text-[#93A39C]">{sub.description}</p>
+                <div className="mt-1 font-mono text-[10px] text-[#93A39C]">{subSpecs}</div>
+                <p className="mt-2 text-xs leading-relaxed text-[#93A39C]">{subDesc}</p>
               </div>
             </div>
           );
@@ -625,7 +643,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#21312D] pt-4 text-xs text-[#93A39C]">
         <div className="flex items-center gap-2 font-mono text-[11px]">
           <Flame className="h-3.5 w-3.5 text-[#FF6759]" />
-          <span>NASA Space Apps Challenge 2026: Harmonization of MODIS and VIIRS Hot Spots</span>
+          <span>{t('schematic.sourceTitle')}</span>
         </div>
 
         <div className="flex items-center gap-4 font-mono text-[11px]">

@@ -16,7 +16,142 @@
     "headline": "Fire leaves traces. Let's make them count.",
     "subtitle": "Harmonization and scientific exploration of 24 years of satellite thermal observations in Argentina to distinguish climate variability from anomalous fires.",
     "methodCta": "How is harmonization calculated?",
+    "satelliteCta": "Explore 3D Satellites (NASA GLB)",
     "disclaimer": "Scientific note: A hot spot is a satellite-detected thermal anomaly in an observation cell, not necessarily an individual fire or its active perimeter. Prior to 2012, calibrated estimates harmonize the scale from MODIS to VIIRS."
+  },
+  "methodDialog": {
+    "title": "Harmonization Method (MODIS & VIIRS)",
+    "p1_strong": "MODIS and VIIRS Harmonization:",
+    "p1": "To allow comparing 24 continuous years of satellite history in Argentina (2000 to present), MODIS (1 km) sensor counts are statistically harmonized to the VIIRS (375 m) scale.",
+    "estimated_title": "Period 2000–2012 (Estimated Data):",
+    "estimated_desc": "Before the launch of Suomi NPP in 2012, only the MODIS instrument was operating. Monthly values for those years are calibrated estimates accompanied by their prediction intervals.",
+    "nodata_strong": "No data ≠ Zero:",
+    "nodata_desc": "If a satellite did not fly over the area or was not operating, the cell is strictly classified as 'no data' and never as zero fires.",
+    "close": "Understood"
+  },
+  "zone": {
+    "title": "Area Selection",
+    "ignBadge": "Official IGN",
+    "province": "Province",
+    "draw": "Draw",
+    "latlon": "Lat/Lon",
+    "territoryLabel": "Jurisdiction or Territory:",
+    "sensorScale": "Sensor / Analysis Scale:",
+    "harmonized": "Harmonized",
+    "modis": "MODIS",
+    "viirs": "VIIRS",
+    "allCountry": "Argentina (Entire Country)",
+    "national": "National"
+  },
+  "anomaly": {
+    "label": "Monthly Anomaly",
+    "criticalBadge": "Critical ▲▲",
+    "criticalTitle": "Far more fire activity than normal for {{month}}",
+    "criticalSub": "Critical activity well above the 75th percentile",
+    "elevatedBadge": "Elevated ▲",
+    "elevatedTitle": "More fire activity than normal for {{month}}",
+    "elevatedSub": "Above historical median",
+    "normalBadge": "Normal ●",
+    "normalTitle": "Normal fire activity for {{month}}",
+    "normalSub": "Within typical interquartile range",
+    "lowBadge": "Low ▼",
+    "lowTitle": "Less fire activity than normal for {{month}}",
+    "lowSub": "Below historical median",
+    "minimumBadge": "Minimum ▼▼",
+    "minimumTitle": "Far less fire activity than normal for {{month}}",
+    "minimumSub": "Historical minimum of thermal anomalies",
+    "noDataBadge": "No data",
+    "noDataTitle": "Insufficient years for comparison",
+    "noDataSub": "Minimum historical series required for evaluation",
+    "spotsMonth": "Monthly spots:",
+    "median": "Historical median:",
+    "range": "Typical range:"
+  },
+  "calendar": {
+    "title": "Harmonized Calendar month × year",
+    "badge": "2000 → today",
+    "subtitle": "Hot spots in",
+    "viewMatrix": "Matrix View",
+    "viewTable": "Table View",
+    "estimatedLegend": "Estimated Data (MODIS Calibration)",
+    "observedLegend": "Observed Data (VIIRS S-NPP)",
+    "noDataLegend": "No data",
+    "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  },
+  "downloads": {
+    "title": "Data Export",
+    "subtitle": "Structured CSV with provenance and metadata",
+    "calendarBtn": "Calendar CSV",
+    "spotsBtn": "Hot spots CSV"
+  },
+  "globe": {
+    "title": "3D Earth Globe",
+    "badge": "Mapbox Satellite · NASA Blue Marble",
+    "spin": "Spin",
+    "pauseSpin": "Pause auto-rotation",
+    "resumeSpin": "Start auto-rotation",
+    "recenter": "Recenter on Argentina & Southern Cone",
+    "tokenTitle": "Mapbox GL JS Token",
+    "tokenDesc": "The 3D globe uses photorealistic satellite textures from Mapbox / NASA. You can enter your public token below or save it in .env as VITE_MAPBOX_ACCESS_TOKEN.",
+    "initBtn": "Initialize 3D Globe",
+    "noToken": "No token?",
+    "freeAccount": "Free Mapbox account",
+    "attribution": "Base: NASA Earth Observatory / Blue Marble · Mapbox GL",
+    "brightTemp": "Brightness Temp:",
+    "calibrated": "NASA FIRMS S-NPP Calibrated"
+  },
+  "schematic": {
+    "missionBadge": "Mission Sheet · Orbital Architecture",
+    "missionTag": "NASA EOS & JPSS",
+    "title": "Instrument & Spacecraft Platform Anatomy",
+    "subtitle": "Explore how orbital instrumentation detects thermal anomalies and harmonizes 24 years of history.",
+    "disassemble": "Disassemble Subsystems",
+    "assemble": "Assemble Spacecraft",
+    "inspect3d": "Inspect 3D NASA",
+    "altitude": "Orbital Altitude",
+    "passTime": "Pass Time",
+    "swath": "Swath Width",
+    "resolution": "Detection Resolution",
+    "viewDisassembled": "View: Technical Disassembly",
+    "viewAssembled": "View: Orbital Assembly",
+    "sourceTitle": "NASA Space Apps Challenge 2026: Harmonization of MODIS and VIIRS Hot Spots",
+    "subsystems": {
+      "payload": {
+        "name": "Payload (Optical Sensor)",
+        "specs": "MODIS: 36 bands (1 km) · VIIRS: 22 bands (375 m)",
+        "desc": "Electro-optical radiometer with cryogenic infrared detector and scanning mirror to measure thermal radiance and detect active hot spots."
+      },
+      "solar": {
+        "name": "Solar Power & Batteries",
+        "specs": "Articulated GaAs array · ~2.5 - 3.0 kW",
+        "desc": "Steerable solar wings track the sun during daytime passes and recharge Ni-H2 / Li-Ion batteries for orbital eclipses."
+      },
+      "thermal": {
+        "name": "Thermal Control (MLI & Radiator)",
+        "specs": "Gold MLI blankets · Passive cooler < 85 K",
+        "desc": "Multilayer insulation (Kapton MLI) and radiator panels radiate heat to deep space to keep infrared detectors cryogenic."
+      },
+      "comms": {
+        "name": "Communications & Telemetry",
+        "specs": "X & S-band parabolic antenna · TDRSS link",
+        "desc": "Continuous downlink of scientific telemetry packets and direct broadcast commands to ground stations and relay satellites."
+      },
+      "aocs": {
+        "name": "Attitude & Navigation (AOCS)",
+        "specs": "Dual Star Trackers · 3-axis reaction wheels",
+        "desc": "Star trackers and gyroscopes maintain nadir pointing toward Earth's surface with sub-pixel pointing accuracy."
+      },
+      "propulsion": {
+        "name": "Orbital Propulsion",
+        "specs": "Hydrazine thrusters (Monopropellant)",
+        "desc": "Orbit maintenance thrusters compensate for atmospheric drag and preserve equatorial crossing solar time (10:30 AM / 1:30 PM)."
+      }
+    }
+  },
+  "satelliteModal": {
+    "title": "NASA Satellite Fleet (MODIS & VIIRS)",
+    "subtitle": "Three-dimensional observation of instruments used in thermal hot spot monitoring",
+    "close": "Close 3D viewer"
   },
   "layout": {
     "leftPanel": "Zone & Map",

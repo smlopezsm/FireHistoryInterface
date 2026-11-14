@@ -55,14 +55,14 @@ export const App: React.FC = () => {
                   id="method-dialog-title"
                   className="font-title text-base font-bold text-[#EFF5ED]"
                 >
-                  {t('header.methodLink')}
+                  {t('methodDialog.title')}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIsMethodOpen(false)}
                 className="rounded-lg p-1 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-2 focus:ring-[#B8EE68]"
-                aria-label="Cerrar"
+                aria-label={t('satelliteModal.close')}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -70,27 +70,27 @@ export const App: React.FC = () => {
 
             <div className="mt-4 space-y-3.5 text-xs leading-relaxed text-[#93A39C]">
               <p>
-                <strong className="text-[#EFF5ED]">Armonización MODIS y VIIRS: </strong>
-                Para permitir comparar 24 años continuos de historia satelital en Argentina (2000 hasta hoy), los conteos del sensor MODIS (1 km) se armonizan estadísticamente a la escala del sensor VIIRS (375 m).
+                <strong className="text-[#EFF5ED]">{t('methodDialog.p1_strong')} </strong>
+                {t('methodDialog.p1')}
               </p>
 
               <div className="rounded-xl border border-[#21312D] bg-[#111E1B] p-3.5">
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-7 rounded border border-dashed border-[#93A39C] pattern-estimado" />
                   <span className="font-semibold text-[#EFF5ED]">
-                    Período 2000–2012 (Datos Estimados):
+                    {t('methodDialog.estimated_title')}
                   </span>
                 </div>
                 <p className="mt-1.5 text-[11px] text-[#93A39C]">
-                  Antes del lanzamiento de Suomi NPP en 2012, solo operaba el instrumento MODIS. Los valores mensuales de esos años son estimaciones calibradas acompañadas de su intervalo de predicción.
+                  {t('methodDialog.estimated_desc')}
                 </p>
               </div>
 
               <div className="flex items-start gap-2.5 rounded-lg border border-[#21312D]/80 bg-[#07100F] p-3">
                 <ShieldAlert className="h-4 w-4 shrink-0 text-[#FF9C55] mt-0.5" />
                 <p className="text-[11px] text-[#93A39C]">
-                  <strong className="text-[#EFF5ED]">Sin dato ≠ Cero: </strong>
-                  Si un satélite no sobrevoló la zona o no estaba en operación, la celda se clasifica rigurosamente como <em className="text-[#EFF5ED]">"sin dato"</em> y jamás como cero focos.
+                  <strong className="text-[#EFF5ED]">{t('methodDialog.nodata_strong')} </strong>
+                  {t('methodDialog.nodata_desc')}
                 </p>
               </div>
             </div>
@@ -101,7 +101,7 @@ export const App: React.FC = () => {
                 onClick={() => setIsMethodOpen(false)}
                 className="rounded-lg bg-[#B8EE68] px-4 py-2 font-mono text-xs font-bold text-[#07100F] hover:bg-[#cbf58c] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] focus:ring-offset-2 focus:ring-offset-[#07100F] transition-all"
               >
-                Entendido
+                {t('methodDialog.close')}
               </button>
             </div>
           </div>

@@ -9,9 +9,10 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }) => {
   const { t, i18n } = useTranslation();
+  const isSpanish = Boolean(i18n?.language?.startsWith('es'));
 
   const toggleLanguage = () => {
-    const nextLang = i18n.language === 'es' ? 'en' : 'es';
+    const nextLang = isSpanish ? 'en' : 'es';
     i18n.changeLanguage(nextLang);
 
     if (typeof window !== 'undefined') {
@@ -111,10 +112,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
             type="button"
             onClick={toggleLanguage}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[#21312D] bg-[#0D1816] px-2.5 py-1.5 font-mono text-xs font-semibold text-[#EFF5ED] hover:bg-[#111E1B] hover:border-[#2A3F3A] transition-colors focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
-            aria-label={`${t('header.lang')}: ${i18n.language.toUpperCase()}`}
+            aria-label={`${t('header.lang')}: ${(i18n?.language || 'en').toUpperCase()}`}
           >
             <Globe className="h-3.5 w-3.5 text-[#93A39C]" aria-hidden="true" />
-            <span>{i18n.language === 'es' ? 'EN' : 'ES'}</span>
+            <span>{isSpanish ? 'EN' : 'ES'}</span>
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
@@ -44,6 +45,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   zoom = 2.0,
   capa = 'armonizado',
 }) => {
+  const { t, i18n } = useTranslation();
+  const isEn = !Boolean(i18n?.language?.startsWith('es'));
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -137,8 +141,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       const popup = new mapboxgl.Popup({ offset: 12, closeButton: false }).setHTML(`
         <div style="font-family: 'DM Mono', monospace; font-size: 11px; padding: 4px; color: #EFF5ED; background: #0D1816; border: 1px solid #21312D; border-radius: 6px;">
           <strong style="color: ${color};">${h.sensor.toUpperCase()} · ${h.province}</strong><br/>
-          <span>T. Brillo: <b>${h.brightness} K</b></span><br/>
-          <span style="color: #93A39C; font-size: 9px;">NASA FIRMS S-NPP Calibrado</span>
+          <span>${isEn ? 'Brightness Temp:' : 'T. Brillo:'} <b>${h.brightness} K</b></span><br/>
+          <span style="color: #93A39C; font-size: 9px;">${isEn ? 'NASA FIRMS S-NPP Calibrated' : 'NASA FIRMS S-NPP Calibrado'}</span>
         </div>
       `);
 
@@ -277,9 +281,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-title font-bold text-[#EFF5ED]">Globo Terráqueo 3D</span>
+              <span className="font-title font-bold text-[#EFF5ED]">{t('globe.title')}</span>
               <span className="rounded bg-[#B8EE68]/15 px-2 py-0.5 font-mono text-[9px] font-bold text-[#B8EE68]">
-                Mapbox Satellite · NASA Blue Marble
+                {t('globe.badge')}
               </span>
             </div>
           </div>
@@ -296,7 +300,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                 : 'text-[#93A39C] hover:text-[#EFF5ED]'
             }`}
           >
-            Armonizado
+            {t('zone.harmonized')}
           </button>
           <button
             type="button"
@@ -328,7 +332,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             type="button"
             onClick={() => setIsSpinning((prev) => !prev)}
             aria-pressed={isSpinning}
-            title={isSpinning ? 'Pausar rotación automática' : 'Reanudar rotación automática'}
+            title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-mono transition-colors ${
               isSpinning
                 ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40'
@@ -336,13 +340,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             }`}
           >
             <RotateCw className="h-3 w-3" />
-            <span className="hidden sm:inline">Giro</span>
+            <span className="hidden sm:inline">{t('globe.spin')}</span>
           </button>
 
           <button
             type="button"
             onClick={handleResetView}
-            title="Centrar en Argentina y Cono Sur"
+            title={t('globe.recenter')}
             className="rounded-md border border-[#21312D] bg-[#111E1B] p-1 text-[#93A39C] hover:text-[#EFF5ED]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -351,7 +355,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           <button
             type="button"
             onClick={() => setIsFullscreen((prev) => !prev)}
-            title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            title={isFullscreen ? (isEn ? 'Exit fullscreen' : 'Salir de pantalla completa') : (isEn ? 'Fullscreen' : 'Pantalla completa')}
             className="rounded-md border border-[#21312D] bg-[#111E1B] p-1 text-[#93A39C] hover:text-[#EFF5ED]"
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -371,10 +375,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                 <Key className="h-6 w-6" />
               </div>
 
-              <h3 className="font-title text-base font-bold text-[#EFF5ED]">Token de Mapbox GL JS</h3>
+              <h3 className="font-title text-base font-bold text-[#EFF5ED]">{t('globe.tokenTitle')}</h3>
               <p className="mt-2 text-xs text-[#93A39C] leading-relaxed">
-                El globo terráqueo 3D utiliza texturas satelitales fotorrealistas de Mapbox / NASA. Podés
-                ingresar tu token público a continuación o guardarlo en <code className="text-[#B8EE68]">.env</code> como <code className="text-[#B8EE68]">VITE_MAPBOX_ACCESS_TOKEN</code>.
+                {t('globe.tokenDesc')}
               </p>
 
               {hasError && (
@@ -397,19 +400,19 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                   disabled={!manualTokenInput.trim()}
                   className="rounded-lg bg-[#B8EE68] px-4 py-2 font-mono text-xs font-bold text-[#07100F] transition-colors hover:bg-[#cbf58c] disabled:opacity-50"
                 >
-                  Inicializar Globo 3D
+                  {t('globe.initBtn')}
                 </button>
               </form>
 
               <div className="mt-4 border-t border-[#21312D] pt-3 text-[11px] text-[#93A39C] flex items-center justify-between">
-                <span>¿No tenés token?</span>
+                <span>{t('globe.noToken')}</span>
                 <a
                   href="https://account.mapbox.com/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[#B8EE68] hover:underline"
                 >
-                  <span>Cuenta gratuita Mapbox</span>
+                  <span>{t('globe.freeAccount')}</span>
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -469,7 +472,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
         {/* Atribución oficial NASA Blue Marble */}
         <div className="absolute bottom-2 left-3 z-10 rounded border border-[#21312D] bg-[#07100F]/85 px-2 py-0.5 font-mono text-[9px] text-[#93A39C] backdrop-blur-md">
-          Base: <span className="text-[#EFF5ED]">NASA Earth Observatory / Blue Marble</span> · Mapbox GL
+          {t('globe.attribution')}
         </div>
       </div>
     </div>

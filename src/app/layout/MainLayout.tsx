@@ -21,16 +21,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   onOpenMethod,
   onOpenSatellites,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [selectedZone, setSelectedZone] = useState<ZoneItem>(PROVINCIAS_ARG[0]); // Argentina por defecto
   const [capa, setCapa] = useState<'armonizado' | 'modis' | 'viirs'>('armonizado');
+
+  const currentMonthName = Boolean(i18n?.language?.startsWith('es')) ? 'Septiembre' : 'September';
 
   // Datos dinámicos contextuales según la provincia seleccionada
   const getZoneAnomalyData = (zoneId: string) => {
     switch (zoneId) {
       case 'cordoba':
         return {
-          mes: 'Septiembre',
+          mes: currentMonthName,
           valor: 1845,
           mediana: 920,
           p25: 410,
@@ -39,7 +41,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         };
       case 'corrientes':
         return {
-          mes: 'Septiembre',
+          mes: currentMonthName,
           valor: 2310,
           mediana: 1400,
           p25: 750,
@@ -48,7 +50,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         };
       case 'entre-rios':
         return {
-          mes: 'Septiembre',
+          mes: currentMonthName,
           valor: 980,
           mediana: 1050,
           p25: 520,
@@ -57,7 +59,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         };
       case 'chubut':
         return {
-          mes: 'Septiembre',
+          mes: currentMonthName,
           valor: 35,
           mediana: 90,
           p25: 40,
@@ -66,7 +68,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         };
       default: // Nacional 'arg' u otras
         return {
-          mes: 'Septiembre',
+          mes: currentMonthName,
           valor: 14250,
           mediana: 8900,
           p25: 5200,
@@ -118,7 +120,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 className="inline-flex items-center gap-2 rounded-lg border border-[#B8EE68]/30 bg-[#B8EE68]/10 px-3.5 py-2 font-mono text-xs font-semibold text-[#B8EE68] hover:bg-[#B8EE68]/20 transition-all focus:outline-none focus:ring-2 focus:ring-[#B8EE68]"
               >
                 <Orbit className="h-4 w-4" />
-                <span>Explorar Satélites en 3D (NASA GLB)</span>
+                <span>{t('hero.satelliteCta')}</span>
               </button>
             )}
           </div>
@@ -218,7 +220,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       >
         <Info className="h-5 w-5 shrink-0 text-[#68D9D0] mt-0.5" aria-hidden="true" />
         <p className="leading-relaxed">
-          <strong className="font-semibold text-[#EFF5ED]">Nota científica: </strong>
+          <strong className="font-semibold text-[#EFF5ED]">{t('hero.scientificNote')} </strong>
           {t('hero.disclaimer')}
         </p>
       </aside>

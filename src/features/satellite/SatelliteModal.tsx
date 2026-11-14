@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SatelliteViewer } from './SatelliteViewer';
 import { X, Orbit } from 'lucide-react';
 
@@ -8,6 +9,7 @@ interface SatelliteModalProps {
 }
 
 export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
   // Cerrar al presionar Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,10 +51,10 @@ export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose 
             </div>
             <div>
               <h2 id="satellite-modal-title" className="text-sm font-bold tracking-tight">
-                Flota Satelital NASA (MODIS & VIIRS)
+                {t('satelliteModal.title')}
               </h2>
               <p className="text-[11px] text-slate-400">
-                Observación tridimensional de los instrumentos utilizados en el monitoreo de focos de calor
+                {t('satelliteModal.subtitle')}
               </p>
             </div>
           </div>
@@ -60,7 +62,7 @@ export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar visor 3D"
+            aria-label={t('satelliteModal.close')}
             className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
           >
             <X className="h-5 w-5" />

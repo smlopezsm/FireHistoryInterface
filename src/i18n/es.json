@@ -16,7 +16,142 @@
     "headline": "El fuego deja huellas. Hagamos que cuenten.",
     "subtitle": "Armonización y exploración científica de 24 años de observaciones térmicas satelitales en Argentina para distinguir variabilidad climática de incendios anómalos.",
     "methodCta": "¿Cómo se calcula la armonización?",
+    "satelliteCta": "Explorar Satélites en 3D (NASA GLB)",
     "disclaimer": "Nota científica: Un punto caliente (hot spot) es una anomalía térmica detectada por satélite en una celda de observación, no necesariamente un incendio individual o su perímetro activo. Antes de 2012, las estimaciones calibradas armonizan la escala de MODIS a VIIRS."
+  },
+  "methodDialog": {
+    "title": "Método de Armonización (MODIS y VIIRS)",
+    "p1_strong": "Armonización MODIS y VIIRS:",
+    "p1": "Para permitir comparar 24 años continuos de historia satelital en Argentina (2000 hasta hoy), los conteos del sensor MODIS (1 km) se armonizan estadísticamente a la escala del sensor VIIRS (375 m).",
+    "estimated_title": "Período 2000–2012 (Datos Estimados):",
+    "estimated_desc": "Antes del lanzamiento de Suomi NPP en 2012, solo operaba el instrumento MODIS. Los valores mensuales de esos años son estimaciones calibradas acompañadas de su intervalo de predicción.",
+    "nodata_strong": "Sin dato ≠ Cero:",
+    "nodata_desc": "Si un satélite no sobrevoló la zona o no estaba en operación, la celda se clasifica rigurosamente como 'sin dato' y jamás como cero focos.",
+    "close": "Entendido"
+  },
+  "zone": {
+    "title": "Selección de Área",
+    "ignBadge": "IGN Oficial",
+    "province": "Provincia",
+    "draw": "Dibujar",
+    "latlon": "Lat/Lon",
+    "territoryLabel": "Jurisdicción o Territorio:",
+    "sensorScale": "Sensor / Escala de Análisis:",
+    "harmonized": "Armonizado",
+    "modis": "MODIS",
+    "viirs": "VIIRS",
+    "allCountry": "Argentina (Completa)",
+    "national": "Nacional"
+  },
+  "anomaly": {
+    "label": "Anomalía Mensual",
+    "criticalBadge": "Crítica ▲▲",
+    "criticalTitle": "Mucho más fuego que lo normal para {{month}}",
+    "criticalSub": "Actividad crítica muy por encima del percentil 75",
+    "elevatedBadge": "Elevada ▲",
+    "elevatedTitle": "Más fuego que lo normal para {{month}}",
+    "elevatedSub": "Por encima de la mediana histórica",
+    "normalBadge": "Normal ●",
+    "normalTitle": "Dentro de lo normal para {{month}}",
+    "normalSub": "Comportamiento en rango intercuartílico típico",
+    "lowBadge": "Baja ▼",
+    "lowTitle": "Menos fuego que lo normal para {{month}}",
+    "lowSub": "Por debajo de la mediana histórica",
+    "minimumBadge": "Mínima ▼▼",
+    "minimumTitle": "Mucho menos fuego que lo normal para {{month}}",
+    "minimumSub": "Mínimos históricos de focos térmicos",
+    "noDataBadge": "Sin dato",
+    "noDataTitle": "No hay suficientes años para comparar",
+    "noDataSub": "Se requiere serie histórica mínima para evaluar anomalía",
+    "spotsMonth": "Focos mes:",
+    "median": "Mediana histórica:",
+    "range": "Rango habitual:"
+  },
+  "calendar": {
+    "title": "Calendario Armonizado mes × año",
+    "badge": "2000 → hoy",
+    "subtitle": "Focos en",
+    "viewMatrix": "Ver Matriz",
+    "viewTable": "Ver Tabla",
+    "estimatedLegend": "Datos Estimados (Calibración MODIS)",
+    "observedLegend": "Datos Observados (VIIRS S-NPP)",
+    "noDataLegend": "Sin dato",
+    "months": ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+  },
+  "downloads": {
+    "title": "Exportación de Datos",
+    "subtitle": "CSV estructurado con procedencia y metadatos",
+    "calendarBtn": "Calendario CSV",
+    "spotsBtn": "Focos CSV"
+  },
+  "globe": {
+    "title": "Globo Terráqueo 3D",
+    "badge": "Mapbox Satellite · NASA Blue Marble",
+    "spin": "Giro",
+    "pauseSpin": "Pausar rotación automática",
+    "resumeSpin": "Reanudar rotación automática",
+    "recenter": "Centrar en Argentina y Cono Sur",
+    "tokenTitle": "Token de Mapbox GL JS",
+    "tokenDesc": "El globo terráqueo 3D utiliza texturas satelitales fotorrealistas de Mapbox / NASA. Podés ingresar tu token público a continuación o guardarlo en .env como VITE_MAPBOX_ACCESS_TOKEN.",
+    "initBtn": "Inicializar Globo 3D",
+    "noToken": "¿No tenés token?",
+    "freeAccount": "Cuenta gratuita Mapbox",
+    "attribution": "Base: NASA Earth Observatory / Blue Marble · Mapbox GL",
+    "brightTemp": "T. Brillo:",
+    "calibrated": "NASA FIRMS S-NPP Calibrado"
+  },
+  "schematic": {
+    "missionBadge": "Lámina de Misión · Arquitectura Orbital",
+    "missionTag": "NASA EOS & JPSS",
+    "title": "Anatomía del Instrumento y Plataforma Satelital",
+    "subtitle": "Explorá cómo la instrumentación orbital detecta anomalías térmicas y armoniza 24 años de historia.",
+    "disassemble": "Desarmar Subsistemas",
+    "assemble": "Rearmar Nave",
+    "inspect3d": "Inspeccionar 3D NASA",
+    "altitude": "Altitud Orbital",
+    "passTime": "Hora de Paso",
+    "swath": "Ancho de Barrido",
+    "resolution": "Resolución de Detección",
+    "viewDisassembled": "Vista: Despiece Técnico",
+    "viewAssembled": "Vista: Ensamblado Orbital",
+    "sourceTitle": "NASA Space Apps Challenge 2026: Harmonization of MODIS and VIIRS Hot Spots",
+    "subsystems": {
+      "payload": {
+        "name": "Carga Útil (Sensor Óptico)",
+        "specs": "MODIS: 36 bandas (1 km) · VIIRS: 22 bandas (375 m)",
+        "desc": "Radiómetro electro-óptico con detector infrarrojo criogénico y espejo escáner para medir radiancia térmica y detectar puntos calientes activos."
+      },
+      "solar": {
+        "name": "Generación Solar y Baterías",
+        "specs": "Panel articulado de GaAs · ~2.5 - 3.0 kW",
+        "desc": "Alas solares articuladas orientables que siguen al sol durante la fase diurna y recargan baterías de Ni-H2 / Li-Ion para los eclipses orbitales."
+      },
+      "thermal": {
+        "name": "Control Térmico (MLI & Radiador)",
+        "specs": "Mantas doradas MLI · Enfriador pasivo < 85 K",
+        "desc": "Aislamiento multicapa (MLI) de Kapton aluminizado y radiadores de aletas que disipan el calor al espacio profundo para enfriar los detectores infrarrojos."
+      },
+      "comms": {
+        "name": "Comunicaciones y Telemetría",
+        "specs": "Antena parabólica banda X & S · Enlace TDRSS",
+        "desc": "Transmisión continua de paquetes de telemetría científica y comandos directos a estaciones terrenas y satélites de retransmisión."
+      },
+      "aocs": {
+        "name": "Actitud y Navegación (AOCS)",
+        "specs": "Star Trackers dobles · Ruedas de inercia de 3 ejes",
+        "desc": "Sensores estelares y giroscopios que mantienen el apuntamiento nadir de los instrumentos hacia la superficie terrestre con precisión milimétrica."
+      },
+      "propulsion": {
+        "name": "Propulsión Orbital",
+        "specs": "Propulsores de hidracina (Monopropelente)",
+        "desc": "Motores de control de órbita utilizados para compensar el frenado atmosférico y conservar la hora solar de cruce ecuatorial (10:30 AM / 13:30 PM)."
+      }
+    }
+  },
+  "satelliteModal": {
+    "title": "Flota Satelital NASA (MODIS & VIIRS)",
+    "subtitle": "Observación tridimensional de los instrumentos utilizados en el monitoreo de focos de calor",
+    "close": "Cerrar visor 3D"
   },
   "layout": {
     "leftPanel": "Zona y mapa",

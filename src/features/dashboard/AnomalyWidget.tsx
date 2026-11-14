@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { CategoriaAnomalia } from '../../api/types';
 import { AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
@@ -21,13 +22,15 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
   p75,
   categoria,
 }) => {
+  const { t, i18n } = useTranslation();
+
   const getCategoryConfig = () => {
     switch (categoria) {
       case 'muy_por_encima':
         return {
-          title: `Mucho más fuego que lo normal para ${mes}`,
-          subtitle: 'Actividad crítica muy por encima del percentil 75',
-          badge: 'Crítica ▲▲',
+          title: t('anomaly.criticalTitle', { month: mes }),
+          subtitle: t('anomaly.criticalSub'),
+          badge: t('anomaly.criticalBadge'),
           color: '#FF6759',
           bg: 'bg-[#FF6759]/10',
           border: 'border-[#FF6759]/40',
@@ -35,9 +38,9 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         };
       case 'por_encima':
         return {
-          title: `Más fuego que lo normal para ${mes}`,
-          subtitle: 'Por encima de la mediana histórica',
-          badge: 'Elevada ▲',
+          title: t('anomaly.elevatedTitle', { month: mes }),
+          subtitle: t('anomaly.elevatedSub'),
+          badge: t('anomaly.elevatedBadge'),
           color: '#FF9C55',
           bg: 'bg-[#FF9C55]/10',
           border: 'border-[#FF9C55]/40',
@@ -45,9 +48,9 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         };
       case 'normal':
         return {
-          title: `Dentro de lo normal para ${mes}`,
-          subtitle: 'Comportamiento en rango intercuartílico típico',
-          badge: 'Normal ●',
+          title: t('anomaly.normalTitle', { month: mes }),
+          subtitle: t('anomaly.normalSub'),
+          badge: t('anomaly.normalBadge'),
           color: '#93A39C',
           bg: 'bg-[#93A39C]/10',
           border: 'border-[#21312D]',
@@ -55,9 +58,9 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         };
       case 'por_debajo':
         return {
-          title: `Menos fuego que lo normal para ${mes}`,
-          subtitle: 'Por debajo de la mediana histórica',
-          badge: 'Baja ▼',
+          title: t('anomaly.lowTitle', { month: mes }),
+          subtitle: t('anomaly.lowSub'),
+          badge: t('anomaly.lowBadge'),
           color: '#68D9D0',
           bg: 'bg-[#68D9D0]/10',
           border: 'border-[#68D9D0]/40',
@@ -65,9 +68,9 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         };
       case 'muy_por_debajo':
         return {
-          title: `Mucho menos fuego que lo normal para ${mes}`,
-          subtitle: 'Mínimos históricos de focos térmicos',
-          badge: 'Mínima ▼▼',
+          title: t('anomaly.minimumTitle', { month: mes }),
+          subtitle: t('anomaly.minimumSub'),
+          badge: t('anomaly.minimumBadge'),
           color: '#3D786E',
           bg: 'bg-[#3D786E]/15',
           border: 'border-[#3D786E]/40',
@@ -75,9 +78,9 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         };
       default:
         return {
-          title: 'No hay suficientes años para comparar',
-          subtitle: 'Se requiere serie histórica mínima para evaluar anomalía',
-          badge: 'Sin dato',
+          title: t('anomaly.noDataTitle'),
+          subtitle: t('anomaly.noDataSub'),
+          badge: t('anomaly.noDataBadge'),
           color: '#93A39C',
           bg: 'bg-[#111E1B]',
           border: 'border-[#21312D]',
@@ -87,11 +90,12 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
   };
 
   const config = getCategoryConfig();
+  const locale = Boolean(i18n?.language?.startsWith('es')) ? 'es-AR' : 'en-US';
 
   return (
     <div
       role="region"
-      aria-label="Diagnóstico de anomalía térmica"
+      aria-label={t('anomaly.label')}
       className={`rounded-xl border ${config.border} ${config.bg} p-4 transition-all duration-300`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -102,7 +106,7 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] uppercase tracking-wider text-[#93A39C]">
-                Anomalía Mensual · {zonaNombre}
+                {t('anomaly.label')} · {zonaNombre}
               </span>
               <span
                 className="rounded px-2 py-0.5 font-mono text-[10px] font-bold"
@@ -120,17 +124,17 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
 
       <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs border-t border-[#21312D]/60 pt-2.5">
         <div>
-          <span className="text-[#93A39C]">Focos mes: </span>
-          <span className="font-bold text-[#EFF5ED] text-sm">{valor.toLocaleString('es-AR')}</span>
+          <span className="text-[#93A39C]">{t('anomaly.spotsMonth')} </span>
+          <span className="font-bold text-[#EFF5ED] text-sm">{valor.toLocaleString(locale)}</span>
         </div>
         <div className="text-[#93A39C]">·</div>
         <div>
-          <span className="text-[#93A39C]">Mediana histórica: </span>
-          <span className="font-semibold text-[#EFF5ED]">{mediana.toLocaleString('es-AR')}</span>
+          <span className="text-[#93A39C]">{t('anomaly.median')} </span>
+          <span className="font-semibold text-[#EFF5ED]">{mediana.toLocaleString(locale)}</span>
         </div>
         <div className="text-[#93A39C]">·</div>
         <div className="text-[11px] text-[#93A39C]">
-          Rango habitual: <span className="text-[#EFF5ED]">{p25} – {p75}</span>
+          {t('anomaly.range')} <span className="text-[#EFF5ED]">{p25} – {p75}</span>
         </div>
       </div>
     </div>

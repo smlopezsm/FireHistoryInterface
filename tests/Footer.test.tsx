@@ -12,8 +12,10 @@ describe('Footer Component & Metadata (User Story 2)', () => {
     );
 
     expect(screen.getByText(/NASA FIRMS/i)).toBeInTheDocument();
-    expect(screen.getByText(/Instituto Geográfico Nacional/i)).toBeInTheDocument();
-    expect(screen.getByText(/Versión de datos:/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/National Geographic Institute|Instituto Geográfico Nacional/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Data version:|Versión de datos:/i)).toBeInTheDocument();
   });
 
   it('renders method notice regarding pre-2012 estimated data', () => {
@@ -24,7 +26,9 @@ describe('Footer Component & Metadata (User Story 2)', () => {
     );
 
     expect(
-      screen.getByText(/Antes de 2012 los datos provienen del satélite MODIS/i)
+      screen.getByText(
+        /Prior to 2012, data originates from MODIS|Antes de 2012 los datos provienen del satélite MODIS/i
+      )
     ).toBeInTheDocument();
   });
 });

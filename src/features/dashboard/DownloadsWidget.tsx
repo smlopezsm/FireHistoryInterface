@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, FileSpreadsheet, Check } from 'lucide-react';
 
 interface DownloadsWidgetProps {
@@ -7,6 +8,7 @@ interface DownloadsWidgetProps {
 }
 
 export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, capa }) => {
+  const { t } = useTranslation();
   const [downloading, setDownloading] = useState<string | null>(null);
 
   const handleDownload = (tipo: 'calendario' | 'focos') => {
@@ -16,23 +18,23 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
     const timestamp = new Date().toISOString().slice(0, 10);
     const headers =
       tipo === 'calendario'
-        ? '# FuegoContinuo · NASA Space Apps Challenge 2026\n# Fuente: NASA FIRMS (MODIS & VIIRS) | Limites: IGN\n# Filtros: Zona=' +
+        ? '# FuegoContinuo · NASA Space Apps Challenge 2026\n# Source: NASA FIRMS (MODIS & VIIRS) | Boundaries: IGN\n# Filters: Zone=' +
           zonaNombre +
-          ' | Capa=' +
+          ' | Layer=' +
           capa +
-          ' | Fecha=' +
+          ' | Date=' +
           timestamp +
-          '\nanio,mes,focos_armonizados,modis_conteo,viirs_conteo,estado,frac_estimada,confianza\n'
-        : '# FuegoContinuo · NASA Space Apps Challenge 2026\n# Puntos Calientes Activos (Hot Spots) | Escala VIIRS S-NPP\n# Zona=' +
+          '\nyear,month,harmonized_spots,modis_count,viirs_count,status,estimated_frac,confidence\n'
+        : '# FuegoContinuo · NASA Space Apps Challenge 2026\n# Active Thermal Hot Spots | VIIRS S-NPP Scale\n# Zone=' +
           zonaNombre +
-          ' | Capa=' +
+          ' | Layer=' +
           capa +
-          '\nlatitud,longitud,fecha,hora_utc,satelite,instrumento,brillo_kelvin,potencia_mw,confianza\n';
+          '\nlatitude,longitude,date,utc_time,satellite,instrument,brightness_kelvin,power_mw,confidence\n';
 
     const sampleRow =
       tipo === 'calendario'
-        ? '2020,08,4812,1720,4600,observado,0.0,alta\n2006,08,359,120,null,estimado,1.0,media\n'
-        : '-31.42,-64.18,2024-09-15,17:35,Suomi-NPP,VIIRS,342.5,48.2,alta\n-31.55,-64.32,2024-09-15,14:10,Aqua,MODIS,328.0,32.0,nominal\n';
+        ? '2020,08,4812,1720,4600,observed,0.0,high\n2006,08,359,120,null,estimated,1.0,medium\n'
+        : '-31.42,-64.18,2024-09-15,17:35,Suomi-NPP,VIIRS,342.5,48.2,high\n-31.55,-64.32,2024-09-15,14:10,Aqua,MODIS,328.0,32.0,nominal\n';
 
     const blob = new Blob([headers + sampleRow], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -51,14 +53,14 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
   return (
     <div
       role="region"
-      aria-label="Descarga de datos tabulares"
+      aria-label={t('downloads.title')}
       className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-3 text-[#EFF5ED]"
     >
       <div className="flex items-center gap-2">
         <FileSpreadsheet className="h-4 w-4 text-[#B8EE68]" />
         <div>
-          <span className="font-mono text-xs font-bold text-[#EFF5ED]">Exportación de Datos</span>
-          <p className="text-[10px] text-[#93A39C]">CSV estructurado con procedencia y metadatos</p>
+          <span className="font-mono text-xs font-bold text-[#EFF5ED]">{t('downloads.title')}</span>
+          <p className="text-[10px] text-[#93A39C]">{t('downloads.subtitle')}</p>
         </div>
       </div>
 
@@ -74,7 +76,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
           ) : (
             <Download className="h-3.5 w-3.5 text-[#B8EE68]" />
           )}
-          <span>Calendario CSV</span>
+          <span>{t('downloads.calendarBtn')}</span>
         </button>
 
         <button
@@ -88,7 +90,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
           ) : (
             <Download className="h-3.5 w-3.5 text-[#FF9C55]" />
           )}
-          <span>Focos CSV</span>
+          <span>{t('downloads.spotsBtn')}</span>
         </button>
       </div>
     </div>

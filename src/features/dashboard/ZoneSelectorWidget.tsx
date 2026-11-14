@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, Pentagon, Compass } from 'lucide-react';
 
 export interface ZoneItem {
@@ -33,19 +34,22 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
   capa,
   onChangeCapa,
 }) => {
+  const { t, i18n } = useTranslation();
+  const isEn = !Boolean(i18n?.language?.startsWith('es'));
+
   return (
     <div
       role="region"
-      aria-label="Selector de zona geográfica y sensor"
+      aria-label={t('zone.title')}
       className="flex flex-col gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 text-[#EFF5ED]"
     >
       {/* Selector de Región / Provincia y Modos */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-[#B8EE68]" />
-          <span className="font-title text-sm font-bold text-[#EFF5ED]">Selección de Área</span>
+          <span className="font-title text-sm font-bold text-[#EFF5ED]">{t('zone.title')}</span>
           <span className="font-mono text-[10px] text-[#93A39C] rounded bg-[#111E1B] border border-[#21312D] px-1.5 py-0.5">
-            IGN Oficial
+            {t('zone.ignBadge')}
           </span>
         </div>
 
@@ -55,23 +59,23 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
             type="button"
             className="flex items-center gap-1 rounded bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40 px-2 py-0.5 font-bold"
           >
-            <span>Provincia</span>
+            <span>{t('zone.province')}</span>
           </button>
           <button
             type="button"
             className="flex items-center gap-1 rounded bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D] px-2 py-0.5"
-            title="Herramienta de dibujo de polígono (Terra Draw)"
+            title="Terra Draw polygon tool"
           >
             <Pentagon className="h-3 w-3" />
-            <span>Dibujar</span>
+            <span>{t('zone.draw')}</span>
           </button>
           <button
             type="button"
             className="flex items-center gap-1 rounded bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D] px-2 py-0.5"
-            title="Ingreso manual de coordenadas"
+            title="Manual coordinates input"
           >
             <Compass className="h-3 w-3" />
-            <span>Lat/Lon</span>
+            <span>{t('zone.latlon')}</span>
           </button>
         </div>
       </div>
@@ -81,7 +85,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
         {/* Desplegable de provincia */}
         <div>
           <label htmlFor="province-select" className="block font-mono text-[11px] text-[#93A39C] mb-1">
-            Jurisdicción o Territorio:
+            {t('zone.territoryLabel')}
           </label>
           <select
             id="province-select"
@@ -92,18 +96,22 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
             }}
             className="w-full rounded-lg border border-[#21312D] bg-[#111E1B] px-3 py-2 font-mono text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none"
           >
-            {PROVINCIAS_ARG.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.name} — {z.region}
-              </option>
-            ))}
+            {PROVINCIAS_ARG.map((z) => {
+              const displayName = z.id === 'arg' && isEn ? t('zone.allCountry') : z.name;
+              const displayRegion = z.id === 'arg' && isEn ? t('zone.national') : z.region;
+              return (
+                <option key={z.id} value={z.id}>
+                  {displayName} — {displayRegion}
+                </option>
+              );
+            })}
           </select>
         </div>
 
         {/* Conmutador de sensor (Armonizado / MODIS / VIIRS) */}
         <div>
           <label className="block font-mono text-[11px] text-[#93A39C] mb-1">
-            Sensor / Escala de Análisis:
+            {t('zone.sensorScale')}
           </label>
           <div className="grid grid-cols-3 gap-1 rounded-lg border border-[#21312D] bg-[#111E1B] p-1 font-mono text-[11px]">
             <button
@@ -115,7 +123,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
                   : 'text-[#93A39C] hover:text-[#EFF5ED]'
               }`}
             >
-              Armonizado
+              {t('zone.harmonized')}
             </button>
             <button
               type="button"
