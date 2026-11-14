@@ -50,4 +50,54 @@ describe('GloboTerraqueo 3D Component', () => {
     fireEvent.click(rotateBtn);
     expect(rotateBtn).toHaveAttribute('aria-pressed', 'false');
   });
+
+  it('respects prefers-reduced-motion and initializes auto-rotation paused', () => {
+    const originalMatchMedia = window.matchMedia;
+    try {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('prefers-reduced-motion: reduce'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      render(<GloboTerraqueo />);
+      const rotateBtn = screen.getByTitle(/Start auto-rotation|Resume auto-rotation|Reanudar rotación/i);
+      expect(rotateBtn).toHaveAttribute('aria-pressed', 'false');
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
+  it('configures mapbox Map with cooperativeGestures: true upon initialization', async () => {
+    const mapboxgl = (await import('mapbox-gl')).default;
+    render(<GloboTerraqueo />);
+
+    const tokenInput = screen.getByPlaceholderText('pk.eyJ1Ijoi...');
+    fireEvent.change(tokenInput, { target: { value: 'pk.mocked-valid-token' } });
+    const initBtn = screen.getByRole('button', { name: /Initialize 3D Globe|Inicializar Globo 3D/i });
+    fireEvent.click(initBtn);
+
+    expect(mapboxgl.Map).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cooperativeGestures: true,
+      })
+    );
+  });
+
+  it('ensures control buttons meet minimum touch target size classes', () => {
+    render(<GloboTerraqueo />);
+
+    const rotateBtn = screen.getByTitle(/auto-rotation|rotación automática/i);
+    const recenterBtn = screen.getByTitle(/Recenter on Argentina|Centrar en Argentina/i);
+    const fullscreenBtn = screen.getByTitle(/Fullscreen|Pantalla completa/i);
+
+    expect(rotateBtn.className).toContain('min-h-[36px]');
+    expect(recenterBtn.className).toContain('min-h-[36px]');
+    expect(fullscreenBtn.className).toContain('min-h-[36px]');
+  });
 });

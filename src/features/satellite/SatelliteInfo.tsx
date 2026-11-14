@@ -1,13 +1,13 @@
-import React from 'react';
-import type { SatelliteData } from '../../data/satellites';
-import { ExternalLink, Compass, ShieldCheck, Flame, Cpu } from 'lucide-react';
+import React from "react";
+import type { SatelliteData } from "../../data/satellites";
+import { ExternalLink, Compass, ShieldCheck, Flame, Cpu } from "lucide-react";
 
 interface SatelliteInfoProps {
   satellite: SatelliteData;
 }
 
 export const SatelliteInfo: React.FC<SatelliteInfoProps> = ({ satellite }) => {
-  const isViirs = satellite.instrument === 'VIIRS';
+  const isViirs = satellite.instrument === "VIIRS";
 
   return (
     <div className="flex flex-col gap-4 text-[#EFF5ED]">
@@ -21,14 +21,16 @@ export const SatelliteInfo: React.FC<SatelliteInfoProps> = ({ satellite }) => {
             <span
               className={`rounded-full px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wider ${
                 isViirs
-                  ? 'border border-[#FF9C55]/40 bg-[#FF9C55]/15 text-[#FF9C55]'
-                  : 'border border-[#68D9D0]/40 bg-[#68D9D0]/15 text-[#68D9D0]'
+                  ? "border border-[#FF9C55]/40 bg-[#FF9C55]/15 text-[#FF9C55]"
+                  : "border border-[#68D9D0]/40 bg-[#68D9D0]/15 text-[#68D9D0]"
               }`}
             >
               {satellite.instrument}
             </span>
           </div>
-          <p className="mt-0.5 text-xs font-sans text-[#93A39C]">{satellite.agency}</p>
+          <p className="mt-0.5 text-xs font-sans text-[#93A39C]">
+            {satellite.agency}
+          </p>
         </div>
 
         <div className="flex items-center gap-1.5 rounded-full border border-[#B8EE68]/40 bg-[#B8EE68]/15 px-2.5 py-1 font-mono text-xs font-medium text-[#B8EE68]">
@@ -60,8 +62,12 @@ export const SatelliteInfo: React.FC<SatelliteInfoProps> = ({ satellite }) => {
             <Cpu className="h-3 w-3 text-[#68D9D0]" />
             <span>Instrumento</span>
           </div>
-          <span className="mt-1 font-mono text-xs font-bold text-[#EFF5ED]">{satellite.instrument}</span>
-          <span className="text-xs text-[#687771]">{satellite.instrumentFullName}</span>
+          <span className="mt-1 font-mono text-xs font-bold text-[#EFF5ED]">
+            {satellite.instrument}
+          </span>
+          <span className="text-xs text-[#93A39C]">
+            {satellite.instrumentFullName}
+          </span>
         </div>
 
         <div className="flex flex-col rounded-lg border border-[#21312D] bg-[#111E1B] p-2.5">
@@ -69,8 +75,12 @@ export const SatelliteInfo: React.FC<SatelliteInfoProps> = ({ satellite }) => {
             <Compass className="h-3 w-3 text-[#B8EE68]" />
             <span>Órbita & Altitud</span>
           </div>
-          <span className="mt-1 font-mono text-xs font-bold text-[#EFF5ED]">{satellite.altitude}</span>
-          <span className="text-xs text-[#687771]">{satellite.equatorCrossing}</span>
+          <span className="mt-1 font-mono text-xs font-bold text-[#EFF5ED]">
+            {satellite.altitude}
+          </span>
+          <span className="text-xs text-[#93A39C]">
+            {satellite.equatorCrossing}
+          </span>
         </div>
       </div>
 

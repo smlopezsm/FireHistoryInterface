@@ -71,4 +71,57 @@ describe('App Shell Layout & i18n (English Default)', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('closes method dialog with Escape key and restores focus to trigger button', () => {
+    render(
+      <Providers>
+        <App />
+      </Providers>
+    );
+
+    const methodButton = screen.getByRole('button', { name: /How is it calculated\?/i });
+    methodButton.focus();
+    expect(document.activeElement).toBe(methodButton);
+
+    fireEvent.click(methodButton);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Presionar Escape
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(methodButton);
+  });
+
+  it('contains focus within method dialog when pressing Tab', () => {
+    render(
+      <Providers>
+        <App />
+      </Providers>
+    );
+
+    const methodButton = screen.getByRole('button', { name: /How is it calculated\?/i });
+    fireEvent.click(methodButton);
+
+    const dialog = screen.getByRole('dialog');
+    const buttons = dialog.querySelectorAll('button');
+    const topCloseBtn = buttons[0];
+    const understandBtn = buttons[1];
+
+    // Focus starts at initial close button
+    topCloseBtn.focus();
+    expect(document.activeElement).toBe(topCloseBtn);
+
+    // Tab moves to bottom button
+    fireEvent.keyDown(window, { key: 'Tab' });
+    understandBtn.focus();
+
+    // Tab on last element wraps back to first element
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    // Escape closes dialog
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });

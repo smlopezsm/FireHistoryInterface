@@ -64,7 +64,11 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [isSpinning, setIsSpinning] = useState(true);
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const [isSpinning, setIsSpinning] = useState(!prefersReducedMotion);
   const [isUserInteracting, setIsUserInteracting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
@@ -171,6 +175,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         minZoom: 1,
         maxZoom: 14,
         antialias: true,
+        cooperativeGestures: true,
       });
 
       mapRef.current = map;
@@ -316,13 +321,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             onClick={() => setIsSpinning((prev) => !prev)}
             aria-pressed={isSpinning}
             title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+            className={`inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
               isSpinning
                 ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40'
                 : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
             }`}
           >
-            <RotateCw className="h-3 w-3" />
+            <RotateCw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t('globe.spin')}</span>
           </button>
 
@@ -330,7 +335,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             type="button"
             onClick={handleResetView}
             title={t('globe.recenter')}
-            className="rounded-md border border-[#21312D] bg-[#111E1B] p-1 text-[#93A39C] hover:text-[#EFF5ED]"
+            className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded-md border border-[#21312D] bg-[#111E1B] p-2 sm:p-1.5 text-[#93A39C] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -339,7 +344,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             type="button"
             onClick={() => setIsFullscreen((prev) => !prev)}
             title={isFullscreen ? (isEn ? 'Exit fullscreen' : 'Salir de pantalla completa') : (isEn ? 'Fullscreen' : 'Pantalla completa')}
-            className="rounded-md border border-[#21312D] bg-[#111E1B] p-1 text-[#93A39C] hover:text-[#EFF5ED]"
+            className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded-md border border-[#21312D] bg-[#111E1B] p-2 sm:p-1.5 text-[#93A39C] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
@@ -437,7 +442,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               type="button"
               onClick={() => mapRef.current?.zoomIn({ duration: 300 })}
               aria-label="Acercar mapa"
-              className="rounded p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED]"
+              className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -446,7 +451,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               type="button"
               onClick={() => mapRef.current?.zoomOut({ duration: 300 })}
               aria-label="Alejar mapa"
-              className="rounded p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED]"
+              className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
             >
               <Minus className="h-3.5 w-3.5" />
             </button>

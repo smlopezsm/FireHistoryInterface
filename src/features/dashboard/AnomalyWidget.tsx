@@ -73,10 +73,10 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
           title: t('anomaly.minimumTitle', { month: mes }),
           subtitle: t('anomaly.minimumSub'),
           badge: t('anomaly.minimumBadge'),
-          color: '#3D786E',
-          bg: 'bg-[#3D786E]/15',
-          border: 'border-[#3D786E]/40',
-          icon: <TrendingDown className="h-5 w-5 text-[#3D786E]" />,
+          color: '#4FA89B',
+          bg: 'bg-[#4FA89B]/10',
+          border: 'border-[#4FA89B]/40',
+          icon: <TrendingDown className="h-5 w-5 text-[#4FA89B]" />,
         };
       default:
         return {

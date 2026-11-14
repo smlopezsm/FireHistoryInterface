@@ -64,7 +64,7 @@ h1, h2, h3, h4, .font-title {
 }
 ::-webkit-scrollbar-thumb {
   background: #21312D;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #2A3F3A;

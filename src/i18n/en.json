@@ -2,6 +2,7 @@
   "header": {
     "title": "FuegoContinuo",
     "badge": "DEMO MODE · SAMPLE DATA",
+    "badgeShort": "DEMO · SAMPLE",
     "subtitle": "Harmonization of MODIS and VIIRS hot spots in Argentina (2000 → today).",
     "nav": {
       "explore": "Explore",
@@ -28,7 +29,8 @@
     "estimated_desc": "Before the launch of Suomi NPP in 2012, only the MODIS instrument was operating. Monthly values for those years are calibrated estimates accompanied by their prediction intervals.",
     "nodata_strong": "No data ≠ Zero:",
     "nodata_desc": "If a satellite did not fly over the area or was not operating, the cell is strictly classified as 'no data' and never as zero fires.",
-    "close": "Understood"
+    "close": "Understood",
+    "closeDialog": "Close explanation"
   },
   "zone": {
     "title": "Area Selection",

@@ -51,7 +51,11 @@ const CanvasLoader: React.FC = () => (
 
 export const SatelliteViewer: React.FC = () => {
   const [selectedId, setSelectedId] = useState<'terra' | 'aqua' | 'suomi'>('terra');
-  const [autoRotate, setAutoRotate] = useState(true);
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const [autoRotate, setAutoRotate] = useState(!prefersReducedMotion);
   const [retryKey, setRetryKey] = useState(0);
   const controlsRef = useRef<OrbitControlsImpl>(null);
 

@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
             >
               {t('footer.nasa')}
             </a>
-            <span className="text-[#687771]">·</span>
+            <span className="text-[#93A39C]/60">·</span>
             <a
               href="https://www.ign.gob.ar/"
               target="_blank"
@@ -32,7 +32,7 @@ export const Footer: React.FC = () => {
               {t('footer.ign')}
             </a>
           </div>
-          <p className="text-xs text-[#687771]">
+          <p className="text-xs text-[#93A39C]">
             {t('footer.methodNotice')}
           </p>
         </div>

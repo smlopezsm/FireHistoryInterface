@@ -16,6 +16,7 @@ colors:
   sensor-viirs: "#FF9C55"
   sensor-high: "#FF6759"
   sensor-mild: "#3D786E"
+  sensor-minimum: "#4FA89B"
 typography:
   display:
     fontFamily: "Manrope, -apple-system, BlinkMacSystemFont, sans-serif"

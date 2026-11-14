@@ -44,7 +44,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
                 {t('header.title')}
               </h1>
               <span className="rounded border border-[#21312D] bg-[#111E1B] px-2 py-0.5 font-mono text-xs text-[#93A39C]">
-                {t('header.badge')}
+                <span className="hidden sm:inline">{t('header.badge')}</span>
+                <span className="inline sm:hidden">{t('header.badgeShort', { defaultValue: 'DEMO' })}</span>
               </span>
             </div>
             <p className="hidden text-xs text-[#93A39C] sm:block">

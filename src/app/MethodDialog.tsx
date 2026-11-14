@@ -1,0 +1,97 @@
+import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { HelpCircle, X, ShieldAlert } from 'lucide-react';
+import { useDialogA11y } from './useDialogA11y';
+
+export interface MethodDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const MethodDialog: React.FC<MethodDialogProps> = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const { containerRef } = useDialogA11y({
+    isOpen,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  });
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="method-dialog-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+    >
+      <div className="w-full max-w-lg rounded-xl border border-[#21312D] bg-[#0D1816] p-6 text-[#EFF5ED] shadow-[0_12px_32px_rgba(0,0,0,0.65)]">
+        <div className="flex items-center justify-between border-b border-[#21312D] pb-3">
+          <div className="flex items-center gap-2">
+            <HelpCircle className="h-5 w-5 text-[#B8EE68]" aria-hidden="true" />
+            <h2
+              id="method-dialog-title"
+              className="font-title text-base font-bold text-[#EFF5ED]"
+            >
+              {t('methodDialog.title')}
+            </h2>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] transition-colors"
+            aria-label={t('methodDialog.closeDialog', { defaultValue: 'Close' })}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3.5 text-xs leading-relaxed text-[#93A39C]">
+          <p>
+            <strong className="text-[#EFF5ED]">{t('methodDialog.p1_strong')} </strong>
+            {t('methodDialog.p1')}
+          </p>
+
+          <div className="rounded-lg border border-[#21312D] bg-[#111E1B] p-3.5">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-7 rounded border border-dashed border-[#93A39C] pattern-estimado" aria-hidden="true" />
+              <span className="font-semibold text-[#EFF5ED]">
+                {t('methodDialog.estimated_title')}
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs text-[#93A39C]">
+              {t('methodDialog.estimated_desc')}
+            </p>
+          </div>
+
+          <div className="flex items-start gap-2.5 rounded-md border border-[#21312D]/80 bg-[#07100F] p-3">
+            <ShieldAlert className="h-4 w-4 shrink-0 text-[#FF9C55] mt-0.5" aria-hidden="true" />
+            <p className="text-xs text-[#93A39C]">
+              <strong className="text-[#EFF5ED]">{t('methodDialog.nodata_strong')} </strong>
+              {t('methodDialog.nodata_desc')}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md bg-[#B8EE68] px-4 py-2 font-sans text-xs font-semibold text-[#07100F] hover:bg-[#cbf58c] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] focus:ring-offset-2 focus:ring-offset-[#07100F] transition-all"
+          >
+            {t('methodDialog.close')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -96,8 +96,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
     <div
       role="region"
       aria-label={t("zone.title")}
-      className="flex flex-col gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 text-[#EFF5ED]"
-      className={`flex flex-col gap-3 bg-[#0D1816] p-4 text-[#EFF5ED] ${className}`}
+      className={`flex flex-col gap-3 bg-[#0D1816] p-4 text-[#EFF5ED] ${className}`.trim()}
     >
       {/* Barra superior de telemetría territorial */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#21312D]/60 pb-3">
