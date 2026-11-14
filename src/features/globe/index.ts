@@ -1,0 +1,1 @@
+export { GloboTerraqueo } from './GloboTerraqueo';

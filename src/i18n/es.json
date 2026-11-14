@@ -1,0 +1,44 @@
+{
+  "header": {
+    "title": "FuegoContinuo",
+    "badge": "MODO DEMOSTRACIÓN · DATOS DE MUESTRA",
+    "subtitle": "Armonización de puntos calientes MODIS y VIIRS en Argentina (2000 → hoy).",
+    "nav": {
+      "explore": "Explorar",
+      "calendar": "Calendario",
+      "mission": "La misión"
+    },
+    "methodLink": "¿Cómo se calcula?",
+    "satelliteViewer": "Satélites 3D",
+    "lang": "Idioma"
+  },
+  "hero": {
+    "headline": "El fuego deja huellas. Hagamos que cuenten.",
+    "subtitle": "Armonización y exploración científica de 24 años de observaciones térmicas satelitales en Argentina para distinguir variabilidad climática de incendios anómalos.",
+    "methodCta": "¿Cómo se calcula la armonización?",
+    "disclaimer": "Nota científica: Un punto caliente (hot spot) es una anomalía térmica detectada por satélite en una celda de observación, no necesariamente un incendio individual o su perímetro activo. Antes de 2012, las estimaciones calibradas armonizan la escala de MODIS a VIIRS."
+  },
+  "layout": {
+    "leftPanel": "Zona y mapa",
+    "rightPanel": "Análisis histórico",
+    "mobileTabMap": "Mapa y Zona",
+    "mobileTabData": "Calendario y Datos"
+  },
+  "placeholders": {
+    "zone": "Selector de zona (Provincia, polígono o coordenadas)",
+    "map": "Mapa de focos e industrias (MapLibre)",
+    "anomaly": "Tarjeta de anomalía del mes actual vs. mediana histórica",
+    "calendar": "Calendario armonizado mes × año (rayado = estimado)",
+    "series": "Serie temporal histórica de focos de calor",
+    "downloads": "Descargas de datos (CSV de calendario y focos)"
+  },
+  "footer": {
+    "sources": "Fuentes:",
+    "nasa": "NASA FIRMS (MODIS y VIIRS)",
+    "ign": "Límites: Instituto Geográfico Nacional (IGN)",
+    "dataVersion": "Versión de datos:",
+    "methodNotice": "Antes de 2012 los datos provienen del satélite MODIS y son estimaciones de lo que habría visto VIIRS.",
+    "loading": "Consultando metadatos de la API...",
+    "error": "No se pudo conectar con el servicio de metadatos"
+  }
+}

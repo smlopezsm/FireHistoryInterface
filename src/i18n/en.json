@@ -1,0 +1,44 @@
+{
+  "header": {
+    "title": "FuegoContinuo",
+    "badge": "DEMO MODE · SAMPLE DATA",
+    "subtitle": "Harmonization of MODIS and VIIRS hot spots in Argentina (2000 → today).",
+    "nav": {
+      "explore": "Explore",
+      "calendar": "Calendar",
+      "mission": "The mission"
+    },
+    "methodLink": "How is it calculated?",
+    "satelliteViewer": "3D Satellites",
+    "lang": "Language"
+  },
+  "hero": {
+    "headline": "Fire leaves traces. Let's make them count.",
+    "subtitle": "Harmonization and scientific exploration of 24 years of satellite thermal observations in Argentina to distinguish climate variability from anomalous fires.",
+    "methodCta": "How is harmonization calculated?",
+    "disclaimer": "Scientific note: A hot spot is a satellite-detected thermal anomaly in an observation cell, not necessarily an individual fire or its active perimeter. Prior to 2012, calibrated estimates harmonize the scale from MODIS to VIIRS."
+  },
+  "layout": {
+    "leftPanel": "Zone & Map",
+    "rightPanel": "Historical Analysis",
+    "mobileTabMap": "Map & Zone",
+    "mobileTabData": "Calendar & Data"
+  },
+  "placeholders": {
+    "zone": "Zone selector (Province, polygon or coordinates)",
+    "map": "Hot spots & industrial sources map (MapLibre)",
+    "anomaly": "Current month anomaly card vs. historical median",
+    "calendar": "Harmonized month × year calendar (hatched = estimated)",
+    "series": "Historical active fire time series",
+    "downloads": "Data downloads (Calendar and hot spots CSV)"
+  },
+  "footer": {
+    "sources": "Sources:",
+    "nasa": "NASA FIRMS (MODIS and VIIRS)",
+    "ign": "Boundaries: National Geographic Institute (IGN Argentina)",
+    "dataVersion": "Data version:",
+    "methodNotice": "Prior to 2012, data originates from MODIS satellite and represents calibrated estimates of what VIIRS would have detected.",
+    "loading": "Querying API metadata...",
+    "error": "Could not connect to metadata service"
+  }
+}
