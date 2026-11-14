@@ -231,7 +231,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
       <div className="relative mt-6 h-[440px] md:h-[520px] w-full rounded-xl border border-[#21312D] bg-gradient-to-b from-[#030706] via-[#050C0B] to-[#0A1614] overflow-hidden select-none">
         {/* Atmósfera curvada y horizonte de la Tierra al fondo */}
         <div className="pointer-events-none absolute -bottom-[420px] left-1/2 h-[600px] w-[1100px] -translate-x-1/2 rounded-[50%] bg-gradient-to-t from-[#0e2722] via-[#08302b] to-[#124d45] opacity-50 blur-[2px]" />
-        <div className="pointer-events-none absolute -bottom-[422px] left-1/2 h-[600px] w-[1100px] -translate-x-1/2 rounded-[50%] border-t-2 border-[#68D9D0]/40 shadow-[0_-8px_30px_rgba(104,217,208,0.25)]" />
+        <div className="pointer-events-none absolute -bottom-[422px] left-1/2 h-[600px] w-[1100px] -translate-x-1/2 rounded-[50%] ring-1 ring-[#68D9D0]/30 shadow-[0_-8px_30px_rgba(104,217,208,0.25)]" />
 
         {/* Estrellas discretas en el fondo */}
         <div className="pointer-events-none absolute inset-0 opacity-40">

@@ -11,6 +11,7 @@ interface AnomalyWidgetProps {
   p25: number;
   p75: number;
   categoria: CategoriaAnomalia | null;
+  className?: string;
 }
 
 export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
@@ -21,6 +22,7 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
   p25,
   p75,
   categoria,
+  className = '',
 }) => {
   const { t, i18n } = useTranslation();
 
@@ -91,38 +93,45 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
 
   const config = getCategoryConfig();
   const locale = Boolean(i18n?.language?.startsWith('es')) ? 'es-AR' : 'en-US';
+  const delta = mediana > 0 ? Math.round(((valor - mediana) / mediana) * 100) : 0;
+  const deltaFormatted = delta > 0 ? `+${delta}%` : `${delta}%`;
 
   return (
     <div
       role="region"
       aria-label={t('anomaly.label')}
-      className={`rounded-xl border ${config.border} ${config.bg} p-4 transition-all duration-300`}
+      className={`p-5 transition-all duration-300 ${config.bg} ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#07100F] border border-[#21312D]">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#07100F] border border-[#21312D]">
             {config.icon}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-[#93A39C]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs uppercase tracking-wider text-[#93A39C]">
                 {t('anomaly.label')} · {zonaNombre}
               </span>
               <span
-                className="rounded px-2 py-0.5 font-mono text-[10px] font-bold"
+                className="rounded px-2 py-0.5 font-mono text-xs font-bold"
                 style={{ color: config.color, backgroundColor: `${config.color}20` }}
               >
                 {config.badge}
               </span>
+              {categoria !== null && (
+                <span className="rounded bg-[#111E1B] border border-[#21312D] px-1.5 py-0.5 font-mono text-xs font-semibold text-[#EFF5ED]">
+                  {deltaFormatted}
+                </span>
+              )}
             </div>
-            <h3 className="mt-0.5 font-title text-sm md:text-base font-bold text-[#EFF5ED]">
+            <h3 className="mt-1 font-title text-sm md:text-base font-bold text-[#EFF5ED]">
               {config.title}
             </h3>
           </div>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs border-t border-[#21312D]/60 pt-2.5">
+      <div className="mt-3.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs border-t border-[#21312D]/60 pt-3">
         <div>
           <span className="text-[#93A39C]">{t('anomaly.spotsMonth')} </span>
           <span className="font-bold text-[#EFF5ED] text-sm">{valor.toLocaleString(locale)}</span>
@@ -133,7 +142,7 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
           <span className="font-semibold text-[#EFF5ED]">{mediana.toLocaleString(locale)}</span>
         </div>
         <div className="text-[#93A39C]">·</div>
-        <div className="text-[11px] text-[#93A39C]">
+        <div className="text-xs text-[#93A39C]">
           {t('anomaly.range')} <span className="text-[#EFF5ED]">{p25} – {p75}</span>
         </div>
       </div>

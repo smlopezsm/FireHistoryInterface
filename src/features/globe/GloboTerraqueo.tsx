@@ -139,10 +139,10 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       `;
 
       const popup = new mapboxgl.Popup({ offset: 12, closeButton: false }).setHTML(`
-        <div style="font-family: 'DM Mono', monospace; font-size: 11px; padding: 4px; color: #EFF5ED; background: #0D1816; border: 1px solid #21312D; border-radius: 6px;">
+        <div style="font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px; color: #EFF5ED; background: #0D1816; border: 1px solid #21312D; border-radius: 4px;">
           <strong style="color: ${color};">${h.sensor.toUpperCase()} · ${h.province}</strong><br/>
           <span>${isEn ? 'Brightness Temp:' : 'T. Brillo:'} <b>${h.brightness} K</b></span><br/>
-          <span style="color: #93A39C; font-size: 9px;">${isEn ? 'NASA FIRMS S-NPP Calibrated' : 'NASA FIRMS S-NPP Calibrado'}</span>
+          <span style="color: #93A39C; font-size: 12px;">${isEn ? 'NASA FIRMS S-NPP Calibrated' : 'NASA FIRMS S-NPP Calibrado'}</span>
         </div>
       `);
 
@@ -267,14 +267,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
   return (
     <div
-      className={`relative flex flex-col rounded-xl overflow-hidden border border-[#21312D] bg-[#07100F] shadow-2xl ${
+      className={`relative flex flex-col rounded-xl overflow-hidden border border-[#21312D] bg-[#07100F] ${
         isFullscreen
           ? 'fixed inset-0 z-50 rounded-none w-screen h-screen'
-          : `w-full min-h-[440px] lg:min-h-[500px] ${className}`
+          : `w-full h-[520px] lg:h-[580px] ${className}`
       }`}
     >
       {/* Barra de cabecera del globo */}
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-[#0D1816]/90 backdrop-blur-md border-b border-[#21312D] text-xs">
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-[#0D1816]/95 backdrop-blur-md border-b border-[#21312D] text-xs">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#B8EE68]/20 text-[#B8EE68]">
             <GlobeIcon className="h-3.5 w-3.5" />
@@ -282,48 +282,31 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-title font-bold text-[#EFF5ED]">{t('globe.title')}</span>
-              <span className="rounded bg-[#B8EE68]/15 px-2 py-0.5 font-mono text-[9px] font-bold text-[#B8EE68]">
+              <span className="rounded bg-[#B8EE68]/15 px-2 py-0.5 font-mono text-xs font-bold text-[#B8EE68]">
                 {t('globe.badge')}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Selector de capa de sensor en el globo */}
-        <div className="flex items-center gap-1 font-mono text-[10px] rounded-lg border border-[#21312D] bg-[#07100F] p-0.5">
-          <button
-            type="button"
-            onClick={() => setActiveSensorFilter('armonizado')}
-            className={`rounded px-2 py-1 font-semibold transition-colors ${
+        {/* Indicador de canal de sensor activo (sincronizado con selector maestro) */}
+        <div className="hidden sm:flex items-center gap-2 rounded-md border border-[#21312D] bg-[#07100F] px-2.5 py-1 font-mono text-xs text-[#EFF5ED]">
+          <span
+            className={`h-2 w-2 rounded-full ${
               activeSensorFilter === 'armonizado'
-                ? 'bg-[#B8EE68] text-[#07100F]'
-                : 'text-[#93A39C] hover:text-[#EFF5ED]'
+                ? 'bg-[#B8EE68]'
+                : activeSensorFilter === 'modis'
+                ? 'bg-[#68D9D0]'
+                : 'bg-[#FF9C55]'
             }`}
-          >
-            {t('zone.harmonized')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSensorFilter('modis')}
-            className={`rounded px-2 py-1 font-semibold transition-colors ${
-              activeSensorFilter === 'modis'
-                ? 'bg-[#68D9D0] text-[#07100F]'
-                : 'text-[#93A39C] hover:text-[#EFF5ED]'
-            }`}
-          >
-            MODIS
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSensorFilter('viirs')}
-            className={`rounded px-2 py-1 font-semibold transition-colors ${
-              activeSensorFilter === 'viirs'
-                ? 'bg-[#FF9C55] text-[#07100F]'
-                : 'text-[#93A39C] hover:text-[#EFF5ED]'
-            }`}
-          >
-            VIIRS
-          </button>
+          />
+          <span className="font-semibold">
+            {activeSensorFilter === 'armonizado'
+              ? (isEn ? 'HARMONIZED · VIIRS EQUIV' : 'ARMONIZADO · ESCALA VIIRS')
+              : activeSensorFilter === 'modis'
+              ? 'MODIS · 1 km'
+              : 'VIIRS · 375 m'}
+          </span>
         </div>
 
         {/* Acciones de control */}
@@ -333,7 +316,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             onClick={() => setIsSpinning((prev) => !prev)}
             aria-pressed={isSpinning}
             title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-mono transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-mono transition-colors ${
               isSpinning
                 ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40'
                 : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
@@ -370,7 +353,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         {/* Modal de configuración de Token si está ausente */}
         {(!activeToken || showTokenPrompt || hasError) && (
           <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-[#07100F]/95 backdrop-blur-md text-[#EFF5ED]">
-            <div className="w-full max-w-md rounded-2xl border border-[#21312D] bg-[#0D1816] p-6 shadow-2xl text-center">
+            <div className="w-full max-w-md rounded-xl border border-[#21312D] bg-[#0D1816] p-6 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#B8EE68]/20 text-[#B8EE68] mb-3">
                 <Key className="h-6 w-6" />
               </div>
@@ -404,7 +387,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                 </button>
               </form>
 
-              <div className="mt-4 border-t border-[#21312D] pt-3 text-[11px] text-[#93A39C] flex items-center justify-between">
+              <div className="mt-4 border-t border-[#21312D] pt-3 text-xs text-[#93A39C] flex items-center justify-between">
                 <span>{t('globe.noToken')}</span>
                 <a
                   href="https://account.mapbox.com/"
@@ -422,12 +405,12 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
         {/* Leyenda científica de puntos calientes en la esquina del globo */}
         {activeToken && isLoaded && (
-          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 rounded-lg border border-[#21312D] bg-[#07100F]/90 p-2.5 backdrop-blur-md shadow-xl text-xs">
-            <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[#93A39C] border-b border-[#21312D] pb-1">
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 rounded-md border border-[#21312D] bg-[#07100F]/90 p-2.5 backdrop-blur-md text-xs">
+            <div className="flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-[#93A39C] border-b border-[#21312D] pb-1">
               <Flame className="h-3.5 w-3.5 text-[#FF6759]" />
               <span>Detecciones Térmicas</span>
             </div>
-            <div className="mt-1 flex flex-col gap-1 font-mono text-[10px]">
+            <div className="mt-1 flex flex-col gap-1 font-mono text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-[#68D9D0]" />
                 <span className="text-[#EFF5ED]">MODIS (1 km)</span>
@@ -441,7 +424,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                 <span className="text-[#EFF5ED]">Alta Intensidad (&gt;360K)</span>
               </div>
             </div>
-            <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-[9px] text-[#B8EE68]">
+            <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
               DATOS DE MUESTRA · FIRMS
             </div>
           </div>
@@ -449,7 +432,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
         {/* Controles de Zoom */}
         {activeToken && isLoaded && (
-          <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1 rounded-lg border border-[#21312D] bg-[#07100F]/80 p-1 backdrop-blur-md shadow-lg">
+          <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1 rounded-md border border-[#21312D] bg-[#07100F]/85 p-1 backdrop-blur-md">
             <button
               type="button"
               onClick={() => mapRef.current?.zoomIn({ duration: 300 })}
@@ -471,7 +454,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         )}
 
         {/* Atribución oficial NASA Blue Marble */}
-        <div className="absolute bottom-2 left-3 z-10 rounded border border-[#21312D] bg-[#07100F]/85 px-2 py-0.5 font-mono text-[9px] text-[#93A39C] backdrop-blur-md">
+        <div className="absolute bottom-2 left-3 z-10 rounded border border-[#21312D] bg-[#07100F]/85 px-2 py-0.5 font-mono text-xs text-[#93A39C] backdrop-blur-md">
           {t('globe.attribution')}
         </div>
       </div>

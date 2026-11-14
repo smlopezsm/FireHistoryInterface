@@ -8,64 +8,60 @@ web
 
 ## Stack
 
-React + TypeScript + Vite, MapLibre GL JS (mapa base), Terra Draw (herramienta de dibujo), TanStack Query (caché y gestión de datos remotos), Nginx Alpine (contenedor para distribución de estáticos).
+React 18 + TypeScript + Vite, Tailwind CSS, Mapbox GL JS (3D globe projection, satellite imagery & atmospheric fog), Three.js + React Three Fiber + Drei (official NASA 3D satellite models in GLB format), TanStack Query (remote metadata and caching), i18next + react-i18next (bilingual internationalization with English default), Nginx Alpine (static asset distribution container).
 
 ## Users
 
-- **Brigadistas y personal de emergencias:** necesitan evaluar rápidamente si el mes en curso presenta una actividad anómala ("peor que lo normal") en su zona de jurisdicción para coordinar recursos y alertas tempranas.
-- **Administradores de tierras y áreas protegidas:** necesitan identificar qué temporada del año concentra el riesgo de incendios y analizar tendencias interanuales en sus zonas.
-- **Científicos, técnicos y analistas ambientales:** requieren datos cuantitativos rigurosos, series históricas, desglose por sensor, intervalos de confianza para datos estimados y exportación en CSV con trazabilidad de fuentes y versiones.
-- **Público general y periodistas:** buscan entender qué sucedió en su provincia o región a través de visualizaciones intuitivas, en lenguaje claro y sin jerga técnica satelital.
+- **Firefighters, emergency responders & rangers:** evaluate whether the current month or season presents anomalous thermal activity ("worse than normal") in their jurisdiction to coordinate resources and early warning.
+- **Land managers and national park administrators:** identify seasonal fire windows, analyze multi-year fire trends, and evaluate fire recurrence patterns across protected ecosystems.
+- **Environmental scientists, geospatial analysts & researchers:** require rigorous quantitative historical series, sensor breakdown (MODIS vs. VIIRS), confidence intervals on pre-2012 estimated counts, and structured CSV export with provenance and data versioning.
+- **General public, educators & journalists:** understand historical wildfire trends through an accessible, visually immersive Earth observation control room interface without navigating raw orbital telemetry.
 
 ## Product Purpose
 
-Proveer una interfaz web interactiva para consultar y descargar el **calendario armonizado de focos de calor detectados por satélite en Argentina (2000 hasta hoy)**, combinando los sensores MODIS y VIIRS en una única escala comparable (equivalente a VIIRS S-NPP), como respuesta al desafío *Harmonization of MODIS and VIIRS Hot Spots* del NASA Space Apps Challenge 2026. El producto permite seleccionar cualquier región del país (por provincia, coordenadas o dibujando polígonos), visualizar qué meses y años tuvieron mayor actividad de fuego, contrastar el mes actual con la mediana histórica (anomalía) y descargar los datos tabulares.
+Provide an immersive and scientific Earth observation interface to explore and download the **harmonized historical record of active fire hot spots in Argentina (2000 to present)**, bridging NASA MODIS (1 km) and VIIRS (375 m) observations onto a unified, comparable scale (VIIRS S-NPP equivalent) for the **NASA Space Apps Challenge 2026: Harmonization of MODIS and VIIRS Hot Spots**. The product combines interactive 3D planetary exploration, regional anomaly diagnostics against historical medians, an annual matrix calendar (2000–today), mission satellite anatomy with exploded vector view, official NASA 3D spacecraft inspection, and structured CSV data exports.
 
 ## Positioning
 
-A diferencia de portales satelitales convencionales que presentan datos crudos desarticulados o superponen sensores con resoluciones dispares sin normalización, FireHistoryInterface armoniza de extremo a extremo MODIS y VIIRS en una sola serie unificada, transparentando rigurosamente la incertidumbre (el período 2000-2012, previo a VIIRS, se comunica como estimado con rangos e intervalos de predicción explícitos y textura visual diferenciada, nunca como dato exacto ni enmascarado).
+Unlike conventional satellite portals that present disjointed raw data or unnormalized multi-sensor overlays, FuegoContinuo provides end-to-end statistical harmonization between MODIS and VIIRS. It makes uncertainty transparent: pre-2012 data (prior to VIIRS launch) is explicitly communicated as estimated with 45° diagonal hatching, prediction intervals, and clear scientific disclaimers (a hot spot is a thermal anomaly detected in an observation cell, not necessarily an individual fire or its active perimeter).
 
 ## Operating Context
 
-- Aplicación web responsive accesible desde navegadores de escritorio (panel doble: mapa 40% a la izquierda, visualizaciones analíticas 60% a la derecha) y dispositivos móviles (flujo vertical optimizado).
-- Consumo directo de la API backend `FireHistoryInterfaceAPI` (FastAPI) desplegada en el mismo dominio o en entorno local (`/api/v1`).
-- Entornos de uso en terreno o guardias con conectividad variable, donde la URL retiene el estado completo (zona, período y capa) para compartir consultas exactas de forma instantánea.
+- Responsive web application optimized for desktop control room monitoring (1440 px target width, double-column layout: 3D globe + area selection on the left, anomaly diagnosis + calendar heatmap on the right) and mobile devices (stacked layout).
+- Direct consumption of backend REST API (`/api/v1`) or self-contained offline sample datasets.
+- Field environments and operation centers with varying network connectivity: lightweight initial bundle (~95 kB gzip) with code-splitting (`React.lazy`) for heavy 3D satellite visualization modules.
 
 ## Capabilities and Constraints
 
-- **Selección espacial:** Selector de provincia oficial (IGN), ingreso manual de coordenadas/bounding box y herramienta de dibujo interactivo de polígonos libres sobre MapLibre.
-- **Visualización temporal:** Calendario mes × año en matriz de calor (años en filas, meses en columnas), tarjeta de anomalía mensual vs. mediana histórica y serie temporal gráfica.
-- **Transparencia metodológica no negociable:**
-  - Todo registro previo a 2012 es estimado (a partir de MODIS calibrado) y debe mostrarse visualmente con textura diagonal rayada a 45° y en texto explícito con rangos de confianza.
-  - La ausencia de dato nunca se representa como "0"; se clasifica y visualiza explícitamente como "sin dato".
-  - Lenguaje llano y accesible: se utiliza "focos de calor detectados por satélite" evitando terminología cruda ("anomalías térmicas VIIRS I-band").
-  - Identificación visible de la versión de datos y metadatos de las fuentes satelitales en el pie de página (`data_version`).
-- **Descargas:** Exportación directa a CSV del calendario de focos agregados y del detalle de eventos con control de volumen (manejo de códigos 413 si la zona es excesivamente amplia).
-- **Internacionalización:** Soporte bilingüe para Español (idioma predeterminado) e Inglés.
+- **Spatial Selection:** Official IGN territory/province dropdown, bounding box / coordinates, and polygon boundary support.
+- **Interactive 3D Earth Globe:** Mapbox GL JS globe projection, photorealistic satellite texture, atmospheric fog (`map.setFog`), active hot spots markers with brightness temperature in Kelvin, sensor filter (Harmonized, MODIS, VIIRS), and auto-rotation loop with mouse pause.
+- **Temporal & Anomaly Analysis:** Annual calendar heatmap matrix (2000–today, months in columns, years in rows) with accessible table view fallback, and real-time monthly anomaly widget (Categorical: critical, elevated, normal, low, minimum) vs. historical median and IQR.
+- **Orbital Satellite Anatomy & Mission Sheet:** Exploded/assembled vector schematic with interactive subsystems (Payload, Solar, Thermal MLI, Comms, AOCS, Propulsion) and side-by-side telemetry (705 km vs 824 km, pass times, swath widths, spatial resolution).
+- **3D NASA Spacecraft Inspection:** Interactive Three.js/R3F viewer for official NASA GLB models: **Terra (MODIS)**, **Aqua (MODIS)**, and **Suomi NPP (VIIRS)**.
+- **Scientific Transparency:** Pre-2012 data visually identified with 45° diagonal hatching (`.pattern-estimado`). "No data" is strictly never shown as zero. Hot spots are defined as observation cell anomalies.
+- **Data Exports:** Structured CSV downloads for calendar matrices and event lists with scientific provenance metadata headers.
+- **Internationalization:** English by default (`en`), with one-click bilingual switching to Spanish (`es`).
 
 ## Brand Commitments
 
-- **Nombre:** FireHistoryInterface (Calendario Armonizado de Focos de Calor - Argentina).
-- **Tono de voz:** Preciso, científico pero accesible, directo, transparente respecto a la incertidumbre de los modelos de estimación.
-- **Referencias y fuentes institucionales:** NASA FIRMS (sensores MODIS y VIIRS), Instituto Geográfico Nacional (IGN) para límites territoriales oficiales de la República Argentina.
+- **Name:** FuegoContinuo (NASA Space Apps Challenge 2026: Harmonization of MODIS and VIIRS Hot Spots).
+- **Voice & Tone:** Editorial control room dark aesthetic, scientifically rigorous yet accessible, transparent, restrained, and purposeful.
+- **Palette:** Base `#07100F`, surfaces `#0D1816` / `#111E1B`, border `#21312D`, accent `#B8EE68` (lime), MODIS `#68D9D0` (cyan), VIIRS `#FF9C55` (orange), high intensity `#FF6759` (red).
+- **Institutional References:** NASA FIRMS (MODIS & VIIRS), NASA EOSDIS / Earth Observatory, NOAA JPSS, and IGN Argentina.
 
 ## Evidence on Hand
 
-- Especificaciones funcionales completas y contratos documentados en `docs/`:
-  - `docs/01-producto.md` (requisitos NASA Space Apps, casos de uso y reglas inquebrantables).
-  - `docs/02-pantallas-y-componentes.md` (arquitectura de componentes, estados de carga y manejo de URL).
-  - `docs/03-consumo-de-api.md` (contratos TypeScript, endpoints y especificación OpenAPI).
-  - `docs/04-diseno-visual-y-accesibilidad.md` (paleta validada para daltonismo, codificación de datos por textura y contraste).
-  - `docs/05-despliegue.md`, `docs/06-pruebas-y-aceptacion.md`, `docs/07-spec-kit.md`.
-- Contrato OpenAPI de la API backend en repositorio complementario `FireHistoryInterfaceAPI`.
+- Functional specifications in `docs/` (`docs/01-producto.md` to `docs/07-spec-kit.md`).
+- Official NASA 3D models downloaded to `public/models/`: `terra.glb`, `aqua.glb`, `suomi.glb`.
+- Passing test suite in Vitest (15 unit tests covering app shell, globe, footer, 3D satellites, and schematic).
 
 ## Product Principles
 
-1. **Claridad para no especialistas:** Textos comprensibles sin jerga; todo dato modelado/estimado se transparenta con textura visual, palabras y rango de incertidumbre.
-2. **Honestidad del dato:** La falta de medición jamás se reporta como "0"; la versión de datos (`data_version`) y las fuentes permanecen siempre visibles.
-3. **Equilibrio operativo y analítico:** La interfaz ofrece tanto diagnóstico inmediato (tarjeta de anomalía para brigadistas) como profundidad analítica (calendario histórico y descarga de series).
-4. **Accesibilidad e inclusión por diseño:** Cumplimiento estricto de WCAG 2.1 AA, paletas probadas contra daltonismo, navegación integral por teclado y tablas accesibles alternativas para datos matriciales.
-5. **Estado compartible y trazable:** Toda consulta (zona, período temporal y capa) se refleja de forma bidireccional en la URL.
+1. **Clarity over Raw Jargon:** Clear language that distinguishes thermal observation anomalies from physical fire perimeters; estimated data is always transparently flagged with text, prediction intervals, and texture.
+2. **Data Integrity & Honesty:** Missing satellite passes are strictly labeled "no data", never "zero fires"; satellite data version (`data_version`) and agency sources remain continuously visible.
+3. **Operational Diagnostic + Deep Historical Context:** Balanced presentation offering instant anomaly triage alongside 24-year historical trends and orbital mechanics insight.
+4. **Accessibility & Craft:** Strict WCAG 2.1 AA compliance, high contrast on dark surfaces, non-color-only encoding (45° hatching pattern), keyboard navigation, accessible table view, and respect for `prefers-reduced-motion`.
+5. **Lightweight & Modular Delivery:** Heavy 3D visualization and satellite models are code-split and loaded on-demand to maintain an ultra-fast initial page load.
 
 ## Accessibility & Inclusion
 

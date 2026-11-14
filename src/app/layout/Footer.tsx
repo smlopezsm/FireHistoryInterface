@@ -32,13 +32,13 @@ export const Footer: React.FC = () => {
               {t('footer.ign')}
             </a>
           </div>
-          <p className="text-[11px] text-[#687771]">
+          <p className="text-xs text-[#687771]">
             {t('footer.methodNotice')}
           </p>
         </div>
 
         {/* Versión de datos y estado de API */}
-        <div className="flex shrink-0 items-center gap-2 self-start rounded-lg border border-[#21312D] bg-[#0D1816] px-3 py-1.5 sm:self-center">
+        <div className="flex shrink-0 items-center gap-2 self-start rounded-md border border-[#21312D] bg-[#0D1816] px-3 py-1.5 sm:self-center">
           <Database className="h-3.5 w-3.5 text-[#B8EE68]" aria-hidden="true" />
           <span className="font-medium text-[#EFF5ED]">{t('footer.dataVersion')}</span>
 
@@ -51,7 +51,7 @@ export const Footer: React.FC = () => {
           ) : isError ? (
             <span
               data-testid="metadata-error"
-              className="flex items-center gap-1 text-[11px] text-[#FF9C55]"
+              className="flex items-center gap-1 text-xs text-[#FF9C55]"
               title={t('footer.error')}
             >
               <Info className="h-3 w-3" />

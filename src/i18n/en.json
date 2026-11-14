@@ -17,7 +17,8 @@
     "subtitle": "Harmonization and scientific exploration of 24 years of satellite thermal observations in Argentina to distinguish climate variability from anomalous fires.",
     "methodCta": "How is harmonization calculated?",
     "satelliteCta": "Explore 3D Satellites (NASA GLB)",
-    "disclaimer": "Scientific note: A hot spot is a satellite-detected thermal anomaly in an observation cell, not necessarily an individual fire or its active perimeter. Prior to 2012, calibrated estimates harmonize the scale from MODIS to VIIRS."
+    "scientificNote": "Scientific note:",
+    "disclaimer": "A hot spot is a satellite-detected thermal anomaly in an observation cell, not necessarily an individual fire or its active perimeter. Prior to 2012, calibrated estimates harmonize the scale from MODIS to VIIRS."
   },
   "methodDialog": {
     "title": "Harmonization Method (MODIS & VIIRS)",

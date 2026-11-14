@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T17:40:00.000Z",
+  "title": "Design System: FuegoContinuo",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Luminous Observation Lime",
+        "canonical": "oklch(88% 0.19 128)",
+        "tonalRamp": ["#142504", "#2c4e0b", "#497c15", "#6cae21", "#94e033", "#b8ee68", "#d3f59e", "#effbdc"]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Observation Lime Hover",
+        "canonical": "oklch(92% 0.16 128)",
+        "tonalRamp": ["#192c06", "#355910", "#548c1b", "#7ac42a", "#a4ed45", "#cbf58c", "#e0f9b6", "#f3fde5"]
+      },
+      "space-base": {
+        "role": "neutral",
+        "displayName": "Deep Cosmic Void",
+        "canonical": "oklch(12% 0.015 170)",
+        "tonalRamp": ["#020505", "#050c0b", "#07100f", "#0c1b19", "#132b28", "#1d3e3a", "#29534e", "#3a7069"]
+      },
+      "space-surface": {
+        "role": "neutral",
+        "displayName": "Subsystem Telemetry Surface",
+        "canonical": "oklch(16% 0.018 170)",
+        "tonalRamp": ["#040807", "#080f0e", "#0d1816", "#142522", "#1d3632", "#284b45", "#35625a", "#468176"]
+      },
+      "space-elevated": {
+        "role": "neutral",
+        "displayName": "Elevated Control Surface",
+        "canonical": "oklch(19% 0.02 170)",
+        "tonalRamp": ["#050908", "#0b1412", "#111e1b", "#192c28", "#243e39", "#31544d", "#406c63", "#538a7f"]
+      },
+      "space-border": {
+        "role": "neutral",
+        "displayName": "Orbital Wireframe Border",
+        "canonical": "oklch(26% 0.025 170)",
+        "tonalRamp": ["#090d0c", "#141e1b", "#21312d", "#2e453f", "#3e5b53", "#50756a", "#659083", "#7eaea0"]
+      },
+      "space-border-light": {
+        "role": "neutral",
+        "displayName": "Subtle Telemetry Wireframe",
+        "canonical": "oklch(31% 0.028 170)",
+        "tonalRamp": ["#0c1311", "#192623", "#2a3f3a", "#3b5851", "#4f756c", "#659388", "#7eb3a6", "#9bc4b9"]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "High-Contrast Telemetry Light",
+        "canonical": "oklch(96% 0.01 130)",
+        "tonalRamp": ["#1a2418", "#384a34", "#597253", "#7f9e78", "#a9c9a2", "#cee4c9", "#eff5ed", "#f9fcf8"]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Muted Telemetry Green-Gray",
+        "canonical": "oklch(68% 0.02 165)",
+        "tonalRamp": ["#151c19", "#2c3933", "#455950", "#637e72", "#84a395", "#93a39c", "#b6c8c1", "#dbe5e1"]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Dim Technical Trace",
+        "canonical": "oklch(53% 0.018 165)",
+        "tonalRamp": ["#111614", "#242d2a", "#394642", "#52635d", "#687771", "#84968f", "#a6b6b0", "#ced7d3"]
+      },
+      "sensor-modis": {
+        "role": "secondary",
+        "displayName": "MODIS Spectral Cyan",
+        "canonical": "oklch(82% 0.12 195)",
+        "tonalRamp": ["#0b2b28", "#16504b", "#237b73", "#34aba0", "#4ec8be", "#68d9d0", "#9be6e0", "#d1f5f2"]
+      },
+      "sensor-viirs": {
+        "role": "secondary",
+        "displayName": "VIIRS Telemetry Orange",
+        "canonical": "oklch(74% 0.16 55)",
+        "tonalRamp": ["#361904", "#693309", "#9e5012", "#d47220", "#fa8e38", "#ff9c55", "#ffbe8a", "#ffe3cc"]
+      },
+      "sensor-high": {
+        "role": "secondary",
+        "displayName": "Thermal Anomaly Scarlet",
+        "canonical": "oklch(66% 0.22 25)",
+        "tonalRamp": ["#380c08", "#6c1710", "#a2251a", "#d8382b", "#f85344", "#ff6759", "#ff9a90", "#ffd1cc"]
+      },
+      "sensor-mild": {
+        "role": "secondary",
+        "displayName": "Mild Thermal Teal",
+        "canonical": "oklch(51% 0.07 185)",
+        "tonalRamp": ["#0a1917", "#15322e", "#234e47", "#326c63", "#3d786e", "#529c90", "#73b9ad", "#a2d8ce"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display Hero",
+        "purpose": "Primary headline and mission statement in Manrope ExtraBold."
+      },
+      "headline": {
+        "displayName": "Section Headline",
+        "purpose": "Major section headings, panel headers, and modal dialog titles."
+      },
+      "title": {
+        "displayName": "Panel Title",
+        "purpose": "Telemetry card titles and satellite subsystem labels."
+      },
+      "body": {
+        "displayName": "Interface Body",
+        "purpose": "Paragraph copy and scientific methodology explanation in DM Sans."
+      },
+      "label": {
+        "displayName": "Telemetry Monospace",
+        "purpose": "Orbital coordinates, timestamps, temperatures in Kelvin, confidence values."
+      }
+    },
+    "shadows": [
+      {
+        "name": "thermal-glow",
+        "value": "0 0 16px rgba(255, 103, 89, 0.45)",
+        "purpose": "Luminous aura around active thermal anomalies and fire markers."
+      },
+      {
+        "name": "overlay-lift",
+        "value": "0 12px 32px rgba(0, 0, 0, 0.65)",
+        "purpose": "Depth for modal dialogs and floating telemetry overlays."
+      }
+    ],
+    "motion": [
+      {
+        "name": "telemetry-ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Mechanical precision ease-out curve for control panels."
+      },
+      {
+        "name": "transition-normal",
+        "value": "200ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Standard interactive hover and focus transition."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "High-visibility primary action button in Luminous Observation Lime.",
+      "html": "<button class=\"ds-btn-primary\"><svg class=\"ds-btn-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" y1=\"8\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"16\" x2=\"12.01\" y2=\"16\"/></svg>ANALYZE REGION</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #B8EE68; color: #07100F; font-family: 'Manrope', -apple-system, sans-serif; font-size: 14px; font-weight: 700; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; transition: background 0.15s ease, transform 0.1s ease; outline: none; } .ds-btn-primary:hover { background: #CBF58C; transform: translateY(-1px); } .ds-btn-primary:focus-visible { box-shadow: 0 0 0 2px #07100F, 0 0 0 4px #B8EE68; } .ds-btn-icon { width: 16px; height: 16px; stroke: #07100F; }"
+    },
+    {
+      "name": "Secondary Control Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Tactile elevated control button for filters, view toggles, and downloads.",
+      "html": "<button class=\"ds-btn-secondary\"><svg class=\"ds-btn-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg>EXPORT CSV</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #111E1B; color: #EFF5ED; font-family: 'DM Sans', -apple-system, sans-serif; font-size: 14px; font-weight: 500; padding: 8px 16px; border-radius: 8px; border: 1px solid #21312D; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; outline: none; } .ds-btn-secondary:hover { background: #182B26; border-color: #2A3F3A; } .ds-btn-secondary:focus-visible { border-color: #B8EE68; box-shadow: 0 0 0 2px #07100F, 0 0 0 4px #B8EE68; } .ds-btn-icon { width: 16px; height: 16px; stroke: #93A39C; }"
+    },
+    {
+      "name": "Sensor Channel Badge",
+      "kind": "chip",
+      "refersTo": "chip-badge",
+      "description": "Dual-sensor indicator pairing spectral color with explicit instrument name and resolution.",
+      "html": "<span class=\"ds-badge-modis\"><span class=\"ds-badge-dot\"></span>MODIS · 1 km</span>",
+      "css": ".ds-badge-modis { display: inline-flex; align-items: center; gap: 6px; background: #111E1B; color: #EFF5ED; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 9999px; border: 1px solid #21312D; letter-spacing: 0.025em; } .ds-badge-dot { width: 6px; height: 6px; border-radius: 9999px; background: #68D9D0; }"
+    },
+    {
+      "name": "Telemetry Data Card",
+      "kind": "card",
+      "refersTo": "card-panel",
+      "description": "Subsystem telemetry panel housing regional stats, medians, and anomaly status.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-header\"><span class=\"ds-card-title\">MONTHLY ANOMALY</span><span class=\"ds-card-status\">ACTIVE</span></div><div class=\"ds-card-value\">+42.8%</div><div class=\"ds-card-sub\">Above 24-year historical median (IQR 12.4%)</div></div>",
+      "css": ".ds-card { background: #0D1816; border: 1px solid #21312D; border-radius: 16px; padding: 20px; color: #EFF5ED; font-family: 'DM Sans', -apple-system, sans-serif; } .ds-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; } .ds-card-title { font-family: 'Manrope', -apple-system, sans-serif; font-size: 13px; font-weight: 700; color: #93A39C; letter-spacing: 0.05em; } .ds-card-status { font-family: 'DM Mono', monospace; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(255, 103, 89, 0.15); color: #FF6759; border: 1px solid rgba(255, 103, 89, 0.3); } .ds-card-value { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 700; color: #FF6759; margin: 4px 0 8px 0; } .ds-card-sub { font-size: 12px; color: #93A39C; line-height: 1.4; }"
+    },
+    {
+      "name": "Hot Spot Pulse Beacon",
+      "kind": "custom",
+      "refersTo": "custom-hotspot",
+      "description": "Luminous concentric pulse beacon denoting an active thermal anomaly.",
+      "html": "<div class=\"ds-beacon-container\"><span class=\"ds-beacon-core\"></span><span class=\"ds-beacon-wave\"></span></div>",
+      "css": ".ds-beacon-container { position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; } .ds-beacon-core { width: 8px; height: 8px; border-radius: 50%; background: #FF6759; box-shadow: 0 0 12px #FF6759; z-index: 2; } .ds-beacon-wave { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 1.5px solid #FF6759; opacity: 0.75; animation: ds-pulse 2s infinite ease-out; } @keyframes ds-pulse { 0% { transform: scale(0.4); opacity: 0.9; } 100% { transform: scale(1.4); opacity: 0; } }"
+    },
+    {
+      "name": "Estimated Matrix Cell",
+      "kind": "custom",
+      "refersTo": "custom-estimated-cell",
+      "description": "Calendar matrix cell featuring 45° diagonal hatching to signify pre-2012 modeled harmonization.",
+      "html": "<div class=\"ds-heatmap-cell ds-cell-estimated\" title=\"2008-08: 412 hotspots (Harmonized Estimate)\"><span class=\"ds-cell-text\">412</span></div>",
+      "css": ".ds-heatmap-cell { width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; color: #EFF5ED; border: 1px solid #21312D; background-color: #3D786E; position: relative; overflow: hidden; cursor: pointer; transition: transform 0.1s ease; } .ds-heatmap-cell:hover { transform: scale(1.1); border-color: #B8EE68; z-index: 2; } .ds-cell-estimated { background-image: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(239, 245, 237, 0.18) 4px, rgba(239, 245, 237, 0.18) 8px); } .ds-cell-text { z-index: 1; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }"
+    },
+    {
+      "name": "Telemetry Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Precision input field for entering geographic coordinates and date ranges.",
+      "html": "<div class=\"ds-input-group\"><label class=\"ds-input-label\">LATITUDE</label><input type=\"text\" class=\"ds-input-field\" value=\"-34.6037° S\" /></div>",
+      "css": ".ds-input-group { display: flex; flex-direction: column; gap: 4px; font-family: 'DM Sans', -apple-system, sans-serif; } .ds-input-label { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; color: #93A39C; letter-spacing: 0.05em; } .ds-input-field { background: #111E1B; border: 1px solid #21312D; border-radius: 8px; color: #EFF5ED; font-family: 'DM Mono', monospace; font-size: 13px; padding: 8px 12px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; } .ds-input-field:focus { border-color: #B8EE68; box-shadow: 0 0 0 1px #B8EE68; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Orbital Control Room",
+    "overview": "FuegoContinuo is an Earth observation command center designed to monitor, harmonize, and diagnose active fire hot spots across Argentina from 2000 to the present day. The interface evokes the quiet authority of an orbital flight operations room: deep cosmic void backgrounds (#07100F), dense telemetry surfaces (#0D1816 and #111E1B), hairline wireframes (#21312D), and luminous focal indicators that cut through the darkness with purposeful scientific clarity.\n\nRather than resembling a generic SaaS dashboard or an exaggerated sci-fi neon interface, the design maintains strict editorial discipline. Every visual element serves an operational purpose: distinguishing spatial resolution regimes (MODIS 1 km vs. VIIRS 375 m), highlighting statistical anomalies against 24-year historical medians, and rendering uncertainty transparent through tactile hatched textures.\n\nInteractive 3D planetary exploration (Mapbox GL JS globe projection) and realistic NASA satellite anatomy (Terra, Aqua, Suomi NPP in Three.js) sit side by side with compact telemetry sidebars. The atmosphere is solemn, high-density, and engineered for rapid situational triage by researchers, rangers, and disaster response teams.",
+    "keyCharacteristics": [
+      "Cosmic Dark Immersion: Layered deep teal-tinted blacks eliminate eye strain during prolonged monitoring while maximizing dynamic contrast.",
+      "Instrument Lineage Encoding: Unmistakable visual pairing of sensor channels (MODIS cyan, VIIRS orange) reinforced by permanent typography and icons, never color alone.",
+      "Scientific Rigor & Uncertainty Transparency: Historical estimations prior to 2012 are physically differentiated with 45° diagonal hatching (.pattern-estimado), while missing passes are explicitly marked 'No Data' rather than zero.",
+      "Monospace Telemetry Discipline: All coordinates, timestamps, Kelvin temperatures, and counts use tabular monospace typography to prevent optical jitter.",
+      "Tactile Precision Controls: Mechanical button states, crisp 1px borders, and high-visibility lime focus rings for keyboard navigation."
+    ],
+    "rules": [
+      {
+        "name": "The Sensor Distinction Rule",
+        "body": "Never rely solely on color to differentiate MODIS and VIIRS data. Accompany every color token with its literal sensor label (MODIS or VIIRS), instrument symbol, or spatial footprint annotation (1 km vs. 375 m), and maintain a permanent visible legend.",
+        "section": "colors"
+      },
+      {
+        "name": "The Rarity of Glow Rule",
+        "body": "Ambient luminosity and neon glow are strictly reserved for active thermal anomalies (#FF6759) and primary focus indicators. Viewport containers, panels, navigation bars, and resting chrome must remain completely matte and flat.",
+        "section": "colors"
+      },
+      {
+        "name": "The Numbers in Monospace Rule",
+        "body": "All coordinates, dates, raw Kelvin temperatures, confidence percentages, and telemetry counters must be rendered in DM Mono. Tabular figure alignment prevents layout jitter during real-time filtering and multi-year comparisons.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces are flat and matte at rest. Depth is established through subtle 1px wireframe borders and background color stepping, never gratuitous drop shadows.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do format all dates, coordinates, pixel counts, and temperatures in DM Mono to preserve clean tabular alignment.",
+      "Do accompany MODIS cyan (#68D9D0) and VIIRS orange (#FF9C55) with text badges or sensor symbols; never rely on color alone.",
+      "Do use the 45° diagonal hatching pattern (.pattern-estimado) whenever presenting modeled or estimated historical data.",
+      "Do mark absent satellite passes explicitly as 'No Data', never as '0 fires'.",
+      "Do reserve #FF6759 strictly for active thermal anomalies and high-severity wildfire alerts.",
+      "Do maintain high contrast (contrast ratio ≥ 4.5:1) for all typography and UI controls against dark surfaces."
+    ],
+    "donts": [
+      "Don't use bubbly SaaS cards, purple pastel gradients, or generic neon aesthetic tricks.",
+      "Don't add diffuse drop shadows behind resting dashboard panels or navigation bars.",
+      "Don't use proportional sans-serif fonts for dynamic numeric counters or time-series data tables.",
+      "Don't hide uncertainty or confidence intervals when displaying pre-2012 harmonized fire series.",
+      "Don't let 3D planetary controls or satellite canvases obscure mission-critical data tables or regional diagnostic summaries."
+    ]
+  }
+}

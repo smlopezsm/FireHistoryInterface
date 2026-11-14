@@ -17,7 +17,8 @@
     "subtitle": "Armonización y exploración científica de 24 años de observaciones térmicas satelitales en Argentina para distinguir variabilidad climática de incendios anómalos.",
     "methodCta": "¿Cómo se calcula la armonización?",
     "satelliteCta": "Explorar Satélites en 3D (NASA GLB)",
-    "disclaimer": "Nota científica: Un punto caliente (hot spot) es una anomalía térmica detectada por satélite en una celda de observación, no necesariamente un incendio individual o su perímetro activo. Antes de 2012, las estimaciones calibradas armonizan la escala de MODIS a VIIRS."
+    "scientificNote": "Nota científica:",
+    "disclaimer": "Un punto caliente (hot spot) es una anomalía térmica detectada por satélite en una celda de observación, no necesariamente un incendio individual o su perímetro activo. Antes de 2012, las estimaciones calibradas armonizan la escala de MODIS a VIIRS."
   },
   "methodDialog": {
     "title": "Método de Armonización (MODIS y VIIRS)",
