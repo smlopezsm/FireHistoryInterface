@@ -149,12 +149,12 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
       </div>
 
       {/* Resumen de máximos históricos */}
-      <div className="my-2.5 flex flex-wrap items-center justify-between rounded-lg bg-[#07100F] px-3 py-1.5 font-mono text-xs border border-[#21312D]">
+      <div className="my-2.5 flex flex-wrap items-center justify-between rounded-lg bg-[#07100F] px-3 py-1.5 font-sans text-xs border border-[#21312D]">
         <div className="flex items-center gap-2">
           <span className="text-[#93A39C]">
             {isEn ? "Historical monthly peak:" : "Pico mensual histórico:"}
           </span>
-          <span className="font-bold text-[#FF6759]">
+          <span className="font-mono tabular-nums font-bold text-[#FF6759]">
             {isEn ? "August 2020 (4,812 spots)" : "Agosto 2020 (4.812 focos)"}
           </span>
         </div>
@@ -162,7 +162,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
           <span className="text-[#93A39C]">
             {isEn ? "Year with most fire:" : "Año con más fuego:"}
           </span>
-          <span className="font-bold text-[#FF9C55]">2020</span>
+          <span className="font-mono tabular-nums font-bold text-[#FF9C55]">2020</span>
         </div>
       </div>
 
@@ -235,9 +235,9 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
       ) : (
         /* Vista de Tabla accesible */
         <div className="max-h-[380px] overflow-auto">
-          <table className="w-full font-mono text-xs border-collapse">
+          <table className="w-full text-xs border-collapse">
             <thead>
-              <tr className="border-b border-[#21312D] text-[#93A39C]">
+              <tr className="border-b border-[#21312D] font-sans font-semibold text-[#93A39C]">
                 <th className="py-2 text-left">{isEn ? "Year" : "Año"}</th>
                 <th className="py-2 text-left">{isEn ? "Month" : "Mes"}</th>
                 <th className="py-2 text-right">
@@ -250,7 +250,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="font-mono tabular-nums">
               {YEARS.slice(0, 10).map((year) =>
                 Array.from({ length: 12 }, (_, monthIdx) => {
                   const data = getCellData(year, monthIdx);
@@ -261,7 +261,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                       className="border-b border-[#21312D]/40 hover:bg-[#111E1B]"
                     >
                       <td className="py-1 text-[#EFF5ED]">{year}</td>
-                      <td className="py-1 text-[#93A39C]">
+                      <td className="py-1 text-[#93A39C] font-sans">
                         {months[monthIdx]}
                       </td>
                       <td className="py-1 text-right font-bold text-[#EFF5ED]">
@@ -273,7 +273,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                       <td className="py-1 text-right text-[#FF9C55]">
                         {data.viirs !== null ? data.viirs : "—"}
                       </td>
-                      <td className="py-1 text-center">
+                      <td className="py-1 text-center font-sans">
                         <span
                           className={`rounded px-1.5 py-0.5 text-xs ${
                             data.isEstimated
@@ -301,12 +301,12 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
       {/* Tooltip dinámico contextual */}
       {hoveredCell && (
-        <div className="mt-2 rounded-lg border border-[#21312D] bg-[#07100F] p-2.5 font-mono text-xs text-[#EFF5ED] animate-fade-in">
+        <div className="mt-2 rounded-lg border border-[#21312D] bg-[#07100F] p-2.5 text-xs text-[#EFF5ED] animate-fade-in">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-[#B8EE68]">
+            <span className="font-title font-bold text-[#B8EE68]">
               {months[hoveredCell.month]} {hoveredCell.year}
             </span>
-            <span className="text-xs text-[#93A39C]">
+            <span className="font-sans text-xs text-[#93A39C]">
               {hoveredCell.isEstimated
                 ? isEn
                   ? "⚠️ Estimated value (before 2012)"
@@ -317,18 +317,20 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
             </span>
           </div>
           <div className="mt-1 text-xs">
-            <span className="text-base font-bold text-[#EFF5ED]">
-              {hoveredCell.val.toLocaleString(locale)}{" "}
+            <span className="font-mono tabular-nums text-base font-bold text-[#EFF5ED]">
+              {hoveredCell.val.toLocaleString(locale)}
+            </span>{" "}
+            <span className="font-sans text-xs text-[#EFF5ED]">
               {isEn ? "hot spots" : "focos"}
             </span>
             {hoveredCell.isEstimated && (
-              <span className="ml-1 text-xs text-[#93A39C]">
+              <span className="ml-1 font-mono text-xs text-[#93A39C]">
                 ({isEn ? "range" : "rango"}: {Math.round(hoveredCell.val * 0.8)}{" "}
                 – {Math.round(hoveredCell.val * 1.25)})
               </span>
             )}
           </div>
-          <div className="mt-1 flex gap-3 text-xs text-[#93A39C] border-t border-[#21312D] pt-1">
+          <div className="mt-1 flex gap-3 font-mono tabular-nums text-xs text-[#93A39C] border-t border-[#21312D] pt-1">
             <span>MODIS: {hoveredCell.modis}</span>
             <span>
               VIIRS:{" "}
@@ -343,7 +345,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
       )}
 
       {/* Leyenda científica de colores y texturas */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#21312D] pt-3 font-mono text-xs text-[#93A39C]">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#21312D] pt-3 font-sans text-xs text-[#93A39C]">
         <div className="flex items-center gap-1.5">
           <span>{isEn ? "Less fire" : "Menos fuego"}</span>
           <div className="flex h-3 gap-0.5">

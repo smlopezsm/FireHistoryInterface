@@ -82,7 +82,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
   onSelectZone,
   capa,
   onChangeCapa,
-  className = '',
+  className = "",
 }) => {
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith("es"));
@@ -96,6 +96,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
     <div
       role="region"
       aria-label={t("zone.title")}
+      className="flex flex-col gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 text-[#EFF5ED]"
       className={`flex flex-col gap-3 bg-[#0D1816] p-4 text-[#EFF5ED] ${className}`}
     >
       {/* Barra superior de telemetría territorial */}
@@ -113,11 +114,11 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
         </div>
 
         {/* Herramientas de visualización geoespacial */}
-        <div className="flex items-center gap-1 font-mono text-xs">
+        <div className="flex items-center gap-1 font-sans text-xs">
           <button
             type="button"
             onClick={() => setShowCoordinates(false)}
-            className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-semibold transition-colors ${
+            className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-colors ${
               !showCoordinates
                 ? "bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40"
                 : "bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]"
@@ -129,7 +130,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
           <button
             type="button"
             onClick={() => setShowCoordinates((prev) => !prev)}
-            className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-colors ${
+            className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-colors ${
               showCoordinates
                 ? "bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40"
                 : "bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]"
@@ -141,7 +142,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
           </button>
 
           <span
-            className="hidden sm:inline-flex items-center gap-1 rounded-md bg-[#111E1B] text-[#687771] border border-[#21312D] px-2 py-1"
+            className="hidden sm:inline-flex items-center gap-1 rounded-md bg-[#111E1B] text-[#687771] border border-[#21312D] px-2 py-1 font-mono text-xs"
             title="IGN Argentina official polygon extents loaded"
           >
             <Pentagon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -157,11 +158,11 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
           <div className="flex items-center justify-between">
             <label
               htmlFor="province-select"
-              className="font-mono text-xs text-[#93A39C]"
+              className="font-sans text-xs font-medium text-[#93A39C]"
             >
               {t("zone.territoryLabel")}
             </label>
-            <span className="font-mono text-xs text-[#B8EE68] flex items-center gap-1">
+            <span className="font-mono tabular-nums text-xs text-[#B8EE68] flex items-center gap-1">
               <Crosshair className="h-3 w-3" />
               <span>{latFormatted}</span>
             </span>
@@ -173,7 +174,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
               const found = PROVINCIAS_ARG.find((z) => z.id === e.target.value);
               if (found) onSelectZone(found);
             }}
-            className="w-full rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 font-mono text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none transition-colors"
+            className="w-full rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 font-sans text-xs font-medium text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none transition-colors"
           >
             {PROVINCIAS_ARG.map((z) => {
               const displayName =
@@ -192,18 +193,18 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
         {/* Conmutador maestro de sensor (Armonizado / MODIS / VIIRS) */}
         <div className="md:col-span-6 flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <label className="font-mono text-xs text-[#93A39C]">
+            <label className="font-sans text-xs font-medium text-[#93A39C]">
               {t("zone.sensorScale")}
             </label>
-            <span className="font-mono text-xs text-[#93A39C]">
+            <span className="font-mono tabular-nums text-xs text-[#93A39C]">
               {lngFormatted}
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-1 rounded-md border border-[#21312D] bg-[#111E1B] p-1 font-mono text-xs">
+          <div className="grid grid-cols-3 gap-1 rounded-md border border-[#21312D] bg-[#111E1B] p-1 font-sans text-xs">
             <button
               type="button"
               onClick={() => onChangeCapa("armonizado")}
-              className={`rounded py-1.5 font-bold transition-all text-center ${
+              className={`rounded py-1.5 font-semibold transition-all text-center ${
                 capa === "armonizado"
                   ? "bg-[#B8EE68] text-[#07100F]"
                   : "text-[#93A39C] hover:text-[#EFF5ED]"
@@ -214,7 +215,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
             <button
               type="button"
               onClick={() => onChangeCapa("modis")}
-              className={`rounded py-1.5 font-bold transition-all text-center ${
+              className={`rounded py-1.5 font-semibold transition-all text-center ${
                 capa === "modis"
                   ? "bg-[#68D9D0] text-[#07100F]"
                   : "text-[#93A39C] hover:text-[#EFF5ED]"
@@ -225,7 +226,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
             <button
               type="button"
               onClick={() => onChangeCapa("viirs")}
-              className={`rounded py-1.5 font-bold transition-all text-center ${
+              className={`rounded py-1.5 font-semibold transition-all text-center ${
                 capa === "viirs"
                   ? "bg-[#FF9C55] text-[#07100F]"
                   : "text-[#93A39C] hover:text-[#EFF5ED]"

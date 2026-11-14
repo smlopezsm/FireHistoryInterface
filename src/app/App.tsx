@@ -99,7 +99,7 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsMethodOpen(false)}
-                className="rounded-md bg-[#B8EE68] px-4 py-2 font-mono text-xs font-bold text-[#07100F] hover:bg-[#cbf58c] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] focus:ring-offset-2 focus:ring-offset-[#07100F] transition-all"
+                className="rounded-md bg-[#B8EE68] px-4 py-2 font-sans text-xs font-semibold text-[#07100F] hover:bg-[#cbf58c] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] focus:ring-offset-2 focus:ring-offset-[#07100F] transition-all"
               >
                 {t('methodDialog.close')}
               </button>

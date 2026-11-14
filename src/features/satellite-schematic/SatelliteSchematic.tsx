@@ -111,7 +111,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
     <section
       id="la-mision"
       aria-label={t('schematic.title')}
-      className="relative w-full rounded-2xl border border-[#21312D] bg-[#07100F] p-4 md:p-8 shadow-2xl overflow-hidden scroll-mt-20"
+      className="relative w-full rounded-xl border border-[#21312D] bg-[#07100F] p-4 md:p-8 overflow-hidden scroll-mt-20"
     >
       {/* Encabezado de la lámina técnica */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#21312D] pb-5">
@@ -121,7 +121,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
             <span className="font-mono text-xs uppercase tracking-widest text-[#B8EE68]">
               {t('schematic.missionBadge')}
             </span>
-            <span className="rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 font-mono text-[10px] text-[#93A39C]">
+            <span className="rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 font-mono text-xs text-[#93A39C]">
               {t('schematic.missionTag')}
             </span>
           </div>
@@ -148,7 +148,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
               onClick={() => setInstrument('modis')}
               className={`rounded px-3 py-1.5 font-mono text-xs font-semibold transition-all ${
                 isModis
-                  ? 'bg-[#68D9D0]/20 text-[#68D9D0] border border-[#68D9D0]/40 shadow-sm'
+                  ? 'bg-[#68D9D0]/20 text-[#68D9D0] border border-[#68D9D0]/40'
                   : 'text-[#93A39C] hover:text-[#EFF5ED]'
               }`}
             >
@@ -161,7 +161,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
               onClick={() => setInstrument('viirs')}
               className={`rounded px-3 py-1.5 font-mono text-xs font-semibold transition-all ${
                 !isModis
-                  ? 'bg-[#FF9C55]/20 text-[#FF9C55] border border-[#FF9C55]/40 shadow-sm'
+                  ? 'bg-[#FF9C55]/20 text-[#FF9C55] border border-[#FF9C55]/40'
                   : 'text-[#93A39C] hover:text-[#EFF5ED]'
               }`}
             >
@@ -175,7 +175,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
             onClick={() => setIsExploded((prev) => !prev)}
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 text-xs font-mono font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#B8EE68] ${
               isExploded
-                ? 'border-[#B8EE68] bg-[#B8EE68]/20 text-[#B8EE68] shadow-md'
+                ? 'border-[#B8EE68] bg-[#B8EE68]/20 text-[#B8EE68]'
                 : 'border-[#21312D] bg-[#0D1816] text-[#EFF5ED] hover:border-[#B8EE68]/50 hover:bg-[#111E1B]'
             }`}
           >
@@ -199,31 +199,31 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
       </div>
 
       {/* Franja de Microdatos de Telemetría Orbital */}
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.altitude')}</span>
-          <span className="font-bold text-[#EFF5ED] text-sm">{telemetry.altitude}</span>
-          <span className="block text-[10px] text-[#93A39C] truncate">{telemetry.orbitType}</span>
+          <span className="block font-sans text-xs font-medium text-[#93A39C]">{t('schematic.altitude')}</span>
+          <span className="font-mono tabular-nums font-bold text-[#EFF5ED] text-sm">{telemetry.altitude}</span>
+          <span className="block font-sans text-xs text-[#93A39C] truncate">{telemetry.orbitType}</span>
         </div>
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.passTime')}</span>
-          <span className="font-bold text-[#EFF5ED] text-sm">{telemetry.passTime.split('(')[0]}</span>
-          <span className="block text-[10px] text-[#93A39C] truncate">{telemetry.passTime}</span>
+          <span className="block font-sans text-xs font-medium text-[#93A39C]">{t('schematic.passTime')}</span>
+          <span className="font-mono tabular-nums font-bold text-[#EFF5ED] text-sm">{telemetry.passTime.split('(')[0]}</span>
+          <span className="block font-sans text-xs text-[#93A39C] truncate">{telemetry.passTime}</span>
         </div>
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.swath')}</span>
-          <span className="font-bold text-[#EFF5ED] text-sm">{telemetry.swath.split('(')[0]}</span>
-          <span className="block text-[10px] text-[#93A39C] truncate">{telemetry.swath}</span>
+          <span className="block font-sans text-xs font-medium text-[#93A39C]">{t('schematic.swath')}</span>
+          <span className="font-mono tabular-nums font-bold text-[#EFF5ED] text-sm">{telemetry.swath.split('(')[0]}</span>
+          <span className="block font-sans text-xs text-[#93A39C] truncate">{telemetry.swath}</span>
         </div>
         <div className="rounded-lg border border-[#21312D] bg-[#0D1816] p-2.5">
-          <span className="block text-[10px] uppercase text-[#93A39C]">{t('schematic.resolution')}</span>
+          <span className="block font-sans text-xs font-medium text-[#93A39C]">{t('schematic.resolution')}</span>
           <span
-            className="font-bold text-sm"
+            className="font-mono tabular-nums font-bold text-sm"
             style={{ color: isModis ? '#68D9D0' : '#FF9C55' }}
           >
             {telemetry.resolution.split('(')[0]}
           </span>
-          <span className="block text-[10px] text-[#93A39C] truncate">{telemetry.resolution}</span>
+          <span className="block font-sans text-xs text-[#93A39C] truncate">{telemetry.resolution}</span>
         </div>
       </div>
 
@@ -268,7 +268,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
             {/* Gradientes metálicos y dorados de mantas térmicas (MLI) */}
             <linearGradient id="mliGold" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#E5A642" />
-              <stop offset="35%" stopColor="#C48220" />
+              <stop offset="35%" stopColor="#FF9C55" />
               <stop offset="70%" stopColor="#F5C065" />
               <stop offset="100%" stopColor="#966012" />
             </linearGradient>
@@ -506,7 +506,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
               LÍNEAS DE LLAMADA Y ETIQUETAS TÉCNICAS (Visibles al Desarmar)
               ======================================================== */}
           {isExploded && (
-            <g className="transition-opacity duration-500 ease-in opacity-100 font-mono text-[11px]">
+            <g className="transition-opacity duration-500 ease-in opacity-100 font-mono text-xs">
               {/* Etiqueta 1: Panel Solar */}
               <g>
                 <line x1="160" y1="180" x2="90" y2="130" stroke="#B8EE68" strokeWidth="1.5" />
@@ -589,7 +589,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
                 : 'Instrumento VIIRS (Suomi-NPP)'}
             </span>
           </div>
-          <p className="mt-1 font-mono text-[11px] text-[#93A39C]">
+          <p className="mt-1 font-mono text-xs text-[#93A39C]">
             {isModis
               ? isEn
                 ? 'Cross-track swath ±55° · 36 bands · Record 2000–present'
@@ -601,7 +601,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
         </div>
 
         {/* Indicador de modo interactivo */}
-        <div className="absolute top-3 right-3 z-10 rounded-lg border border-[#21312D] bg-[#07100F]/80 px-2.5 py-1 text-[11px] font-mono text-[#93A39C]">
+        <div className="absolute top-3 right-3 z-10 rounded-lg border border-[#21312D] bg-[#07100F]/80 px-2.5 py-1 text-xs font-mono text-[#93A39C]">
           {isExploded ? t('schematic.viewDisassembled') : t('schematic.viewAssembled')}
         </div>
       </div>
@@ -620,7 +620,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
               onClick={() => setActiveCallout(isActive ? null : sub.id)}
               className={`flex flex-col justify-between rounded-xl border p-4 transition-all duration-200 cursor-pointer ${
                 isActive
-                  ? 'border-[#B8EE68] bg-[#111E1B] shadow-md'
+                  ? 'border-[#B8EE68] bg-[#111E1B]'
                   : 'border-[#21312D] bg-[#0D1816] hover:border-[#2A3F3A] hover:bg-[#111E1B]/70'
               }`}
             >
@@ -631,7 +631,7 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
                     <h3 className="text-xs font-bold text-[#EFF5ED]">{subName}</h3>
                   </div>
                 </div>
-                <div className="mt-1 font-mono text-[10px] text-[#93A39C]">{subSpecs}</div>
+                <div className="mt-1 font-mono text-xs text-[#93A39C]">{subSpecs}</div>
                 <p className="mt-2 text-xs leading-relaxed text-[#93A39C]">{subDesc}</p>
               </div>
             </div>
@@ -641,12 +641,12 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
 
       {/* Enlaces a fuentes científicas primarias */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#21312D] pt-4 text-xs text-[#93A39C]">
-        <div className="flex items-center gap-2 font-mono text-[11px]">
+        <div className="flex items-center gap-2 font-mono text-xs">
           <Flame className="h-3.5 w-3.5 text-[#FF6759]" />
           <span>{t('schematic.sourceTitle')}</span>
         </div>
 
-        <div className="flex items-center gap-4 font-mono text-[11px]">
+        <div className="flex items-center gap-4 font-mono text-xs">
           <a
             href="https://modis.gsfc.nasa.gov/"
             target="_blank"

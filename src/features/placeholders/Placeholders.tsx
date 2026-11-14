@@ -27,7 +27,7 @@ export const PlaceholderBox: React.FC<PlaceholderBoxProps> = ({
           <h3 className="text-sm font-semibold text-[#1f1f1d]">{title}</h3>
         </div>
         {badge && (
-          <span className="rounded bg-[#f4f4f2] px-2 py-0.5 text-[11px] font-medium text-[#55554f]">
+          <span className="rounded bg-[#f4f4f2] px-2 py-0.5 text-xs font-mono font-medium text-[#55554f]">
             {badge}
           </span>
         )}

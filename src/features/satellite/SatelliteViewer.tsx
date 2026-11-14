@@ -41,9 +41,9 @@ class ModelErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBounda
 }
 
 const CanvasLoader: React.FC = () => (
-  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/70 backdrop-blur-sm text-cyan-400 z-10">
+  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#07100F]/85 backdrop-blur-sm text-[#B8EE68] z-10">
     <Loader2 className="h-8 w-8 animate-spin" />
-    <span className="text-xs font-semibold tracking-wider text-slate-300 uppercase">
+    <span className="text-xs font-mono font-semibold tracking-wider text-[#EFF5ED] uppercase">
       Cargando modelo 3D oficial...
     </span>
   </div>
@@ -73,21 +73,21 @@ export const SatelliteViewer: React.FC = () => {
   };
 
   return (
-    <div className="relative flex flex-col w-full h-full min-h-[580px] lg:min-h-[640px] rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl">
+    <div className="relative flex flex-col w-full h-full min-h-[580px] lg:min-h-[640px] rounded-xl overflow-hidden bg-[#07100F] border border-[#21312D]">
       {/* Barra superior de controles */}
-      <div className="relative z-20 flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80">
+      <div className="relative z-20 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#111E1B] border-b border-[#21312D]">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#07100F] text-[#B8EE68] border border-[#21312D]">
             <Eye className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+            <h2 className="text-sm font-sans font-bold text-[#EFF5ED] tracking-wide flex items-center gap-2">
               Visor 3D de Satélites
-              <span className="rounded bg-cyan-950 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 border border-cyan-700/50">
+              <span className="rounded border border-[#21312D] bg-[#07100F] px-2 py-0.5 font-mono text-xs text-[#93A39C]">
                 NASA EOS & VIIRS
               </span>
             </h2>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-[#93A39C] font-sans">
               Modelos orbitales tridimensionales oficiales de la NASA
             </p>
           </div>
@@ -103,10 +103,10 @@ export const SatelliteViewer: React.FC = () => {
             onClick={() => setAutoRotate((prev) => !prev)}
             aria-pressed={autoRotate}
             title={autoRotate ? 'Pausar rotación automática' : 'Reanudar rotación automática'}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-sans font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#B8EE68] ${
               autoRotate
-                ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-300'
-                : 'border-slate-700 bg-slate-900 text-slate-400 hover:text-white'
+                ? 'border-[#B8EE68] bg-[#B8EE68]/15 text-[#EFF5ED]'
+                : 'border-[#21312D] bg-[#0D1816] text-[#93A39C] hover:border-[#2A3F3A] hover:text-[#EFF5ED]'
             }`}
           >
             <RotateCw className={`h-3.5 w-3.5 ${autoRotate ? 'animate-spin-slow' : ''}`} />
@@ -117,7 +117,7 @@ export const SatelliteViewer: React.FC = () => {
             type="button"
             onClick={handleResetCamera}
             title="Restablecer posición de cámara"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#0D1816] px-3 py-1.5 text-xs font-sans font-medium text-[#93A39C] hover:border-[#2A3F3A] hover:text-[#EFF5ED] focus:outline-none focus:ring-2 focus:ring-[#B8EE68]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Restablecer</span>
@@ -128,15 +128,15 @@ export const SatelliteViewer: React.FC = () => {
       {/* Contenedor principal: Canvas 3D + Panel de información */}
       <div className="relative flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
         {/* Viewport 3D Three.js (7 columnas en desktop) */}
-        <div className="relative lg:col-span-7 h-[380px] lg:h-full min-h-[380px] bg-gradient-to-b from-[#040711] via-[#070b18] to-[#040711] select-none">
+        <div className="relative lg:col-span-7 h-[380px] lg:h-full min-h-[380px] bg-[#07100F] select-none">
           <ModelErrorBoundary
             key={`${selectedId}-${retryKey}`}
             fallback={(_error, reset) => (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 z-10">
-                <AlertTriangle className="h-10 w-10 text-amber-400 mb-3" />
-                <h3 className="text-sm font-bold text-white">Error al cargar el modelo 3D</h3>
-                <p className="mt-1 text-xs text-slate-400 max-w-sm">
-                  No se pudo cargar el archivo GLB desde <code className="text-cyan-300">{satellite.modelPath}</code>.
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#07100F]/95 border border-[#FF6759]/40 z-10">
+                <AlertTriangle className="h-10 w-10 text-[#FF6759] mb-3" />
+                <h3 className="text-sm font-sans font-bold text-[#EFF5ED]">Error al cargar el modelo 3D</h3>
+                <p className="mt-1 text-xs font-sans text-[#93A39C] max-w-sm">
+                  No se pudo cargar el archivo GLB desde <code className="text-xs font-mono text-[#68D9D0]">{satellite.modelPath}</code>.
                 </p>
                 <button
                   type="button"
@@ -144,7 +144,7 @@ export const SatelliteViewer: React.FC = () => {
                     reset();
                     handleRetry();
                   }}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white hover:bg-cyan-500"
+                  className="mt-4 inline-flex items-center gap-2 rounded-md bg-[#FF6759] px-4 py-2 text-xs font-sans font-semibold text-[#07100F] hover:bg-[#FF6759]/90 focus:outline-none focus:ring-2 focus:ring-[#B8EE68]"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span>Reintentar</span>
@@ -160,7 +160,7 @@ export const SatelliteViewer: React.FC = () => {
                 className="w-full h-full cursor-grab active:cursor-grabbing"
               >
                 {/* Fondo estrellado espacial */}
-                <color attach="background" args={['#050814']} />
+                <color attach="background" args={['#07100F']} />
                 <Stars radius={100} depth={50} count={3000} factor={4} saturation={0.5} fade speed={1} />
 
                 {/* Iluminación científica calibrada */}
@@ -197,13 +197,13 @@ export const SatelliteViewer: React.FC = () => {
           </ModelErrorBoundary>
 
           {/* Guía de interacción en esquina inferior */}
-          <div className="absolute bottom-3 left-3 z-10 rounded-lg bg-slate-950/70 px-2.5 py-1 text-[10px] text-slate-400 backdrop-blur-md border border-slate-800 pointer-events-none">
+          <div className="absolute bottom-3 left-3 z-10 rounded-md bg-[#07100F]/90 px-2.5 py-1 text-xs font-mono text-[#93A39C] backdrop-blur-sm border border-[#21312D] pointer-events-none">
             Arrastrá para rotar · Rueda o pellizco para zoom
           </div>
         </div>
 
         {/* Panel lateral con información del satélite (5 columnas en desktop) */}
-        <div className="lg:col-span-5 p-4 lg:p-6 overflow-y-auto max-h-[400px] lg:max-h-full bg-slate-950/90 border-t lg:border-t-0 lg:border-l border-slate-800">
+        <div className="lg:col-span-5 p-4 lg:p-6 overflow-y-auto max-h-[440px] lg:max-h-full bg-[#0D1816] border-t lg:border-t-0 lg:border-l border-[#21312D]">
           <SatelliteInfo satellite={satellite} />
         </div>
       </div>

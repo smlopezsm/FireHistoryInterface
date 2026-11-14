@@ -310,13 +310,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         </div>
 
         {/* Acciones de control */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 font-sans text-xs">
           <button
             type="button"
             onClick={() => setIsSpinning((prev) => !prev)}
             aria-pressed={isSpinning}
             title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-mono transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
               isSpinning
                 ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40'
                 : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
@@ -381,7 +381,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                 <button
                   type="submit"
                   disabled={!manualTokenInput.trim()}
-                  className="rounded-lg bg-[#B8EE68] px-4 py-2 font-mono text-xs font-bold text-[#07100F] transition-colors hover:bg-[#cbf58c] disabled:opacity-50"
+                  className="rounded-lg bg-[#B8EE68] px-4 py-2 font-sans text-xs font-bold text-[#07100F] transition-colors hover:bg-[#cbf58c] disabled:opacity-50"
                 >
                   {t('globe.initBtn')}
                 </button>
@@ -406,7 +406,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         {/* Leyenda científica de puntos calientes en la esquina del globo */}
         {activeToken && isLoaded && (
           <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 rounded-md border border-[#21312D] bg-[#07100F]/90 p-2.5 backdrop-blur-md text-xs">
-            <div className="flex items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wider text-[#93A39C] border-b border-[#21312D] pb-1">
+            <div className="flex items-center gap-1.5 font-sans text-xs font-semibold text-[#EFF5ED] border-b border-[#21312D] pb-1">
               <Flame className="h-3.5 w-3.5 text-[#FF6759]" />
               <span>Detecciones Térmicas</span>
             </div>

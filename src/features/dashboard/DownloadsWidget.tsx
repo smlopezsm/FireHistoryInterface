@@ -65,7 +65,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
       <div className="flex items-center gap-2">
         <FileSpreadsheet className="h-4 w-4 text-[#B8EE68]" />
         <div>
-          <span className="font-mono text-xs font-bold text-[#EFF5ED]">
+          <span className="font-title text-xs md:text-sm font-bold text-[#EFF5ED]">
             {t("downloads.title")}
           </span>
           <p className="text-xs text-[#93A39C]">{t("downloads.subtitle")}</p>
@@ -77,7 +77,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
           type="button"
           onClick={() => handleDownload("calendario")}
           disabled={downloading !== null}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-mono text-xs font-semibold text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-sans text-xs font-medium text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors"
         >
           {downloading === "calendario" ? (
             <Check className="h-3.5 w-3.5 text-[#B8EE68]" />
@@ -91,7 +91,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
           type="button"
           onClick={() => handleDownload("focos")}
           disabled={downloading !== null}
-          className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-mono text-xs font-semibold text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-sans text-xs font-medium text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors"
         >
           {downloading === "focos" ? (
             <Check className="h-3.5 w-3.5 text-[#FF9C55]" />

@@ -109,7 +109,7 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs uppercase tracking-wider text-[#93A39C]">
+              <span className="font-sans text-xs font-medium text-[#93A39C]">
                 {t('anomaly.label')} · {zonaNombre}
               </span>
               <span
@@ -119,7 +119,7 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
                 {config.badge}
               </span>
               {categoria !== null && (
-                <span className="rounded bg-[#111E1B] border border-[#21312D] px-1.5 py-0.5 font-mono text-xs font-semibold text-[#EFF5ED]">
+                <span className="rounded bg-[#111E1B] border border-[#21312D] px-1.5 py-0.5 font-mono tabular-nums text-xs font-semibold text-[#EFF5ED]">
                   {deltaFormatted}
                 </span>
               )}
@@ -131,19 +131,19 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         </div>
       </div>
 
-      <div className="mt-3.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs border-t border-[#21312D]/60 pt-3">
+      <div className="mt-3.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-sans text-xs border-t border-[#21312D]/60 pt-3">
         <div>
           <span className="text-[#93A39C]">{t('anomaly.spotsMonth')} </span>
-          <span className="font-bold text-[#EFF5ED] text-sm">{valor.toLocaleString(locale)}</span>
+          <span className="font-mono tabular-nums font-bold text-[#EFF5ED] text-sm">{valor.toLocaleString(locale)}</span>
         </div>
         <div className="text-[#93A39C]">·</div>
         <div>
           <span className="text-[#93A39C]">{t('anomaly.median')} </span>
-          <span className="font-semibold text-[#EFF5ED]">{mediana.toLocaleString(locale)}</span>
+          <span className="font-mono tabular-nums font-semibold text-[#EFF5ED]">{mediana.toLocaleString(locale)}</span>
         </div>
         <div className="text-[#93A39C]">·</div>
-        <div className="text-xs text-[#93A39C]">
-          {t('anomaly.range')} <span className="text-[#EFF5ED]">{p25} – {p75}</span>
+        <div className="text-[#93A39C]">
+          {t('anomaly.range')} <span className="font-mono tabular-nums text-[#EFF5ED]">{p25} – {p75}</span>
         </div>
       </div>
     </div>

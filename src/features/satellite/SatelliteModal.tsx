@@ -42,18 +42,18 @@ export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose 
       aria-labelledby="satellite-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-fade-in"
     >
-      <div className="relative flex flex-col w-full max-w-6xl max-h-[94vh] rounded-2xl bg-slate-950 border border-slate-700/80 shadow-2xl overflow-hidden">
+      <div className="relative flex flex-col w-full max-w-6xl max-h-[94vh] rounded-xl bg-[#0D1816] border border-[#21312D] shadow-[0_12px_32px_rgba(0,0,0,0.65)] overflow-hidden">
         {/* Cabecera del modal */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900/90 text-white">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#21312D] bg-[#111E1B] text-[#EFF5ED]">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-400">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#21312D] bg-[#07100F] text-[#B8EE68]">
               <Orbit className="h-5 w-5" />
             </div>
             <div>
-              <h2 id="satellite-modal-title" className="text-sm font-bold tracking-tight">
+              <h2 id="satellite-modal-title" className="text-sm font-sans font-bold tracking-tight text-[#EFF5ED]">
                 {t('satelliteModal.title')}
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-xs text-[#93A39C] font-sans">
                 {t('satelliteModal.subtitle')}
               </p>
             </div>
@@ -63,14 +63,14 @@ export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose 
             type="button"
             onClick={onClose}
             aria-label={t('satelliteModal.close')}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            className="rounded-md p-1.5 text-[#93A39C] transition-colors hover:bg-[#07100F] hover:text-[#EFF5ED] focus:outline-none focus:ring-2 focus:ring-[#B8EE68]"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Visor 3D */}
-        <div className="flex-1 overflow-hidden p-2 sm:p-3 bg-slate-950">
+        <div className="flex-1 overflow-hidden p-2 sm:p-3 bg-[#07100F]">
           <SatelliteViewer />
         </div>
       </div>
