@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Table, Loader2, Hash, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCalendario, type Capa, type PedidoZona, type PeriodoParams, type Punto } from '../../api';
@@ -74,6 +74,45 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   const etiquetas = etiquetasTramos(cortes, locale);
   const confianzaLabel = (c: Punto['confianza']) =>
     c === 'alta' ? (isEn ? 'high confidence' : 'confianza alta') : c === 'media' ? (isEn ? 'medium confidence' : 'confianza media') : isEn ? 'low confidence' : 'confianza baja';
+
+  // Teclado (patrón "grid" de ARIA): una sola celda tabulable y flechas para moverse.
+  const [foco, setFoco] = useState<string | null>(null);
+  const celdasRef = useRef(new Map<string, HTMLDivElement>());
+  const clave = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}`;
+  const activa = useMemo(() => {
+    if (foco && mesesMap.has(foco)) return foco;
+    for (const anio of years) for (let m = 1; m <= 12; m++) if (mesesMap.has(clave(anio, m))) return clave(anio, m);
+    return null;
+  }, [foco, mesesMap, years]);
+
+  const destino = (actual: string, tecla: string): string | null => {
+    const anio = Number(actual.slice(0, 4));
+    const mes = Number(actual.slice(5, 7));
+    const fila = years.indexOf(anio);
+    const existe = (a: number | undefined, m: number) => (a !== undefined && mesesMap.has(clave(a, m)) ? clave(a, m) : null);
+    const enFila = (a: number, desde: number, paso: number) => {
+      for (let m = desde; m >= 1 && m <= 12; m += paso) if (mesesMap.has(clave(a, m))) return clave(a, m);
+      return null;
+    };
+    switch (tecla) {
+      case 'ArrowRight': return enFila(anio, mes + 1, 1);
+      case 'ArrowLeft': return enFila(anio, mes - 1, -1);
+      case 'ArrowUp': return existe(years[fila - 1], mes);
+      case 'ArrowDown': return existe(years[fila + 1], mes);
+      case 'Home': return enFila(anio, 1, 1);
+      case 'End': return enFila(anio, 12, -1);
+      default: return null;
+    }
+  };
+
+  const onTeclaCelda = (e: React.KeyboardEvent, actual: string) => {
+    if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const siguiente = destino(actual, e.key);
+    if (!siguiente) return;
+    setFoco(siguiente);
+    celdasRef.current.get(siguiente)?.focus();
+  };
 
   const fmt = (v: number | null) => (v === null ? sinDato : Math.round(v).toLocaleString(locale));
 
@@ -222,9 +261,9 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
           {!showTableView ? (
             <div className="overflow-x-auto pb-1">
-              <div className="w-full min-w-[360px]">
-                <div className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 mb-1 font-mono text-[10px] sm:text-xs text-[#93A39C] text-center items-center">
-                  <span className="text-left pl-0.5">{isEn ? 'Year' : 'Año'}</span>
+              <div className="w-full min-w-[660px] sm:min-w-[360px]">
+                <div className="grid grid-cols-[40px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 mb-1 font-mono text-[10px] sm:text-xs text-[#93A39C] text-center items-center">
+                  <span className="sticky left-0 z-10 bg-[#0D1816] text-left pl-0.5">{isEn ? 'Year' : 'Año'}</span>
                   {months.map((m) => (
                     <span key={m} className="truncate">{m}</span>
                   ))}
@@ -235,15 +274,15 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                   {years.map((year) => {
                     const yearTotal = getYearTotal(year);
                     return (
-                      <div key={year} role="row" className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 items-center">
-                        <span className="font-mono text-xs font-semibold text-[#93A39C]">{year}</span>
+                      <div key={year} role="row" className="grid grid-cols-[40px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 items-center">
+                        <span className="sticky left-0 z-10 bg-[#0D1816] font-mono text-xs font-semibold text-[#93A39C]">{year}</span>
 
                         {Array.from({ length: 12 }, (_, monthIdx) => {
                           const key = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
                           const p = mesesMap.get(key);
                           if (!p) {
                             // Fuera del período consultado
-                            return <div key={monthIdx} className="h-7 sm:h-8 rounded-sm" style={{ border: '1px dashed #1A2724' }} aria-hidden="true" />;
+                            return <div key={monthIdx} className="h-11 sm:h-8 rounded-sm" style={{ border: '1px dashed #1A2724' }} aria-hidden="true" />;
                           }
                           const val = valorDeCapa(p, capa);
                           const pattern = p.estado === 'estimado' ? 'pattern-estimado' : p.estado === 'mixto' ? 'pattern-mixto' : '';
@@ -251,12 +290,20 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                           return (
                             <div
                               key={monthIdx}
+                              ref={(el) => {
+                                if (el) celdasRef.current.set(key, el);
+                                else celdasRef.current.delete(key);
+                              }}
+                              onKeyDown={(e) => onTeclaCelda(e, key)}
                               onMouseEnter={() => setHovered(p)}
-                              onFocus={() => setHovered(p)}
+                              onFocus={() => {
+                                setHovered(p);
+                                setFoco(key);
+                              }}
                               onMouseLeave={() => setHovered(null)}
                               onBlur={() => setHovered(null)}
-                              tabIndex={0}
-                              className={`group relative h-7 sm:h-8 rounded-sm transition-transform duration-100 hover:scale-110 hover:z-20 focus:z-20 focus:outline focus:outline-1 focus:outline-[#B8EE68] cursor-pointer flex items-center justify-center ${pattern}`}
+                              tabIndex={key === activa ? 0 : -1}
+                              className={`group relative h-11 sm:h-8 rounded-sm transition-transform duration-100 hover:scale-110 hover:z-20 focus:z-20 focus:outline focus:outline-1 focus:outline-[#B8EE68] cursor-pointer flex items-center justify-center ${pattern}`}
                               style={{
                                 backgroundColor: fondo,
                                 border: p.parcial
@@ -268,7 +315,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                                       : '1px solid rgba(0,0,0,0.3)',
                               }}
                               role="gridcell"
-                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)} · ${confianzaLabel(p.confianza)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}`}
+                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)}${p.estado !== 'observado' && capa === 'armonizado' ? (isEn ? ` · 80 % range ${fmt(p.minimo)}–${fmt(p.maximo)}` : ` · rango 80 % ${fmt(p.minimo)}–${fmt(p.maximo)}`) : ''} · ${confianzaLabel(p.confianza)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}`}
                               data-confianza={p.confianza}
                             >
                               {p.confianza !== 'alta' && val !== null && (

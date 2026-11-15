@@ -107,7 +107,7 @@ export const CoordinateForm: React.FC<CoordinateFormProps> = ({ isEn, selectedZo
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[#687771]">
+        <span className="text-[#93A39C]">
           {isEn
             ? "Decimal degrees; south and west are negative."
             : "Grados decimales; el sur y el oeste son negativos."}
