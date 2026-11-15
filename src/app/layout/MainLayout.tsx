@@ -226,12 +226,15 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
+            {/* Orden en celular (docs/02 §1): zona → anomalía y calendario → mapa → serie → descargas */}
             <div className="rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
               {selector}
-              {globo('h-[420px]')}
             </div>
             <div className="rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]">
               {diagnostico}
+            </div>
+            <div className="rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
+              {globo('h-[420px]')}
             </div>
             {serie('rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden')}
             {descargas('rounded-xl border border-[#21312D]')}

@@ -204,7 +204,7 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
             </select>
           </div>
           {esZonaRegion(selectedZone) && (
-            <span className="text-xs text-[#687771]">
+            <span className="text-xs text-[#93A39C]">
               {isEn
                 ? "Region = union of its provinces' outlines; may differ 1–5 % from the sum by province."
                 : "Región = unión de los contornos de sus provincias; puede diferir 1–5 % de la suma por provincia."}
