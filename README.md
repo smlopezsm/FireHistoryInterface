@@ -65,7 +65,11 @@ FireHistoryInterface/
 
 ```bash
 npm ci
-VITE_API_BASE_URL=http://66.97.41.70:9000/ npm run dev
+# El frontend siempre llama a la ruta relativa /api/v1.
+# En desarrollo, el proxy de Vite la manda al backend indicado en VITE_BACKEND_URL
+# (por defecto http://localhost:8000). Para usar otra API, creá .env.development.local:
+#   VITE_BACKEND_URL=http://localhost:8000
+npm run dev
 # Producción local con Docker
 docker build -t firehistory-web .
 docker run --rm -p 8080:80 firehistory-web

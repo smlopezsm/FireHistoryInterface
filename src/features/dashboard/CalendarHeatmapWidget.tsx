@@ -1,576 +1,400 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Table, Loader2, Hash } from 'lucide-react';
-import { useCalendario, type MesArmonizado } from '../../api';
+import { Table, Loader2, Hash, AlertCircle } from 'lucide-react';
+import { useCalendario, type Capa, type PedidoZona, type PeriodoParams, type Punto } from '../../api';
 
 interface CalendarHeatmapWidgetProps {
   zonaNombre: string;
-  capa: "armonizado" | "modis" | "viirs";
-  provincia_id?: string;
-  bbox?: [number, number, number, number];
+  capa: Capa;
+  pedido: PedidoZona | null;
+  periodo?: Omit<PeriodoParams, 'capa'>;
+  /** Después de esta fecha los datos son NRT (preliminares). */
+  fechaUltimoSp?: string;
   className?: string;
 }
 
-const MONTHS_ES = [
-  "Ene",
-  "Feb",
-  "Mar",
-  "Abr",
-  "May",
-  "Jun",
-  "Jul",
-  "Ago",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dic",
-];
-const MONTHS_EN = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-const YEARS = Array.from({ length: 27 }, (_, i) => 2026 - i); // 2026 a 2000
+const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Valor a mostrar según la capa. null = sin dato (nunca 0). */
+const valorDeCapa = (p: Punto, capa: Capa): number | null =>
+  capa === 'modis' ? p.modis : capa === 'viirs' ? p.viirs : p.armonizado;
+
+// Rampa de color proporcional a la cantidad de focos del mes
+const getCellColor = (val: number | null) => {
+  if (val === null) return '#111E1B';
+  if (val === 0) return '#0D1816';
+  if (val < 50) return '#162C25';
+  if (val < 250) return '#234C3E';
+  if (val < 800) return '#357161';
+  if (val < 2500) return '#D97736';
+  if (val < 5000) return '#E85338';
+  return '#FF3B30';
+};
+
+const OPACIDAD_CONFIANZA = { alta: 1, media: 0.85, baja: 0.68 } as const;
 
 export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   zonaNombre,
   capa,
-  provincia_id,
-  bbox,
+  pedido,
+  periodo = {},
+  fechaUltimoSp,
   className = '',
 }) => {
   const { t, i18n } = useTranslation();
-  const isEn = !Boolean(i18n?.language?.startsWith("es"));
+  const isEn = !Boolean(i18n?.language?.startsWith('es'));
   const months = isEn ? MONTHS_EN : MONTHS_ES;
-  const locale = isEn ? "en-US" : "es-AR";
+  const locale = isEn ? 'en-US' : 'es-AR';
+  const spots = isEn ? 'spots' : 'focos';
+  const sinDato = isEn ? 'no data' : 'sin dato';
 
-  const bboxStr = !provincia_id && bbox ? bbox.join(',') : undefined;
-  const { data: apiData, isLoading: isLoadingCalendar } = useCalendario({
-    provincia_id,
-    bbox: bboxStr,
-    capa,
-  });
+  const { data, isLoading, isFetching, error } = useCalendario(pedido, { ...periodo, capa });
 
-  const apiMesesMap = useMemo(() => {
-    const map = new Map<string, MesArmonizado>();
-    if (apiData?.meses) {
-      apiData.meses.forEach((m) => {
-        map.set(m.periodo, m);
-      });
-    }
+  const mesesMap = useMemo(() => {
+    const map = new Map<string, Punto>();
+    data?.meses.forEach((m) => map.set(m.periodo, m));
     return map;
-  }, [apiData]);
+  }, [data]);
 
-  const [hoveredCell, setHoveredCell] = useState<{
-    year: number;
-    month: number;
-    val: number;
-    isEstimated: boolean;
-    modis: number;
-    viirs: number | null;
-    minimo?: number;
-    maximo?: number;
-    confianza?: string;
-  } | null>(null);
+  // Años presentes en la respuesta, del más reciente al más antiguo
+  const years = useMemo(() => {
+    const set = new Set<number>();
+    data?.meses.forEach((m) => set.add(parseInt(m.periodo.slice(0, 4), 10)));
+    return Array.from(set).sort((a, b) => b - a);
+  }, [data]);
 
+  const mesUltimoSp = fechaUltimoSp?.slice(0, 7);
+
+  const [hovered, setHovered] = useState<Punto | null>(null);
   const [showTableView, setShowTableView] = useState(false);
   const [showNumbers, setShowNumbers] = useState(true);
 
-  // Formato compacto para números dentro de las celdas (ej: 0, 45, 1.2k, 18k)
-  const formatCellCount = (val: number | null) => {
-    if (val === null) return '';
-    if (val === 0) return '0';
-    if (val < 1000) return `${val}`;
-    if (val < 10000) return `${(val / 1000).toFixed(1).replace('.0', '')}k`;
-    return `${Math.round(val / 1000)}k`;
+  const fmt = (v: number | null) => (v === null ? sinDato : Math.round(v).toLocaleString(locale));
+
+  // Formato compacto para números dentro de las celdas (0, 45, 1.2k, 18k)
+  const formatCellCount = (val: number) => {
+    const v = Math.round(val);
+    if (v < 1000) return `${v}`;
+    if (v < 10000) return `${(v / 1000).toFixed(1).replace('.0', '')}k`;
+    return `${Math.round(v / 1000)}k`;
   };
 
-  // Obtener datos del mes: desde FireHistoryInterfaceAPI o fallback determinista
-  const getCellData = (year: number, monthIndex: number) => {
-    // Meses antes de Nov 2000 o después de Nov 2026 no tienen datos
-    if (year === 2000 && monthIndex < 10) {
-      return { val: null, isEstimated: false, modis: null, viirs: null };
-    }
-    if (year > 2026 || (year === 2026 && monthIndex > 10)) {
-      return { val: null, isEstimated: false, modis: null, viirs: null };
-    }
-
-    const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
-    const apiPunto = apiMesesMap.get(key);
-
-    if (apiData) {
-      // Si la API respondió, usamos datos reales del backend
-      if (apiPunto) {
-        const val =
-          capa === 'modis'
-            ? apiPunto.modis
-            : capa === 'viirs'
-              ? apiPunto.viirs
-              : Math.round(apiPunto.armonizado);
-
-        return {
-          val,
-          isEstimated: apiPunto.estado === 'estimado',
-          modis: apiPunto.modis,
-          viirs: apiPunto.viirs,
-          minimo: apiPunto.minimo,
-          maximo: apiPunto.maximo,
-          confianza: apiPunto.confianza,
-        };
-      }
-
-      // Mes dentro del período pero sin registros (0 focos)
-      return {
-        val: 0,
-        isEstimated: year < 2012,
-        modis: 0,
-        viirs: year >= 2012 ? 0 : null,
-        minimo: 0,
-        maximo: 0,
-        confianza: 'alta',
-      };
-    }
-
-    // Fallback contextual mientras la API carga o si está offline
-    const isEstimated = year < 2012;
-    const seasonalFactor =
-      monthIndex === 7
-        ? 4.5
-        : monthIndex === 8
-          ? 5.2
-          : monthIndex === 9
-            ? 3.8
-            : monthIndex === 6
-              ? 2.5
-              : 1.0;
-
-    const yearExtreme = year === 2020 ? 3.2 : year === 2008 ? 2.4 : 1.0;
-    const baseValue = Math.round(
-      (45 + ((year * 17 + monthIndex * 31) % 180)) *
-        seasonalFactor *
-        yearExtreme,
-    );
-
-    const modisCount = Math.round(baseValue / 2.8);
-    const viirsCount = isEstimated ? null : Math.round(baseValue * 0.95);
-
-    return {
-      val: capa === 'modis' ? modisCount : capa === 'viirs' ? viirsCount : baseValue,
-      isEstimated,
-      modis: modisCount,
-      viirs: viirsCount,
-      minimo: Math.round(baseValue * 0.8),
-      maximo: Math.round(baseValue * 1.25),
-      confianza: 'alta',
-    };
-  };
-
-  const peakMonthFormatted = useMemo(() => {
-    if (apiData?.resumen?.max_mes) {
-      const [y, m] = apiData.resumen.max_mes.split('-');
-      const monthIdx = parseInt(m, 10) - 1;
-      const monthName = months[monthIdx] || m;
-      const peakPunto = apiMesesMap.get(apiData.resumen.max_mes);
-      const val =
-        peakPunto
-          ? Math.round(
-              capa === 'modis'
-                ? peakPunto.modis
-                : capa === 'viirs'
-                  ? (peakPunto.viirs ?? 0)
-                  : peakPunto.armonizado,
-            )
-          : null;
-      const spotsText =
-        val !== null ? ` (${val.toLocaleString(locale)} ${isEn ? 'spots' : 'focos'})` : '';
-      return `${monthName} ${y}${spotsText}`;
-    }
-    return isEn ? "August 2020 (4,812 spots)" : "Agosto 2020 (4.812 focos)";
-  }, [apiData, apiMesesMap, capa, months, locale, isEn]);
-
-  const peakYearFormatted = apiData?.resumen?.max_anio ?? 2020;
-
-  // Suma total anual de focos para cada año (columna 13 de la matriz)
   const getYearTotal = (year: number) => {
     let total = 0;
     let hasData = false;
-    for (let m = 0; m < 12; m++) {
-      const cell = getCellData(year, m);
-      if (cell.val !== null) {
-        total += cell.val;
+    for (let m = 1; m <= 12; m++) {
+      const p = mesesMap.get(`${year}-${String(m).padStart(2, '0')}`);
+      const v = p ? valorDeCapa(p, capa) : null;
+      if (v !== null) {
+        total += v;
         hasData = true;
       }
     }
-    return hasData ? total : null;
+    return hasData ? Math.round(total) : null;
   };
 
-  // Rampa de color proporcional a la cantidad real de focos en el mes
-  const getCellColor = (val: number | null) => {
-    if (val === null) return '#111E1B'; // Sin dato satelital / fuera del período
-    if (val === 0) return '#0D1816';    // 0 focos (Sin actividad de incendios en el mes)
-    if (val < 50) return '#162C25';    // 1 a 49 focos (Actividad muy leve)
-    if (val < 250) return '#234C3E';   // 50 a 249 focos (Baja)
-    if (val < 800) return '#357161';   // 250 a 799 focos (Moderada)
-    if (val < 2500) return '#D97736';  // 800 a 2499 focos (Alta)
-    if (val < 5000) return '#E85338';  // 2500 a 4999 focos (Muy alta)
-    return '#FF3B30';                  // ≥ 5000 focos (Extrema / Crítica)
-  };
+  const estadoLabel = (p: Punto) =>
+    p.estado === 'observado'
+      ? isEn ? 'Observed' : 'Observado'
+      : p.estado === 'estimado'
+        ? isEn ? 'Estimated' : 'Estimado'
+        : isEn ? 'Mixed' : 'Mixto';
+
+  const peak = useMemo(() => {
+    const maxMes = data?.resumen.max_mes;
+    if (!maxMes) return null;
+    const [y, m] = maxMes.split('-');
+    const p = mesesMap.get(maxMes);
+    const v = p ? valorDeCapa(p, capa) : null;
+    return `${months[parseInt(m, 10) - 1]} ${y}${v !== null ? ` (${fmt(v)} ${spots})` : ''}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, mesesMap, capa, months, locale]);
+
+  // La API devuelve la unidad en español; en inglés se traduce la conocida.
+  const unidad =
+    isEn && data?.unidad === 'focos (escala VIIRS S-NPP)'
+      ? 'spots (VIIRS S-NPP scale)'
+      : isEn && data?.unidad.startsWith('focos')
+        ? data.unidad.replace(/^focos/, 'spots')
+        : data?.unidad ?? '';
+  const capaLabel = capa === 'armonizado' ? (isEn ? 'Harmonized' : 'Armonizado') : capa.toUpperCase();
 
   return (
-    <div
-      role="region"
-      aria-label={t("calendar.title")}
-      className={`bg-[#0D1816] p-4 text-[#EFF5ED] ${className}`}
-    >
-      {/* Encabezado del Widget */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#21312D] pb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-title text-sm md:text-base font-bold text-[#EFF5ED]">
-              {t("calendar.title")}
-            </h3>
-            <span className="rounded bg-[#111E1B] border border-[#21312D] px-2 py-0.5 font-mono text-xs text-[#93A39C] flex items-center gap-1.5">
-              {isLoadingCalendar && (
-                <Loader2 className="h-3 w-3 animate-spin text-[#B8EE68]" />
-              )}
-              <span>{t("calendar.badge")}</span>
-            </span>
+    <div role="region" aria-label={t('calendar.title')} aria-busy={isLoading} className={`bg-[#0D1816] p-4 text-[#EFF5ED] ${className}`}>
+      {/* Encabezado */}
+      <div className="flex flex-col gap-2 border-b border-[#21312D] pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="font-title text-sm md:text-base font-bold text-[#EFF5ED]">{t('calendar.title')}</h3>
+            {isFetching && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#B8EE68]" />}
           </div>
-          <p className="mt-0.5 text-xs text-[#93A39C]">
-            {t("calendar.subtitle")}{" "}
-            <span className="text-[#EFF5ED] font-semibold">{zonaNombre}</span> (
-            {capa}) ·{" "}
-            <span className="text-[#B8EE68]/90 font-mono">
-              {isEn ? "Resolution: Monthly (12 months × 27 years)" : "Resolución: Mensual (12 meses × 27 años)"}
-            </span>
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {!showTableView && (
+          <div className="flex items-center gap-1.5">
+            {!showTableView && (
+              <button
+                type="button"
+                onClick={() => setShowNumbers((prev) => !prev)}
+                aria-pressed={showNumbers}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
+              >
+                <Hash className="h-3.5 w-3.5" />
+                <span>{showNumbers ? (isEn ? 'Hide values' : 'Ocultar valores') : (isEn ? 'Show values' : 'Mostrar valores')}</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setShowNumbers((prev) => !prev)}
-              className="inline-flex items-center gap-1 rounded-md border border-[#21312D] bg-[#111E1B] px-2.5 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
-              title={showNumbers ? (isEn ? "Hide number of spots in cells" : "Ocultar cantidad de focos en las celdas") : (isEn ? "Show number of spots in cells" : "Mostrar cantidad de focos en las celdas")}
+              onClick={() => setShowTableView((prev) => !prev)}
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
             >
-              <Hash className="h-3.5 w-3.5" />
-              <span>{showNumbers ? (isEn ? "Hide values" : "Ocultar valores") : (isEn ? "Show values" : "Mostrar valores")}</span>
+              <Table className="h-3.5 w-3.5" />
+              <span>{showTableView ? t('calendar.viewMatrix') : t('calendar.viewTable')}</span>
             </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowTableView((prev) => !prev)}
-            className="inline-flex items-center gap-1 rounded-md border border-[#21312D] bg-[#111E1B] px-2.5 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
-          >
-            <Table className="h-3.5 w-3.5" />
-            <span>
-              {showTableView
-                ? t("calendar.viewMatrix")
-                : t("calendar.viewTable")}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Resumen de cantidades y máximos históricos */}
-      <div className="my-2.5 flex flex-wrap items-center justify-between gap-y-2 rounded-lg bg-[#07100F] px-3 py-1.5 font-sans text-xs border border-[#21312D]">
-        <div className="flex items-center gap-2">
-          <span className="text-[#93A39C]">
-            {isEn ? "Historical monthly peak:" : "Pico mensual histórico:"}
-          </span>
-          <span className="font-mono tabular-nums font-bold text-[#FF6759]">
-            {peakMonthFormatted}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[#93A39C]">
-            {isEn ? "Total in period:" : "Total acumulado:"}
-          </span>
-          <span className="font-mono tabular-nums font-bold text-[#B8EE68]">
-            {apiData?.resumen?.total !== undefined
-              ? `${Math.round(apiData.resumen.total).toLocaleString(locale)} ${isEn ? "spots" : "focos"}`
-              : isEn ? "Calculating..." : "Calculando..."}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[#93A39C]">
-            {isEn ? "Year with most fire:" : "Año con más fuego:"}
-          </span>
-          <span className="font-mono tabular-nums font-bold text-[#FF9C55]">
-            {peakYearFormatted}
-          </span>
-        </div>
-      </div>
-
-      {/* Matriz Heatmap o Vista en Tabla */}
-      {!showTableView ? (
-        <div className="overflow-x-auto pb-1">
-          <div className="min-w-[580px]">
-            {/* Cabecera con meses y Total Anual */}
-            <div className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 mb-1 font-mono text-xs text-[#93A39C] text-center items-center">
-              <span className="text-left pl-1">{isEn ? "Year" : "Año"}</span>
-              {months.map((m) => (
-                <span key={m}>{m}</span>
-              ))}
-              <span className="text-right pr-1 font-semibold text-[#EFF5ED]">{isEn ? "Total" : "Total"}</span>
-            </div>
-
-            {/* Filas de años */}
-            <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1">
-              {YEARS.map((year) => {
-                const yearTotal = getYearTotal(year);
-
-                return (
-                  <div
-                    key={year}
-                    className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 items-center"
-                  >
-                    <span className="font-mono text-xs font-semibold text-[#93A39C]">
-                      {year}
-                    </span>
-
-                    {Array.from({ length: 12 }, (_, monthIdx) => {
-                      const data = getCellData(year, monthIdx);
-                      const bgColor = getCellColor(data.val);
-
-                      return (
-                        <div
-                          key={monthIdx}
-                          onMouseEnter={() =>
-                            data.val !== null &&
-                            setHoveredCell({
-                              year,
-                              month: monthIdx,
-                              val: data.val,
-                              isEstimated: data.isEstimated,
-                              modis: data.modis!,
-                              viirs: data.viirs,
-                              minimo: data.minimo,
-                              maximo: data.maximo,
-                              confianza: data.confianza,
-                            })
-                          }
-                          onMouseLeave={() => setHoveredCell(null)}
-                          className={`group relative h-7 sm:h-8 rounded-sm transition-transform duration-100 hover:scale-110 hover:z-20 cursor-pointer flex items-center justify-center ${
-                            data.isEstimated ? "pattern-estimado" : ""
-                          }`}
-                          style={{
-                            backgroundColor: bgColor,
-                            border:
-                              data.val === null
-                                ? "1px dashed #21312D"
-                                : data.val === 0
-                                  ? "1px solid #162420"
-                                  : "1px solid rgba(0,0,0,0.3)",
-                          }}
-                          role="gridcell"
-                          aria-label={`${months[monthIdx]} ${year}: ${
-                            data.val !== null
-                              ? `${data.val.toLocaleString(locale)} ${isEn ? "spots" : "focos"}`
-                              : t("calendar.noDataLegend")
-                          }`}
-                        >
-                          {showNumbers && data.val !== null && (
-                            <span
-                              className={`font-mono text-[9px] sm:text-[10px] tabular-nums font-semibold select-none leading-none pointer-events-none ${
-                                data.val === 0
-                                  ? "text-[#475753]"
-                                  : data.val >= 800
-                                    ? "text-[#07100F] font-bold"
-                                    : "text-[#EFF5ED]"
-                              }`}
-                            >
-                              {formatCellCount(data.val)}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Columna Total Anual */}
-                    <div
-                      className="font-mono text-xs font-semibold tabular-nums text-right pr-1 text-[#FF9C55]"
-                      title={`Total ${year}: ${yearTotal !== null ? yearTotal.toLocaleString(locale) : '—'} focos`}
-                    >
-                      {yearTotal !== null ? (yearTotal >= 1000 ? `${(yearTotal / 1000).toFixed(1)}k` : yearTotal) : '—'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
-      ) : (
-        /* Vista de Tabla accesible */
-        <div className="max-h-[380px] overflow-auto">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-[#21312D] font-sans font-semibold text-[#93A39C]">
-                <th className="py-2 text-left">{isEn ? "Year" : "Año"}</th>
-                <th className="py-2 text-left">{isEn ? "Month" : "Mes"}</th>
-                <th className="py-2 text-right">
-                  {isEn ? "Harmonized Spots" : "Focos Armonizados"}
-                </th>
-                <th className="py-2 text-right">MODIS</th>
-                <th className="py-2 text-right">VIIRS</th>
-                <th className="py-2 text-center">
-                  {isEn ? "Status" : "Estado"}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="font-mono tabular-nums">
-              {YEARS.slice(0, 10).map((year) =>
-                Array.from({ length: 12 }, (_, monthIdx) => {
-                  const data = getCellData(year, monthIdx);
-                  if (data.val === null) return null;
-                  return (
-                    <tr
-                      key={`${year}-${monthIdx}`}
-                      className="border-b border-[#21312D]/40 hover:bg-[#111E1B]"
-                    >
-                      <td className="py-1 text-[#EFF5ED]">{year}</td>
-                      <td className="py-1 text-[#93A39C] font-sans">
-                        {months[monthIdx]}
+        <p className="text-xs text-[#93A39C]">
+          {t('calendar.subtitle')} <span className="text-[#EFF5ED] font-semibold">{zonaNombre}</span>
+          {' · '}
+          {capaLabel}
+          {data && (
+            <span className="font-mono text-[#B8EE68]/90">
+              {' · '}
+              {data.meses[0]?.periodo.slice(0, 4)}–{data.meses[data.meses.length - 1]?.periodo.slice(0, 4)}
+              {' · '}
+              {unidad}
+            </span>
+          )}
+        </p>
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-3 flex items-start gap-1.5 rounded-md border border-[#FF6759]/40 bg-[#FF6759]/10 px-2.5 py-1.5 text-xs text-[#FF6759]">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-px" />
+          <span>{error.message}</span>
+        </p>
+      )}
+
+      {isLoading && (
+        <div className="mt-3 flex h-40 items-center justify-center gap-2 rounded-lg border border-dashed border-[#21312D] text-xs text-[#93A39C]">
+          <Loader2 className="h-4 w-4 animate-spin text-[#B8EE68]" />
+          {isEn ? 'Loading calendar…' : 'Cargando calendario…'}
+        </div>
+      )}
+
+      {data && (
+        <>
+          {/* Resumen */}
+          <div className="my-2.5 flex flex-wrap items-center justify-between gap-y-2 rounded-lg bg-[#07100F] px-3 py-1.5 font-sans text-xs border border-[#21312D]">
+            <div className="flex items-center gap-2">
+              <span className="text-[#93A39C]">{isEn ? 'Peak month:' : 'Pico mensual:'}</span>
+              <span className="font-mono tabular-nums font-bold text-[#FF6759]">{peak ?? sinDato}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[#93A39C]">{isEn ? 'Total in period:' : 'Total del período:'}</span>
+              <span className="font-mono tabular-nums font-bold text-[#B8EE68]">
+                {data.resumen.total === null ? sinDato : `${fmt(data.resumen.total)} ${spots}`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[#93A39C]">{isEn ? 'Year with most fire:' : 'Año con más fuego:'}</span>
+              <span className="font-mono tabular-nums font-bold text-[#FF9C55]">{data.resumen.max_anio ?? sinDato}</span>
+            </div>
+          </div>
+
+          {!showTableView ? (
+            <div className="overflow-x-auto pb-1">
+              <div className="min-w-[580px]">
+                <div className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 mb-1 font-mono text-xs text-[#93A39C] text-center items-center">
+                  <span className="text-left pl-1">{isEn ? 'Year' : 'Año'}</span>
+                  {months.map((m) => (
+                    <span key={m}>{m}</span>
+                  ))}
+                  <span className="text-right pr-1 font-semibold text-[#EFF5ED]">Total</span>
+                </div>
+
+                <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1" role="grid">
+                  {years.map((year) => {
+                    const yearTotal = getYearTotal(year);
+                    return (
+                      <div key={year} role="row" className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 items-center">
+                        <span className="font-mono text-xs font-semibold text-[#93A39C]">{year}</span>
+
+                        {Array.from({ length: 12 }, (_, monthIdx) => {
+                          const key = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+                          const p = mesesMap.get(key);
+                          if (!p) {
+                            // Fuera del período consultado
+                            return <div key={monthIdx} className="h-7 sm:h-8 rounded-sm" style={{ border: '1px dashed #1A2724' }} aria-hidden="true" />;
+                          }
+                          const val = valorDeCapa(p, capa);
+                          const pattern = p.estado === 'estimado' ? 'pattern-estimado' : p.estado === 'mixto' ? 'pattern-mixto' : '';
+                          return (
+                            <div
+                              key={monthIdx}
+                              onMouseEnter={() => setHovered(p)}
+                              onFocus={() => setHovered(p)}
+                              onMouseLeave={() => setHovered(null)}
+                              onBlur={() => setHovered(null)}
+                              tabIndex={0}
+                              className={`group relative h-7 sm:h-8 rounded-sm transition-transform duration-100 hover:scale-110 hover:z-20 focus:z-20 focus:outline focus:outline-1 focus:outline-[#B8EE68] cursor-pointer flex items-center justify-center ${pattern}`}
+                              style={{
+                                backgroundColor: getCellColor(val),
+                                opacity: OPACIDAD_CONFIANZA[p.confianza],
+                                border: p.parcial
+                                  ? '1px solid #B8EE68'
+                                  : val === null
+                                    ? '1px dashed #2A3F3A'
+                                    : p.estado === 'mixto'
+                                      ? '1px dashed rgba(255,156,85,0.55)'
+                                      : '1px solid rgba(0,0,0,0.3)',
+                              }}
+                              role="gridcell"
+                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}`}
+                            >
+                              {showNumbers && val !== null && (
+                                <span
+                                  className={`font-mono text-[9px] sm:text-[10px] tabular-nums font-semibold select-none leading-none pointer-events-none ${
+                                    Math.round(val) === 0 ? 'text-[#475753]' : val >= 800 ? 'text-[#07100F] font-bold' : 'text-[#EFF5ED]'
+                                  }`}
+                                >
+                                  {formatCellCount(val)}
+                                </span>
+                              )}
+                              {showNumbers && val === null && (
+                                <span className="font-mono text-[9px] text-[#475753] select-none pointer-events-none">—</span>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <div className="font-mono text-xs font-semibold tabular-nums text-right pr-1 text-[#FF9C55]" title={`Total ${year}: ${yearTotal !== null ? yearTotal.toLocaleString(locale) : sinDato}`}>
+                          {yearTotal !== null ? (yearTotal >= 1000 ? `${(yearTotal / 1000).toFixed(1)}k` : yearTotal) : '—'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="max-h-[380px] overflow-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-[#21312D] font-sans font-semibold text-[#93A39C]">
+                    <th className="py-2 text-left">{isEn ? 'Period' : 'Período'}</th>
+                    <th className="py-2 text-right">{isEn ? 'Harmonized' : 'Armonizado'}</th>
+                    <th className="py-2 text-right">{isEn ? 'Range 80%' : 'Rango 80 %'}</th>
+                    <th className="py-2 text-right">MODIS</th>
+                    <th className="py-2 text-right">VIIRS</th>
+                    <th className="py-2 text-center">{isEn ? 'Status' : 'Estado'}</th>
+                  </tr>
+                </thead>
+                <tbody className="font-mono tabular-nums">
+                  {[...data.meses].reverse().map((p) => (
+                    <tr key={p.periodo} className="border-b border-[#21312D]/40 hover:bg-[#111E1B]">
+                      <td className="py-1 text-[#EFF5ED]">
+                        {p.periodo}
+                        {p.parcial && <span className="ml-1 text-[#B8EE68]">*</span>}
                       </td>
-                      <td className="py-1 text-right font-bold text-[#EFF5ED]">
-                        {data.val.toLocaleString(locale)}
+                      <td className="py-1 text-right font-bold text-[#EFF5ED]">{fmt(p.armonizado)}</td>
+                      <td className="py-1 text-right text-[#93A39C]">
+                        {p.estado === 'observado' ? '—' : `${fmt(p.minimo)}–${fmt(p.maximo)}`}
                       </td>
-                      <td className="py-1 text-right text-[#68D9D0]">
-                        {data.modis}
-                      </td>
-                      <td className="py-1 text-right text-[#FF9C55]">
-                        {data.viirs !== null ? data.viirs : "—"}
-                      </td>
+                      <td className="py-1 text-right text-[#68D9D0]">{fmt(p.modis)}</td>
+                      <td className="py-1 text-right text-[#FF9C55]">{fmt(p.viirs)}</td>
                       <td className="py-1 text-center font-sans">
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-xs ${
-                            data.isEstimated
-                              ? "bg-[#FF9C55]/20 text-[#FF9C55]"
-                              : "bg-[#B8EE68]/20 text-[#B8EE68]"
-                          }`}
-                        >
-                          {data.isEstimated
-                            ? isEn
-                              ? "Estimated"
-                              : "Estimado"
-                            : isEn
-                              ? "Observed"
-                              : "Observado"}
+                        <span className={`rounded px-1.5 py-0.5 text-xs ${p.estado === 'observado' ? 'bg-[#B8EE68]/20 text-[#B8EE68]' : 'bg-[#FF9C55]/20 text-[#FF9C55]'}`}>
+                          {estadoLabel(p)}
                         </span>
                       </td>
                     </tr>
-                  );
-                }),
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Detalle del mes bajo el cursor */}
+          {hovered && (
+            <div className="mt-2 rounded-lg border border-[#21312D] bg-[#07100F] p-2.5 text-xs text-[#EFF5ED] animate-fade-in">
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <span className="font-title font-bold text-[#B8EE68]">
+                  {months[parseInt(hovered.periodo.slice(5, 7), 10) - 1]} {hovered.periodo.slice(0, 4)}
+                  {hovered.parcial && (
+                    <span className="ml-2 rounded bg-[#B8EE68]/15 px-1.5 py-0.5 font-mono text-[10px] text-[#B8EE68]">
+                      {isEn ? 'month in progress' : 'mes en curso'}
+                    </span>
+                  )}
+                  {mesUltimoSp && hovered.periodo > mesUltimoSp && (
+                    <span className="ml-2 rounded bg-[#FF9C55]/15 px-1.5 py-0.5 font-mono text-[10px] text-[#FF9C55]">
+                      {isEn ? 'preliminary' : 'preliminar'}
+                    </span>
+                  )}
+                </span>
+                <span className="font-sans text-xs text-[#93A39C]">
+                  {estadoLabel(hovered)}
+                  {hovered.estado !== 'observado' &&
+                    ` · ${Math.round(hovered.frac_estimada * 100)} % ${isEn ? 'of days estimated' : 'de los días estimados'}`}
+                </span>
+              </div>
+              <div className="mt-1 text-xs">
+                <span className="font-mono tabular-nums text-base font-bold text-[#EFF5ED]">{fmt(valorDeCapa(hovered, capa))}</span>{' '}
+                <span className="font-sans text-xs text-[#EFF5ED]">
+                  {valorDeCapa(hovered, capa) === null
+                    ? isEn ? '(no VIIRS data for this month)' : '(no hay dato VIIRS para este mes)'
+                    : isEn ? 'spots in the month' : 'focos en el mes'}
+                </span>
+                {hovered.estado !== 'observado' && capa === 'armonizado' && (
+                  <span className="ml-1 font-mono text-xs text-[#93A39C]">
+                    ({isEn ? 'between' : 'entre'} {fmt(hovered.minimo)} {isEn ? 'and' : 'y'} {fmt(hovered.maximo)}, 80 %)
+                  </span>
+                )}
+                <span className="ml-2 rounded bg-[#111E1B] px-1.5 py-0.5 font-mono text-[10px] text-[#68D9D0] border border-[#21312D]">
+                  {isEn ? 'Confidence' : 'Confianza'}: {hovered.confianza}
+                </span>
+              </div>
+              <div className="mt-1 flex gap-3 font-mono tabular-nums text-xs text-[#93A39C] border-t border-[#21312D] pt-1">
+                <span>MODIS: {fmt(hovered.modis)}</span>
+                <span>VIIRS: {fmt(hovered.viirs)}</span>
+                <span>{isEn ? 'Harmonized' : 'Armonizado'}: {fmt(hovered.armonizado)}</span>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Tooltip dinámico contextual */}
-      {hoveredCell && (
-        <div className="mt-2 rounded-lg border border-[#21312D] bg-[#07100F] p-2.5 text-xs text-[#EFF5ED] animate-fade-in">
-          <div className="flex items-center justify-between">
-            <span className="font-title font-bold text-[#B8EE68]">
-              {months[hoveredCell.month]} {hoveredCell.year}
-            </span>
-            <span className="font-sans text-xs text-[#93A39C]">
-              {hoveredCell.isEstimated
-                ? isEn
-                  ? "⚠️ Estimated value (before 2012)"
-                  : "⚠️ Valor estimado (antes de 2012)"
-                : isEn
-                  ? "✓ Active VIIRS sensor"
-                  : "✓ Sensor VIIRS activo"}
-            </span>
-          </div>
-          <div className="mt-1 text-xs">
-            <span className="font-mono tabular-nums text-base font-bold text-[#EFF5ED]">
-              {hoveredCell.val.toLocaleString(locale)}
-            </span>{" "}
-            <span className="font-sans text-xs text-[#EFF5ED]">
-              {hoveredCell.val === 0
-                ? isEn
-                  ? "spots (no fire activity in this month)"
-                  : "focos (sin actividad de fuego en el mes)"
-                : isEn
-                  ? "spots (monthly aggregated)"
-                  : "focos acumulados en el mes"}
-            </span>
-            {hoveredCell.val > 0 && hoveredCell.isEstimated && (
-              <span className="ml-1 font-mono text-xs text-[#93A39C]">
-                ({isEn ? "80% CI" : "IC 80%"}:{" "}
-                {hoveredCell.minimo !== undefined
-                  ? Math.round(hoveredCell.minimo).toLocaleString(locale)
-                  : Math.round(hoveredCell.val * 0.8)}{" "}
-                –{" "}
-                {hoveredCell.maximo !== undefined
-                  ? Math.round(hoveredCell.maximo).toLocaleString(locale)
-                  : Math.round(hoveredCell.val * 1.25)})
-              </span>
-            )}
-            {hoveredCell.val > 0 && hoveredCell.confianza && (
-              <span className="ml-2 rounded bg-[#111E1B] px-1.5 py-0.5 font-mono text-[10px] text-[#68D9D0] border border-[#21312D]">
-                {isEn ? `Conf: ${hoveredCell.confianza}` : `Conf: ${hoveredCell.confianza}`}
-              </span>
-            )}
-          </div>
-          <div className="mt-1 flex gap-3 font-mono tabular-nums text-xs text-[#93A39C] border-t border-[#21312D] pt-1">
-            <span>MODIS: {hoveredCell.modis}</span>
-            <span>
-              VIIRS:{" "}
-              {hoveredCell.viirs !== null
-                ? hoveredCell.viirs
-                : isEn
-                  ? "no data (started 2012)"
-                  : "sin dato (inició 2012)"}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Leyenda científica de colores y texturas */}
+      {/* Leyenda */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#21312D] pt-3 font-sans text-xs text-[#93A39C]">
         <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-1">
             <span className="inline-block h-3 w-3 rounded-sm border border-[#162420] bg-[#0D1816]" />
             <span>0</span>
           </div>
-          <span className="mx-1 text-[#2A3F3A]">|</span>
-          <span>{isEn ? "Low (1–49)" : "Leve (1–49)"}</span>
           <div className="flex h-3 gap-0.5">
-            <span className="w-3 rounded-sm" style={{ backgroundColor: '#162C25' }} title="1–49 focos" />
-            <span className="w-3 rounded-sm" style={{ backgroundColor: '#234C3E' }} title="50–249 focos" />
-            <span className="w-3 rounded-sm" style={{ backgroundColor: '#357161' }} title="250–799 focos" />
-            <span className="w-3 rounded-sm" style={{ backgroundColor: '#D97736' }} title="800–2499 focos" />
-            <span className="w-3 rounded-sm" style={{ backgroundColor: '#E85338' }} title="2500–4999 focos" />
-            <span className="w-3 rounded-sm" style={{ backgroundColor: '#FF3B30' }} title="≥ 5000 focos" />
+            {['#162C25', '#234C3E', '#357161', '#D97736', '#E85338', '#FF3B30'].map((c) => (
+              <span key={c} className="w-3 rounded-sm" style={{ backgroundColor: c }} />
+            ))}
           </div>
-          <span className="text-[#FF3B30]">
-            {isEn ? "Extreme (≥5k)" : "Extremo (≥5k)"}
-          </span>
+          <span className="text-[#FF3B30]">≥5k</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1">
             <div className="h-3 w-5 rounded border border-[#93A39C] bg-[#285448] pattern-estimado" />
-            <span>{isEn ? "Estimated (pre-2012)" : "Estimado (pre-2012)"}</span>
+            <span>{isEn ? 'Estimated' : 'Estimado'}</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded bg-[#111E1B] border border-dashed border-[#21312D]" />
-            <span>{t("calendar.noDataLegend")}</span>
+            <div className="h-3 w-5 rounded bg-[#285448] pattern-mixto" style={{ border: '1px dashed rgba(255,156,85,0.7)' }} />
+            <span>{isEn ? 'Mixed' : 'Mixto'}</span>
           </div>
+          <div className="flex items-center gap-1">
+            <div className="h-3 w-3 rounded bg-[#285448] border border-[#B8EE68]" />
+            <span>{isEn ? 'In progress' : 'En curso'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="h-3 w-3 rounded bg-[#111E1B] border border-dashed border-[#2A3F3A]" />
+            <span>{t('calendar.noDataLegend')}</span>
+          </div>
+          <span className="text-[#687771]">{isEn ? 'Fainter = lower confidence' : 'Más tenue = menor confianza'}</span>
         </div>
       </div>
     </div>

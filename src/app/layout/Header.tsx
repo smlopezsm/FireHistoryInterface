@@ -85,13 +85,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
           >
             {t('header.nav.calendar')}
           </button>
-          <button
-            type="button"
-            onClick={() => scrollToSection('la-mision')}
-            className="rounded px-2.5 py-1 hover:text-[#EFF5ED] hover:bg-[#111E1B] transition-colors focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
-          >
-            {t('header.nav.mission')}
-          </button>
         </nav>
 
         {/* Acciones de cabecera */}
