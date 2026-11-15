@@ -14,6 +14,7 @@ import {
   useAnomalia,
   useMetadata,
   useProvincias,
+  esZonaRegion,
   pedidoDeZona,
   zoomParaBbox,
   aMes,
@@ -121,6 +122,16 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
     />
   );
 
+  const selectedProvinciaIds = useMemo(() => {
+    if (zona.provincia_id) return [zona.provincia_id];
+    if (esZonaRegion(zona) && apiProvincias) {
+      return apiProvincias
+        .filter((p) => p.region === zona.region)
+        .map((p) => p.provincia_id);
+    }
+    return [];
+  }, [zona, apiProvincias]);
+
   const globo = (heightClass: string) => (
     <GloboTerraqueo
       center={zona.center}
@@ -128,7 +139,9 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
       bbox={zona.bbox}
       capa={capa}
       externalMonth={mesMapa ?? undefined}
+      geometriaZona={zona.geometria}
       selectedProvinciaId={zona.provincia_id}
+      selectedProvinciaIds={selectedProvinciaIds}
       onSelectProvincia={handleSelectProvinciaFromMap}
       className={`w-full ${heightClass} rounded-none border-0`}
     />

@@ -47,6 +47,36 @@ const monthDiff = (fromYm: string, toYm: string): number => {
   return Math.max(0, (ty - fy) * 12 + (tm - fm));
 };
 
+const isPointInRing = (lng: number, lat: number, ring: number[][]): boolean => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+};
+
+const isPointInPolygonCoords = (lng: number, lat: number, rings: number[][][]): boolean => {
+  if (!rings.length || !isPointInRing(lng, lat, rings[0])) return false;
+  for (let i = 1; i < rings.length; i++) {
+    if (isPointInRing(lng, lat, rings[i])) return false;
+  }
+  return true;
+};
+
+const isPointInGeometry = (
+  lng: number,
+  lat: number,
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
+): boolean => {
+  if (geometry.type === 'Polygon') {
+    return isPointInPolygonCoords(lng, lat, geometry.coordinates);
+  }
+  return geometry.coordinates.some((poly) => isPointInPolygonCoords(lng, lat, poly));
+};
+
 // Estilo cartográfico oscuro científico (IGN Argentina Argenmap Oscuro), perspectiva 3D inclinada sobre Argentina
 const DEFAULT_GLOBE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -135,7 +165,9 @@ interface GloboTerraqueoProps {
   bbox?: [number, number, number, number];
   capa?: 'armonizado' | 'modis' | 'viirs';
   externalMonth?: string;
+  geometriaZona?: GeoJSON.Polygon | GeoJSON.MultiPolygon;
   selectedProvinciaId?: string;
+  selectedProvinciaIds?: string[];
   onSelectProvincia?: (provinciaId: string | null) => void;
 }
 
@@ -147,7 +179,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   bbox = [-73.6, -55.1, -53.6, -21.8],
   capa = 'armonizado',
   externalMonth,
+  geometriaZona,
   selectedProvinciaId,
+  selectedProvinciaIds,
   onSelectProvincia,
 }) => {
   const { t, i18n } = useTranslation();
@@ -165,7 +199,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     GeoJSON.Geometry,
     ProvinciaFeatureProperties
   > | null>(null);
-  const selectedProvinciaIdRef = useRef(selectedProvinciaId);
+  const activeSelectedIds = selectedProvinciaIds ?? (selectedProvinciaId ? [selectedProvinciaId] : []);
+  const selectedProvinciaIdsRef = useRef<string[]>(activeSelectedIds);
+  selectedProvinciaIdsRef.current = activeSelectedIds;
   const onSelectProvinciaRef = useRef(onSelectProvincia);
   onSelectProvinciaRef.current = onSelectProvincia;
   const idleTimeoutRef = useRef<number | null>(null);
@@ -375,13 +411,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       .then((fc) => {
         if (isCancelled) return;
         const features = fc?.features || [];
-        setTotalCellsCount(features.length);
 
-        const topFeatures = [...features]
-          .sort((a: any, b: any) => (b.properties?.valor ?? 0) - (a.properties?.valor ?? 0))
-          .slice(0, 60);
-
-        const mapped = topFeatures.map((f: any, idx: number) => {
+        const mappedAll = features.map((f: any, idx: number) => {
           const coords = f.geometry?.coordinates?.[0] || [];
           let sumLng = 0;
           let sumLat = 0;
@@ -400,11 +431,23 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             lat: Number((sumLat / count).toFixed(4)),
             sensor: sensor as 'viirs' | 'modis',
             brightness: Math.min(420, Math.round(310 + valor * 1.5)),
+            valor,
             province: provId ? `Prov. ${provId} (${Math.round(valor)} focos)` : `Celda ${f.properties?.cell_id ?? idx}`,
           };
         });
 
-        setRealHotspots(mapped);
+        const scoped = geometriaZona
+          ? mappedAll.filter((spot) => isPointInGeometry(spot.lng, spot.lat, geometriaZona))
+          : mappedAll;
+
+        setTotalCellsCount(scoped.length);
+
+        const topSpots = [...scoped]
+          .sort((a, b) => b.valor - a.valor)
+          .slice(0, 60)
+          .map(({ valor: _v, ...spot }) => spot);
+
+        setRealHotspots(topSpots);
       })
       .catch(() => {
         if (!isCancelled) {
@@ -419,7 +462,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [activeSensorFilter, selectedMonth, bboxParam, metadata?.fecha_max]);
+  }, [activeSensorFilter, selectedMonth, bboxParam, metadata?.fecha_max, geometriaZona]);
 
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {
@@ -461,7 +504,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
         if (provinciasGeoJSONRef.current) {
           provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
-          provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+          provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
         }
 
         setIsLoaded(true);
@@ -536,13 +579,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       };
       provinciasGeoJSONRef.current = fc;
       provinciasControllerRef.current.setGeoJSON(fc);
-      provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+      provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
       return;
     }
 
     if (provinciasGeoJSONRef.current) {
       provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
-      provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+      provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
       return;
     }
 
@@ -553,7 +596,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         if (!data || data.type !== 'FeatureCollection' || !provinciasControllerRef.current) return;
         provinciasGeoJSONRef.current = data;
         provinciasControllerRef.current.setGeoJSON(data);
-        provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+        provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
       })
       .catch(() => {
         // Silencioso en entornos sin red o tests jsdom
@@ -562,12 +605,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     return () => controller.abort();
   }, [isLoaded, apiProvincias]);
 
-  // Sincronizar selección externa (ZoneSelectorWidget) con el estado GPU del mapa
+  // Sincronizar selección externa (provincia o región) con el estado GPU del mapa
+  const selectedIdsKey = activeSelectedIds.join(',');
   useEffect(() => {
-    selectedProvinciaIdRef.current = selectedProvinciaId;
     if (!isLoaded || !provinciasControllerRef.current) return;
-    provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaId ?? null);
-  }, [selectedProvinciaId, isLoaded]);
+    provinciasControllerRef.current.setSelectedProvincias(activeSelectedIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdsKey, isLoaded]);
 
   // Actualizar marcadores al cambiar filtro de sensor o reiniciar animación
   useEffect(() => {

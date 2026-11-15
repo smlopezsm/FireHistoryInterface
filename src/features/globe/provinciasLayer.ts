@@ -32,6 +32,7 @@ export interface ProvinciasLayerController {
     data: GeoJSON.FeatureCollection<GeoJSON.Geometry, ProvinciaFeatureProperties>
   ) => void;
   setSelectedProvincia: (provinciaId?: string | null) => void;
+  setSelectedProvincias: (provinciaIds: string[]) => void;
   ensureLayers: () => void;
   destroy: () => void;
 }
@@ -46,8 +47,8 @@ export function attachProvinciasLayer(
   options: ProvinciasLayerOptions = {}
 ): ProvinciasLayerController {
   let hoveredId: string | number | null = null;
-  let selectedId: string | number | null = null;
-  let desiredProvinciaId: string | null = null;
+  const selectedIds = new Set<string | number>();
+  let desiredProvinciaIds: string[] = [];
   let lastGeoJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry, ProvinciaFeatureProperties> = {
     type: 'FeatureCollection',
     features: [],
@@ -84,14 +85,21 @@ export function attachProvinciasLayer(
     }
   };
 
-  const applySelectedFeatureId = (nextId: string | number | null) => {
-    if (selectedId === nextId) return;
-    if (selectedId !== null) {
-      setStateSafe(selectedId, { selected: false });
+  const applySelectedFeatureIds = (nextIds: Iterable<string | number>) => {
+    const nextSet = new Set(nextIds);
+    for (const id of selectedIds) {
+      if (!nextSet.has(id)) {
+        setStateSafe(id, { selected: false });
+      }
     }
-    selectedId = nextId;
-    if (selectedId !== null) {
-      setStateSafe(selectedId, { selected: true });
+    for (const id of nextSet) {
+      if (!selectedIds.has(id)) {
+        setStateSafe(id, { selected: true });
+      }
+    }
+    selectedIds.clear();
+    for (const id of nextSet) {
+      selectedIds.add(id);
     }
   };
 
@@ -209,13 +217,13 @@ export function attachProvinciasLayer(
     const pid = (feature.properties?.provincia_id as string | undefined) ?? null;
     if (pid) provIdToFeatureId.set(pid, clickedId);
 
-    if (selectedId === clickedId) {
-      applySelectedFeatureId(null);
-      desiredProvinciaId = null;
+    if (selectedIds.size === 1 && selectedIds.has(clickedId)) {
+      applySelectedFeatureIds([]);
+      desiredProvinciaIds = [];
       options.onSelectProvincia?.(null);
     } else {
-      applySelectedFeatureId(clickedId);
-      desiredProvinciaId = pid;
+      applySelectedFeatureIds([clickedId]);
+      desiredProvinciaIds = pid ? [pid] : [];
       options.onSelectProvincia?.(pid);
     }
   };
@@ -229,9 +237,9 @@ export function attachProvinciasLayer(
       layers: [PROVINCIAS_FILL_LAYER_ID],
     });
 
-    if (hits.length === 0 && selectedId !== null) {
-      applySelectedFeatureId(null);
-      desiredProvinciaId = null;
+    if (hits.length === 0 && selectedIds.size > 0) {
+      applySelectedFeatureIds([]);
+      desiredProvinciaIds = [];
       options.onSelectProvincia?.(null);
     }
   };
@@ -239,9 +247,11 @@ export function attachProvinciasLayer(
   const handleSourceData = (e: maplibregl.MapSourceDataEvent) => {
     if (e.sourceId !== PROVINCIAS_SOURCE_ID || !e.isSourceLoaded) return;
     rebuildFeatureIndex();
-    if (desiredProvinciaId) {
-      const targetFeatureId = provIdToFeatureId.get(desiredProvinciaId) ?? null;
-      applySelectedFeatureId(targetFeatureId);
+    if (desiredProvinciaIds.length > 0) {
+      const targetFeatureIds = desiredProvinciaIds
+        .map((id) => provIdToFeatureId.get(id))
+        .filter((id): id is string | number => id !== undefined && id !== null);
+      applySelectedFeatureIds(targetFeatureIds);
     }
   };
 
@@ -251,6 +261,20 @@ export function attachProvinciasLayer(
   map.on?.('click', PROVINCIAS_FILL_LAYER_ID, handleLayerClick);
   map.on?.('click', handleMapClick);
   map.on?.('sourcedata', handleSourceData);
+
+  const syncDesiredSelection = () => {
+    if (desiredProvinciaIds.length === 0) {
+      applySelectedFeatureIds([]);
+      return;
+    }
+    rebuildFeatureIndex();
+    const targetFeatureIds = desiredProvinciaIds
+      .map((id) => provIdToFeatureId.get(id))
+      .filter((id): id is string | number => id !== undefined && id !== null);
+    if (targetFeatureIds.length > 0) {
+      applySelectedFeatureIds(targetFeatureIds);
+    }
+  };
 
   return {
     setGeoJSON(data) {
@@ -263,26 +287,23 @@ export function attachProvinciasLayer(
         lastGeoJSON as unknown as Parameters<maplibregl.GeoJSONSource['setData']>[0]
       );
       hoveredId = null;
-      selectedId = null;
+      selectedIds.clear();
       provIdToFeatureId.clear();
     },
 
     setSelectedProvincia(provinciaId?: string | null) {
-      desiredProvinciaId = provinciaId ?? null;
-      if (!desiredProvinciaId) {
-        applySelectedFeatureId(null);
-        return;
-      }
-      rebuildFeatureIndex();
-      const targetFeatureId = provIdToFeatureId.get(desiredProvinciaId) ?? null;
-      if (targetFeatureId !== null) {
-        applySelectedFeatureId(targetFeatureId);
-      }
+      desiredProvinciaIds = provinciaId ? [provinciaId] : [];
+      syncDesiredSelection();
+    },
+
+    setSelectedProvincias(provinciaIds: string[]) {
+      desiredProvinciaIds = provinciaIds;
+      syncDesiredSelection();
     },
 
     ensureLayers() {
       hoveredId = null;
-      selectedId = null;
+      selectedIds.clear();
       ensureLayers();
       if (lastGeoJSON.features.length > 0) {
         const source = map.getSource?.(PROVINCIAS_SOURCE_ID) as
@@ -299,9 +320,11 @@ export function attachProvinciasLayer(
         setStateSafe(hoveredId, { hover: false });
         hoveredId = null;
       }
-      if (selectedId !== null) {
-        setStateSafe(selectedId, { selected: false });
-        selectedId = null;
+      if (selectedIds.size > 0) {
+        for (const id of selectedIds) {
+          setStateSafe(id, { selected: false });
+        }
+        selectedIds.clear();
       }
       setCursor('');
       map.off?.('mousemove', PROVINCIAS_FILL_LAYER_ID, handleMouseMove);
