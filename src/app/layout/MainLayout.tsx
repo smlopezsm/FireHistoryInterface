@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import {
@@ -11,7 +11,7 @@ import {
 } from '../../features/dashboard';
 import { GloboTerraqueo } from '../../features/globe';
 import { SatelliteSchematic } from '../../features/satellite-schematic';
-import { useAnomalia } from '../../api';
+import { useAnomalia, useProvincias } from '../../api';
 
 interface MainLayoutProps {
   onOpenMethod?: () => void;
@@ -25,6 +25,38 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const [selectedZone, setSelectedZone] = useState<ZoneItem>(PROVINCIAS_ARG[0]); // Argentina por defecto
   const [capa, setCapa] = useState<'armonizado' | 'modis' | 'viirs'>('armonizado');
   const [selectedMonth, setSelectedMonth] = useState<string | undefined>(undefined);
+  const { data: apiProvincias } = useProvincias();
+
+  const handleSelectProvinciaFromMap = useCallback(
+    (provinciaId: string | null) => {
+      if (!provinciaId) {
+        setSelectedZone(PROVINCIAS_ARG[0]);
+        return;
+      }
+
+      const apiMatch = apiProvincias?.find((p) => p.provincia_id === provinciaId);
+      if (apiMatch) {
+        const lng = Number(((apiMatch.bbox[0] + apiMatch.bbox[2]) / 2).toFixed(2));
+        const lat = Number(((apiMatch.bbox[1] + apiMatch.bbox[3]) / 2).toFixed(2));
+        setSelectedZone({
+          id: apiMatch.provincia_id,
+          provincia_id: apiMatch.provincia_id,
+          name: apiMatch.nombre,
+          region: apiMatch.region,
+          center: [lng, lat],
+          zoom: 5.5,
+          bbox: apiMatch.bbox,
+        });
+        return;
+      }
+
+      const fallbackMatch = PROVINCIAS_ARG.find((z) => z.provincia_id === provinciaId);
+      if (fallbackMatch) {
+        setSelectedZone(fallbackMatch);
+      }
+    },
+    [apiProvincias]
+  );
 
   const isSpanish = Boolean(i18n?.language?.startsWith('es'));
   const currentMonthName = isSpanish ? 'Septiembre' : 'September';
@@ -163,6 +195,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               bbox={selectedZone.bbox}
               capa={capa}
               externalMonth={selectedMonth}
+              selectedProvinciaId={selectedZone.provincia_id}
+              onSelectProvincia={handleSelectProvinciaFromMap}
               className="w-full h-[560px] xl:h-[620px] rounded-none border-0"
             />
 
@@ -231,6 +265,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               bbox={selectedZone.bbox}
               capa={capa}
               externalMonth={selectedMonth}
+              selectedProvinciaId={selectedZone.provincia_id}
+              onSelectProvincia={handleSelectProvinciaFromMap}
               className="w-full h-[420px] rounded-none border-0"
             />
           </div>

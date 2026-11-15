@@ -2,7 +2,13 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getMapaCeldas, useMetadata } from '../../api';
+import { getMapaCeldas, useMetadata, type GeoJSON } from '../../api';
+import {
+  attachProvinciasLayer,
+  PROVINCIAS_GEOJSON_URL,
+  type ProvinciaFeatureProperties,
+  type ProvinciasLayerController,
+} from './provinciasLayer';
 import {
   RotateCw,
   RefreshCw,
@@ -129,6 +135,8 @@ interface GloboTerraqueoProps {
   bbox?: [number, number, number, number];
   capa?: 'armonizado' | 'modis' | 'viirs';
   externalMonth?: string;
+  selectedProvinciaId?: string;
+  onSelectProvincia?: (provinciaId: string | null) => void;
 }
 
 export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
@@ -139,6 +147,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   bbox = [-73.6, -55.1, -53.6, -21.8],
   capa = 'armonizado',
   externalMonth,
+  selectedProvinciaId,
+  onSelectProvincia,
 }) => {
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
@@ -149,6 +159,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const provinciasControllerRef = useRef<ProvinciasLayerController | null>(null);
+  const provinciasGeoJSONRef = useRef<GeoJSON.FeatureCollection<
+    GeoJSON.Geometry,
+    ProvinciaFeatureProperties
+  > | null>(null);
+  const selectedProvinciaIdRef = useRef(selectedProvinciaId);
+  const onSelectProvinciaRef = useRef(onSelectProvincia);
+  onSelectProvinciaRef.current = onSelectProvincia;
   const idleTimeoutRef = useRef<number | null>(null);
   const userPickedMonthRef = useRef(false);
   const prevViewRef = useRef({ lng: center[0], lat: center[1], zoom });
@@ -399,6 +417,20 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         } catch {
           // Ignorar si el entorno de test/estilo difiere
         }
+
+        if (!provinciasControllerRef.current) {
+          provinciasControllerRef.current = attachProvinciasLayer(map, {
+            onSelectProvincia: (pid) => onSelectProvinciaRef.current?.(pid),
+          });
+        } else {
+          provinciasControllerRef.current.ensureLayers();
+        }
+
+        if (provinciasGeoJSONRef.current) {
+          provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
+          provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+        }
+
         setIsLoaded(true);
         if (onMapReady) onMapReady(map);
       });
@@ -437,6 +469,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       return () => {
         if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+        provinciasControllerRef.current?.destroy();
+        provinciasControllerRef.current = null;
         markersRef.current.forEach((m) => m.remove());
         map.remove();
         mapRef.current = null;
@@ -446,6 +480,38 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       setErrorMessage(err instanceof Error ? err.message : 'Error al inicializar MapLibre');
     }
   }, [handleInteractionStart, handleInteractionEnd, spinGlobe, onMapReady]);
+
+  // Cargar GeoJSON estático de provincias desde public/ (sin depender del backend)
+  useEffect(() => {
+    if (!isLoaded || !provinciasControllerRef.current) return;
+    if (provinciasGeoJSONRef.current) {
+      provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
+      provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(PROVINCIAS_GEOJSON_URL, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || data.type !== 'FeatureCollection' || !provinciasControllerRef.current) return;
+        provinciasGeoJSONRef.current = data;
+        provinciasControllerRef.current.setGeoJSON(data);
+        provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+      })
+      .catch(() => {
+        // Silencioso en entornos sin red o tests jsdom
+      });
+
+    return () => controller.abort();
+  }, [isLoaded]);
+
+  // Sincronizar selección externa (ZoneSelectorWidget) con el estado GPU del mapa
+  useEffect(() => {
+    selectedProvinciaIdRef.current = selectedProvinciaId;
+    if (!isLoaded || !provinciasControllerRef.current) return;
+    provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaId ?? null);
+  }, [selectedProvinciaId, isLoaded]);
 
   // Actualizar marcadores al cambiar filtro de sensor o reiniciar animación
   useEffect(() => {
