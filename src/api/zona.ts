@@ -100,22 +100,26 @@ export function validarBbox(oeste: number, sur: number, este: number, norte: num
   if (este < aO || oeste > aE || norte < aS || sur > aN) {
     return { ok: false, error: isEn ? 'The area is outside Argentina.' : 'La zona queda fuera de Argentina.' };
   }
-  return { ok: true, bbox: [r4(oeste), r4(sur), r4(este), r4(norte)] };
+  const bbox: BBox = [r4(oeste), r4(sur), r4(este), r4(norte)];
+  if (bbox[0] >= bbox[2] || bbox[1] >= bbox[3]) {
+    return { ok: false, error: isEn ? 'The rectangle is too small.' : 'El rectángulo es demasiado chico.' };
+  }
+  return { ok: true, bbox };
 }
 
-/** Rectángulo centrado en un punto con un radio en km. */
-export function bboxDePunto(lat: number, lon: number, radioKm: number, isEn = false): ResultadoBbox {
-  if (![lat, lon, radioKm].every(Number.isFinite)) {
-    return { ok: false, error: isEn ? 'Enter latitude, longitude and radius.' : 'Ingresá latitud, longitud y radio.' };
+/** Rectángulo centrado en un punto con una distancia en km del centro a cada lado. */
+export function bboxDePunto(lat: number, lon: number, distanciaKm: number, isEn = false): ResultadoBbox {
+  if (![lat, lon, distanciaKm].every(Number.isFinite)) {
+    return { ok: false, error: isEn ? 'Enter latitude, longitude and distance.' : 'Ingresá latitud, longitud y distancia.' };
   }
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return { ok: false, error: isEn ? 'Latitude goes from −90 to 90 and longitude from −180 to 180.' : 'La latitud va de −90 a 90 y la longitud de −180 a 180.' };
   }
-  if (radioKm < 1 || radioKm > 1000) {
-    return { ok: false, error: isEn ? 'Radius must be between 1 and 1000 km.' : 'El radio tiene que estar entre 1 y 1000 km.' };
+  if (distanciaKm < 1 || distanciaKm > 1000) {
+    return { ok: false, error: isEn ? 'Distance must be between 1 and 1000 km.' : 'La distancia tiene que estar entre 1 y 1000 km.' };
   }
-  const dLat = radioKm / KM_POR_GRADO;
-  const dLon = radioKm / (KM_POR_GRADO * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+  const dLat = distanciaKm / KM_POR_GRADO;
+  const dLon = distanciaKm / (KM_POR_GRADO * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
   return validarBbox(lon - dLon, lat - dLat, lon + dLon, lat + dLat, isEn);
 }
 

@@ -7,7 +7,9 @@ import { MainLayout } from '../src/app/layout/MainLayout';
 
 // El globo real necesita WebGL: acá alcanza con ver qué mes recibe.
 vi.mock('../src/features/globe', () => ({
-  GloboTerraqueo: (props: { month?: string }) => <div data-testid="globo" data-mes={props.month} />,
+  GloboTerraqueo: (props: { month?: string; mesDesde?: string; mesHasta?: string }) => (
+    <div data-testid="globo" data-mes={props.month} data-desde={props.mesDesde} data-hasta={props.mesHasta} />
+  ),
 }));
 
 const provincias = [
@@ -42,7 +44,10 @@ describe('MainLayout · estado en la URL', () => {
     vi.spyOn(api, 'getProvincias').mockResolvedValue(provincias as any);
     vi.spyOn(api, 'getCalendario').mockResolvedValue(calendario as any);
     vi.spyOn(api, 'getSerie').mockResolvedValue({ zona: calendario.zona, granularidad: 'anio', puntos: [] } as any);
-    vi.spyOn(api, 'getAnomalia').mockResolvedValue({ mes: '2024-08', valor: 1, categoria: null } as any);
+    vi.spyOn(api, 'getAnomalia').mockImplementation(async (_zona, { mes } = {}) =>
+      ({ mes, valor: 1, categoria: null }) as any,
+    );
+    vi.spyOn(api, 'descargarCsv').mockResolvedValue('datos.csv');
   });
   afterEach(() => irA(''));
 
@@ -58,6 +63,9 @@ describe('MainLayout · estado en la URL', () => {
       ),
     );
     expect(screen.getAllByTestId('globo')[0]).toHaveAttribute('data-mes', '2024-08');
+    expect(screen.getByTestId('globo')).toHaveAttribute('data-desde', '2018-01');
+    expect(screen.getByTestId('globo')).toHaveAttribute('data-hasta', '2024-12');
+    expect(api.getCalendario).toHaveBeenCalledTimes(1);
     // La URL se conserva (incluido lang).
     expect(new URLSearchParams(window.location.search).get('zona')).toBe('prov:74');
     expect(new URLSearchParams(window.location.search).get('lang')).toBe('es');
@@ -87,6 +95,43 @@ describe('MainLayout · estado en la URL', () => {
     const julio = screen.getByRole('gridcell', { name: /Jul 2024/ });
     fireEvent.click(julio);
     await waitFor(() => expect(screen.getAllByTestId('globo')[0]).toHaveAttribute('data-mes', '2024-07'));
+    await waitFor(() => expect(api.getAnomalia).toHaveBeenLastCalledWith(
+      { provincia_id: '74' }, { mes: '2024-07' }, expect.anything(),
+    ));
     expect(new URLSearchParams(window.location.search).get('mes')).toBe('2024-07');
   });
+  it('acota el mes al período y las descargas usan el alcance de cada vista', async () => {
+    irA('?zona=prov:74&desde=2024-07&hasta=2024-08&mes=2024-09&capa=viirs');
+    render(<Providers><MainLayout /></Providers>);
+
+    await waitFor(() => expect(screen.getByTestId('globo')).toHaveAttribute('data-mes', '2024-08'));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).has('mes')).toBe(false));
+
+    fireEvent.click(screen.getByText('Download CSV'));
+    fireEvent.click(screen.getByRole('button', { name: /Calendar.*MODIS, VIIRS and harmonized/ }));
+    await waitFor(() => expect(api.descargarCsv).toHaveBeenLastCalledWith(
+      { provincia_id: '74' },
+      { tipo: 'calendario', desde: '2024-07', hasta: '2024-08' },
+      expect.any(String),
+    ));
+
+    const focos = screen.getByRole('button', { name: /Hot spots.*August 2024.*All sensors/ });
+    await waitFor(() => expect(focos).toBeEnabled());
+    fireEvent.click(focos);
+    await waitFor(() => expect(api.descargarCsv).toHaveBeenLastCalledWith(
+      { provincia_id: '74' },
+      { tipo: 'focos', desde: '2024-08-01', hasta: '2024-08-31', sensor: 'todos' },
+      expect.any(String),
+    ));
+  });
+
+  it('muestra el mes parcial cuando es el único del período', async () => {
+    irA('?desde=2026-11&hasta=2026-11');
+    render(<Providers><MainLayout /></Providers>);
+    await waitFor(() => expect(screen.getByTestId('globo')).toHaveAttribute('data-mes', '2026-11'));
+    await waitFor(() => expect(api.getAnomalia).toHaveBeenLastCalledWith(
+      expect.anything(), { mes: '2026-11' }, expect.anything(),
+    ));
+  });
+
 });

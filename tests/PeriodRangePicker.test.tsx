@@ -3,7 +3,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { PeriodRangePicker } from '../src/features/dashboard/PeriodRangePicker';
 
 describe('PeriodRangePicker', () => {
-  it('applies quick period presets directly', () => {
+  it('does not offer dates when metadata is missing', () => {
+    render(<PeriodRangePicker periodo={{ desde: '', hasta: '' }} onChangePeriodo={vi.fn()} isEn metadataError />);
+    expect(screen.getByRole('status')).toHaveTextContent('Period unavailable');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('offers presets inside the period selector', () => {
     const onChangePeriodo = vi.fn();
     render(
       <PeriodRangePicker
@@ -15,10 +21,15 @@ describe('PeriodRangePicker', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '1Y' }));
+    const trigger = screen.getByRole('button', { name: /Select period range/i });
+    expect(screen.queryByRole('button', { name: 'Last year' })).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Last year' }));
     expect(onChangePeriodo).toHaveBeenCalledWith({ desde: '2025-12', hasta: '2026-11' });
 
-    fireEvent.click(screen.getByRole('button', { name: '5Y' }));
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Last 5 years' }));
     expect(onChangePeriodo).toHaveBeenCalledWith({ desde: '2021-12', hasta: '2026-11' });
   });
 

@@ -47,6 +47,12 @@ describe('tramos de conteo del mapa', () => {
 });
 
 describe('celdasAMarcadores', () => {
+  it('omite celdas sin geometría utilizable', () => {
+    const sinGeometria = celda(1, 20);
+    sinGeometria.geometry.coordinates = [];
+    expect(celdasAMarcadores([sinGeometria])).toEqual({ marcadores: [], total: 0 });
+  });
+
   it('ordena por focos, limita la cantidad dibujada e informa el total', () => {
     const features = Array.from({ length: 249 }, (_, i) => celda(i, 5 + i));
     const { marcadores, total } = celdasAMarcadores(features, { max: 60 });
@@ -105,11 +111,11 @@ describe('popupCeldaHtml', () => {
 
 describe('textoContador', () => {
   it('dice cuántas celdas se dibujan sobre el total', () => {
-    expect(textoContador(60, 249, '2026-10', false)).toBe('60 de 249 celdas · 2026-10');
-    expect(textoContador(60, 249, '2026-10', true)).toBe('60 of 249 cells · 2026-10');
+    expect(textoContador(60, 249, false)).toBe('60 de 249 celdas');
+    expect(textoContador(60, 249, true)).toBe('60 of 249 cells');
   });
 
   it('cuando se dibujan todas, muestra solo el total', () => {
-    expect(textoContador(12, 12, '2026-10', false)).toBe('12 celdas · 2026-10');
+    expect(textoContador(12, 12, false)).toBe('12 celdas');
   });
 });

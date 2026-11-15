@@ -1,8 +1,6 @@
 {
   "header": {
     "title": "FuegoContinuo",
-    "badge": "DEMO MODE · SAMPLE DATA",
-    "badgeShort": "DEMO · SAMPLE",
     "subtitle": "Harmonization of MODIS and VIIRS hot spots in Argentina (2000 → today).",
     "nav": {
       "explore": "Explore",
@@ -56,6 +54,8 @@
     "closeDialog": "Close explanation"
   },
   "zone": {
+    "coordinates": "Area by coordinates",
+    "calendarAndComparison": "Calendar and historical comparison",
     "title": "Area Selection",
     "ignBadge": "Official IGN",
     "province": "Province",
@@ -96,7 +96,7 @@
     "range": "Historical middle half (P25–P75):"
   },
   "calendar": {
-    "title": "Harmonized Calendar month × year",
+    "title": "Monthly calendar",
     "badge": "2000 → today",
     "subtitle": "Hot spots in",
     "viewMatrix": "Matrix View",

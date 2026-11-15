@@ -4,7 +4,6 @@ import type { GeoJSON } from '../../api/types';
 export const PROVINCIAS_SOURCE_ID = 'provincias-source';
 export const PROVINCIAS_FILL_LAYER_ID = 'provincias-fill';
 export const PROVINCIAS_LINE_LAYER_ID = 'provincias-line';
-export const PROVINCIAS_GEOJSON_URL = '/data/provincias-argentina.geojson';
 
 /**
  * Visual palette for GPU-accelerated province hover & selection states.

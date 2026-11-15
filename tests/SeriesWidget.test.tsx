@@ -77,6 +77,7 @@ describe('SeriesWidget · la curva corresponde siempre a su encabezado', () => {
     expect(screen.getByText('400k')).toBeInTheDocument();
     const grafico = screen.getByRole('img', { name: /Focos por|Fire spots per/ });
     expect(grafico).toHaveAttribute('data-desactualizado', 'true');
+    expect(grafico).toHaveAccessibleName(/por año|per year/);
     expect(screen.getByRole('region', { name: /Serie temporal|Time series/ })).toHaveAttribute('aria-busy', 'true');
   });
 });

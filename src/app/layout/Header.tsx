@@ -46,16 +46,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
               <h1 className="font-title text-base md:text-lg font-bold tracking-tight text-[#EFF5ED]">
                 {t('header.title')}
               </h1>
-              <span className="rounded border border-[#21312D] bg-[#111E1B] px-2 py-0.5 font-mono text-xs text-[#93A39C]">
-                {metadata?.factores_version ? (
-                  <span>v{metadata.factores_version}</span>
-                ) : (
-                  <>
-                    <span className="hidden sm:inline">{t('header.badge')}</span>
-                    <span className="inline sm:hidden">{t('header.badgeShort', { defaultValue: 'DEMO' })}</span>
-                  </>
-                )}
-              </span>
+              {metadata?.factores_version && (
+                <span className="rounded border border-[#21312D] bg-[#111E1B] px-2 py-0.5 font-mono text-xs text-[#93A39C]">
+                  v{metadata.factores_version}
+                </span>
+              )}
             </div>
             <p className="hidden text-xs text-[#93A39C] sm:block">
               {t('header.subtitle')}

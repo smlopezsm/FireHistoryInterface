@@ -66,14 +66,14 @@ interface OpcionesMarcadores {
   max?: number;
 }
 
-const centroide = (f: CeldaFeature): [number, number] => {
+const centroide = (f: CeldaFeature): [number, number] | null => {
   const anillo = f.geometry?.coordinates?.[0] ?? [];
   // El anillo GeoJSON repite el primer vértice al final: no lo contamos dos veces.
   const vertices =
     anillo.length > 1 && anillo[0][0] === anillo.at(-1)![0] && anillo[0][1] === anillo.at(-1)![1]
       ? anillo.slice(0, -1)
       : anillo;
-  if (!vertices.length) return [0, 0];
+  if (!vertices.length || vertices.some(([lng, lat]) => !Number.isFinite(lng) || !Number.isFinite(lat))) return null;
   const [sx, sy] = vertices.reduce(([x, y], [lng, lat]) => [x + lng, y + lat], [0, 0]);
   return [Number((sx / vertices.length).toFixed(4)), Number((sy / vertices.length).toFixed(4))];
 };
@@ -86,10 +86,12 @@ export function celdasAMarcadores(
   const enZona = features
     .filter((f) => !provinciaId || f.properties.provincia_id === provinciaId)
     .filter((f) => !provinciaIds?.length || provinciaIds.includes(f.properties.provincia_id ?? ''))
-    .map((f): MarcadorCelda => {
-      const [lng, lat] = centroide(f);
+    .flatMap((f): MarcadorCelda[] => {
+      const centro = centroide(f);
+      if (!centro) return [];
+      const [lng, lat] = centro;
       const { cell_id, provincia_id, valor, estado } = f.properties;
-      return {
+      return [{
         id: `celda-${cell_id}`,
         cellId: cell_id,
         lng,
@@ -98,7 +100,7 @@ export function celdasAMarcadores(
         estado,
         provinciaId: provincia_id,
         provinciaNombre: (provincia_id && nombres?.get(provincia_id)) || null,
-      };
+      }];
     })
     .filter((m) => !dentro || dentro(m.lng, m.lat));
 
@@ -132,15 +134,15 @@ export function popupCeldaHtml(m: MarcadorCelda, { capa, isEn }: { capa: CapaMap
       <span><b>${conteo} ${unidad}</b> · ${capaTexto}</span><br/>
       ${estado ? `<span style="color: #93A39C; font-size: 11px;">${estado}</span><br/>` : ''}
       <a href="https://www.google.com/maps?q=${coords}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 3px; color: #B8EE68; text-decoration: underline; font-size: 11px;">
-        ${m.lat.toFixed(4)}, ${m.lng.toFixed(4)} · Google Maps ↗
+        ${isEn ? 'Cell center' : 'Centro de la celda'} · ${m.lat.toFixed(4)}, ${m.lng.toFixed(4)} · Google Maps ↗
       </a>
     </div>
   `;
 }
 
-/** "60 de 249 celdas · 2026-10" (o "12 celdas · 2026-10" si se dibujan todas). */
-export function textoContador(dibujadas: number, total: number, mes: string, isEn: boolean): string {
-  const celdas = isEn ? 'cells' : 'celdas';
-  if (dibujadas >= total) return `${total} ${celdas} · ${mes}`;
-  return `${dibujadas} ${isEn ? 'of' : 'de'} ${total} ${celdas} · ${mes}`;
+/** Indica cuántas de las celdas devueltas se muestran. */
+export function textoContador(dibujadas: number, total: number, isEn: boolean): string {
+  const celdas = total === 1 ? (isEn ? 'cell' : 'celda') : (isEn ? 'cells' : 'celdas');
+  if (dibujadas >= total) return `${total} ${celdas}`;
+  return `${dibujadas} ${isEn ? 'of' : 'de'} ${total} ${celdas}`;
 }

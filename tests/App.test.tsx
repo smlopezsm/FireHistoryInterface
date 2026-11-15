@@ -20,11 +20,11 @@ describe('App Shell Layout & i18n (English Default)', () => {
     expect(screen.getByRole('heading', { name: /FuegoContinuo/i })).toBeInTheDocument();
 
     // Check key widgets in main layout in English
-    expect(screen.getAllByText(/Area Selection/i)[0]).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Area' })).toBeInTheDocument();
     // El globo se carga de forma diferida (React.lazy).
     expect((await screen.findAllByText(/3D Earth Globe/i))[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Monthly Anomaly/i)[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/Harmonized Calendar month × year/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Monthly calendar/i)[0]).toBeInTheDocument();
 
     // Footer sources
     expect(screen.getByText(/NASA FIRMS/i)).toBeInTheDocument();

@@ -24,6 +24,7 @@ interface CalendarHeatmapWidgetProps {
   mesMapa?: string | null;
   /** Clic o Enter sobre un mes: abrirlo en el mapa. */
   onElegirMes?: (mes: string) => void;
+  escalaFija?: boolean;
   className?: string;
 }
 
@@ -43,6 +44,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   fechaUltimoSp,
   mesMapa,
   onElegirMes,
+  escalaFija = false,
   className = '',
 }) => {
   const { t, i18n } = useTranslation();
@@ -51,6 +53,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   const locale = isEn ? 'en-US' : 'es-AR';
   const spots = isEn ? 'spots' : 'focos';
   const sinDato = isEn ? 'no data' : 'sin dato';
+  const armonizado = capa === 'armonizado';
 
   const { data, isLoading, isFetching, error } = useCalendario(pedido, { ...periodo, capa });
 
@@ -69,12 +72,11 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
   const mesUltimoSp = fechaUltimoSp?.slice(0, 7);
 
-  const [hovered, setHovered] = useState<Punto | null>(null);
+  const detalle = mesMapa ? mesesMap.get(mesMapa) : undefined;
   const [showTableView, setShowTableView] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [showNumbers, setShowNumbers] = useState(true);
   // Escala relativa a la zona (por defecto) o fija para comparar zonas entre sí.
-  const [escalaFija, setEscalaFija] = useState(false);
   const cortes = useMemo(
     () => (escalaFija ? CORTES_FIJOS : cortesPorZona((data?.meses ?? []).map((p) => valorDeCapa(p, capa)))),
     [escalaFija, data, capa]
@@ -233,6 +235,11 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
             </span>
           )}
         </p>
+        {isExpanded && onElegirMes && (
+          <p className="text-xs text-[#C8D3CE]">
+            {isEn ? 'Choose a month to update the map and historical comparison.' : 'Elegí un mes para actualizar el mapa y la comparación histórica.'}
+          </p>
+        )}
         {onOpenMethod && (
           <button type="button" onClick={onOpenMethod} className="w-fit rounded-sm py-1 text-xs text-[#B8EE68] underline underline-offset-2 focus-visible:outline focus-visible:outline-[#B8EE68]">
             {t('calendar.methodLink')}
@@ -272,7 +279,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[#93A39C]">{isEn ? 'Year with most fire:' : 'Año con más fuego:'}</span>
+              <span className="text-[#93A39C]">{isEn ? 'Year with most hot spots:' : 'Año con más focos:'}</span>
               <span className="font-mono tabular-nums font-bold text-[#FF9C55]">{data.resumen.max_anio ?? sinDato}</span>
             </div>
           </div>
@@ -303,7 +310,14 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                             return <div key={monthIdx} className="h-11 sm:h-8 rounded-sm" style={{ border: '1px dashed #1A2724' }} aria-hidden="true" />;
                           }
                           const val = valorDeCapa(p, capa);
-                          const pattern = p.estado === 'estimado' ? 'pattern-estimado' : p.estado === 'mixto' ? 'pattern-mixto' : '';
+                          const pattern = !armonizado ? '' : p.estado === 'estimado' ? 'pattern-estimado' : p.estado === 'mixto' ? 'pattern-mixto' : '';
+                          const calidad = armonizado
+                            ? [
+                                estadoLabel(p),
+                                p.estado !== 'observado' && `${t('calendar.nominalRange')} ${fmt(p.minimo)}–${fmt(p.maximo)}`,
+                                confianzaLabel(p.confianza),
+                              ].filter(Boolean)
+                            : [];
                           const fondo = colorDeValor(val, cortes);
                           return (
                             <div
@@ -315,13 +329,9 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                               onKeyDown={(e) => onTeclaCelda(e, key)}
                               onClick={onElegirMes ? () => onElegirMes(key) : undefined}
                               aria-current={key === mesMapa ? 'date' : undefined}
-                              onMouseEnter={() => setHovered(p)}
                               onFocus={() => {
-                                setHovered(p);
                                 setFoco(key);
                               }}
-                              onMouseLeave={() => setHovered(null)}
-                              onBlur={() => setHovered(null)}
                               tabIndex={key === activa ? 0 : -1}
                               className={`group relative h-11 sm:h-8 rounded-sm transition-transform duration-100 hover:scale-110 hover:z-20 focus:z-20 focus:outline focus:outline-1 focus:outline-[#B8EE68] cursor-pointer flex items-center justify-center ${pattern}`}
                               style={{
@@ -330,17 +340,22 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                                   ? '1px solid #B8EE68'
                                   : val === null
                                     ? '1px dashed #2A3F3A'
-                                    : p.estado === 'mixto'
+                                    : armonizado && p.estado === 'mixto'
                                       ? '1px dashed rgba(255,156,85,0.55)'
                                       : '1px solid rgba(0,0,0,0.3)',
                                 // Mes del mapa: anillo celeste por fuera (no compite con el borde de estado).
                                 boxShadow: key === mesMapa ? '0 0 0 2px #68D9D0' : undefined,
                               }}
                               role="gridcell"
-                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)}${p.estado !== 'observado' && capa === 'armonizado' ? (isEn ? ` · 80 % range ${fmt(p.minimo)}–${fmt(p.maximo)}` : ` · rango 80 % ${fmt(p.minimo)}–${fmt(p.maximo)}`) : ''} · ${confianzaLabel(p.confianza)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}${key === mesMapa ? (isEn ? ' · map month' : ' · mes del mapa') : ''}`}
-                              data-confianza={p.confianza}
+                              aria-label={[
+                                `${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`}`,
+                                ...calidad,
+                                p.parcial && (isEn ? 'month in progress' : 'mes en curso'),
+                                key === mesMapa && (isEn ? 'map month' : 'mes del mapa'),
+                              ].filter(Boolean).join(' · ')}
+                              data-confianza={armonizado ? p.confianza : undefined}
                             >
-                              {p.confianza !== 'alta' && val !== null && (
+                              {armonizado && p.confianza !== 'alta' && val !== null && (
                                 // Confianza fuera del color: anillo = media, punto lleno = baja.
                                 <span
                                   aria-hidden="true"
@@ -388,14 +403,23 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                     <th className="py-2 text-right">{t('calendar.nominalRange')}</th>
                     <th className="py-2 text-right">MODIS</th>
                     <th className="py-2 text-right">VIIRS</th>
-                    <th className="py-2 text-center">{isEn ? 'Status' : 'Estado'}</th>
+                    <th className="py-2 text-center">{isEn ? 'Harmonization status' : 'Estado de la armonización'}</th>
                   </tr>
                 </thead>
                 <tbody className="font-mono tabular-nums">
                   {[...data.meses].reverse().map((p) => (
                     <tr key={p.periodo} className="border-b border-[#21312D]/40 hover:bg-[#111E1B]">
                       <td className="py-1 text-[#EFF5ED]">
-                        {p.periodo}
+                        {onElegirMes ? (
+                          <button
+                            type="button"
+                            aria-current={p.periodo === mesMapa ? 'date' : undefined}
+                            onClick={() => onElegirMes(p.periodo)}
+                            className="whitespace-nowrap rounded px-1 py-1.5 text-[#C8D3CE] underline underline-offset-2 hover:text-[#EFF5ED] aria-[current=date]:font-bold aria-[current=date]:text-[#68D9D0]"
+                          >
+                            {p.periodo}
+                          </button>
+                        ) : p.periodo}
                         {p.parcial && <span className="ml-1 text-[#B8EE68]">*</span>}
                       </td>
                       <td className="py-1 text-right font-bold text-[#EFF5ED]">{fmt(p.armonizado)}</td>
@@ -416,52 +440,56 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
             </div>
           )}
 
-          {/* Detalle del mes bajo el cursor */}
-          {hovered && (
+          {/* Detalle del mes seleccionado */}
+          {detalle && (
             <div className="mt-2 rounded-lg border border-[#21312D] bg-[#07100F] p-2.5 text-xs text-[#EFF5ED] animate-fade-in">
               <div className="flex flex-wrap items-center justify-between gap-1">
                 <span className="font-title font-bold text-[#B8EE68]">
-                  {months[parseInt(hovered.periodo.slice(5, 7), 10) - 1]} {hovered.periodo.slice(0, 4)}
-                  {hovered.parcial && (
+                  {months[parseInt(detalle.periodo.slice(5, 7), 10) - 1]} {detalle.periodo.slice(0, 4)}
+                  {detalle.parcial && (
                     <span className="ml-2 rounded bg-[#B8EE68]/15 px-1.5 py-0.5 font-mono text-[10px] text-[#B8EE68]">
                       {isEn ? 'month in progress' : 'mes en curso'}
                     </span>
                   )}
-                  {mesUltimoSp && hovered.periodo > mesUltimoSp && (
+                  {mesUltimoSp && detalle.periodo > mesUltimoSp && (
                     <span className="ml-2 rounded bg-[#FF9C55]/15 px-1.5 py-0.5 font-mono text-[10px] text-[#FF9C55]">
                       {isEn ? 'preliminary' : 'preliminar'}
                     </span>
                   )}
                 </span>
-                <span className="font-sans text-xs text-[#93A39C]">
-                  {estadoLabel(hovered)}
-                  {hovered.estado !== 'observado' &&
-                    ` · ${Math.round(hovered.frac_estimada * 100)} % ${isEn ? 'of days estimated' : 'de los días estimados'}`}
-                </span>
+                {armonizado && (
+                  <span className="font-sans text-xs text-[#93A39C]">
+                    {estadoLabel(detalle)}
+                    {detalle.estado !== 'observado' &&
+                      ` · ${Math.round(detalle.frac_estimada * 100)} % ${isEn ? 'of days estimated' : 'de los días estimados'}`}
+                  </span>
+                )}
               </div>
               <div className="mt-1 text-xs">
-                <span className="font-mono tabular-nums text-base font-bold text-[#EFF5ED]">{fmt(valorDeCapa(hovered, capa))}</span>{' '}
+                <span className="font-mono tabular-nums text-base font-bold text-[#EFF5ED]">{fmt(valorDeCapa(detalle, capa))}</span>{' '}
                 <span className="font-sans text-xs text-[#EFF5ED]">
-                  {valorDeCapa(hovered, capa) === null
+                  {valorDeCapa(detalle, capa) === null
                     ? isEn ? '(no VIIRS data for this month)' : '(no hay dato VIIRS para este mes)'
                     : isEn ? 'spots in the month' : 'focos en el mes'}
                 </span>
-                {hovered.estado !== 'observado' && capa === 'armonizado' && (
+                {detalle.estado !== 'observado' && capa === 'armonizado' && (
                   <span className="ml-1 font-mono text-xs text-[#93A39C]">
-                    ({t('calendar.nominalRange')} · {fmt(hovered.minimo)}–{fmt(hovered.maximo)})
+                    ({t('calendar.nominalRange')} · {fmt(detalle.minimo)}–{fmt(detalle.maximo)})
                   </span>
                 )}
-                <span className="ml-2 rounded bg-[#111E1B] px-1.5 py-0.5 font-mono text-[10px] text-[#68D9D0] border border-[#21312D]">
-                  {isEn ? 'Confidence' : 'Confianza'}: {hovered.confianza}
-                </span>
+                {armonizado && (
+                  <span className="ml-2 rounded bg-[#111E1B] px-1.5 py-0.5 font-mono text-[10px] text-[#68D9D0] border border-[#21312D]">
+                    {confianzaLabel(detalle.confianza)}
+                  </span>
+                )}
               </div>
-              {(hovered.dias_sin_modis ?? 0) > 0 && (
-                <p className="mt-1 text-[#FF9C55]">{t('calendar.modisGap', { count: hovered.dias_sin_modis })}</p>
+              {armonizado && (detalle.dias_sin_modis ?? 0) > 0 && (
+                <p className="mt-1 text-[#FF9C55]">{t('calendar.modisGap', { count: detalle.dias_sin_modis })}</p>
               )}
-              <div className="mt-1 flex gap-3 font-mono tabular-nums text-xs text-[#93A39C] border-t border-[#21312D] pt-1">
-                <span>MODIS: {fmt(hovered.modis)}</span>
-                <span>VIIRS: {fmt(hovered.viirs)}</span>
-                <span>{isEn ? 'Harmonized' : 'Armonizado'}: {fmt(hovered.armonizado)}</span>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono tabular-nums text-xs text-[#93A39C] border-t border-[#21312D] pt-1">
+                <span>MODIS: {fmt(detalle.modis)}</span>
+                <span>VIIRS: {fmt(detalle.viirs)}</span>
+                <span>{isEn ? 'Harmonized' : 'Armonizado'}: {fmt(detalle.armonizado)}</span>
               </div>
             </div>
           )}
@@ -482,35 +510,26 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
               <span className="tabular-nums">{etiquetas[i] ?? (isEn ? '> 0' : '> 0')}</span>
             </div>
           ))}
-          <div className="ml-1 flex rounded border border-[#21312D] p-0.5" role="group" aria-label={isEn ? 'Color scale' : 'Escala de color'}>
-            {[false, true].map((fija) => (
-              <button
-                key={String(fija)}
-                type="button"
-                aria-pressed={escalaFija === fija}
-                onClick={() => setEscalaFija(fija)}
-                className={`rounded px-1.5 py-0.5 ${escalaFija === fija ? 'bg-[#21312D] text-[#EFF5ED]' : 'text-[#93A39C] hover:text-[#EFF5ED]'}`}
-                title={
-                  fija
-                    ? isEn ? 'Same scale for every zone: compare zones' : 'Misma escala para todas las zonas: sirve para comparar'
-                    : isEn ? 'Scale fitted to this zone and period' : 'Escala ajustada a esta zona y período'
-                }
-              >
-                {fija ? (isEn ? 'Fixed' : 'Fija') : isEn ? 'This zone' : 'Esta zona'}
-              </button>
-            ))}
-          </div>
+          <span>
+            {escalaFija
+              ? (isEn ? 'Fixed scale' : 'Escala fija')
+              : (isEn ? 'Scale for this area and period' : 'Escala de esta zona y período')}
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-5 rounded border border-[#93A39C] bg-[#6A3519] pattern-estimado" />
-            <span>{isEn ? 'Estimated' : 'Estimado'}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="h-3 w-5 rounded bg-[#6A3519] pattern-mixto" style={{ border: '1px dashed rgba(255,156,85,0.7)' }} />
-            <span>{isEn ? 'Mixed' : 'Mixto'}</span>
-          </div>
+          {armonizado && (
+            <>
+              <div className="flex items-center gap-1">
+                <div className="h-3 w-5 rounded border border-[#93A39C] bg-[#6A3519] pattern-estimado" />
+                <span>{isEn ? 'Estimated' : 'Estimado'}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-3 w-5 rounded bg-[#6A3519] pattern-mixto" style={{ border: '1px dashed rgba(255,156,85,0.7)' }} />
+                <span>{isEn ? 'Mixed' : 'Mixto'}</span>
+              </div>
+            </>
+          )}
           <div className="flex items-center gap-1">
             <div className="h-3 w-3 rounded bg-[#6A3519] border border-[#B8EE68]" />
             <span>{isEn ? 'In progress' : 'En curso'}</span>
@@ -519,18 +538,22 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
             <div className="h-3 w-3 rounded bg-[#111E1B] border border-dashed border-[#2A3F3A]" />
             <span>{t('calendar.noDataLegend')}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-1.5 w-1.5 rounded-full border border-[#C8D3CE]" />
-            <span>{isEn ? 'Medium confidence' : 'Confianza media'}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C8D3CE]" />
-            <span>{isEn ? 'Low confidence' : 'Confianza baja'}</span>
-          </div>
+          {armonizado && (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="inline-block h-1.5 w-1.5 rounded-full border border-[#C8D3CE]" />
+                <span>{isEn ? 'Medium confidence' : 'Confianza media'}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C8D3CE]" />
+                <span>{isEn ? 'Low confidence' : 'Confianza baja'}</span>
+              </div>
+            </>
+          )}
           {mesMapa && (
             <div className="flex items-center gap-1">
               <span className="inline-block h-3 w-3 rounded-sm" style={{ boxShadow: '0 0 0 2px #68D9D0' }} />
-              <span>{isEn ? 'Map month (click a month to open it)' : 'Mes del mapa (clic en un mes para abrirlo)'}</span>
+              <span>{isEn ? 'Selected month' : 'Mes seleccionado'}</span>
             </div>
           )}
         </div>

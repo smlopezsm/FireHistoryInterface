@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, FileSpreadsheet, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Download, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   descargarCsv,
   rangoDelMes,
-  type Capa,
   type PedidoZona,
   type PeriodoParams,
 } from "../../api";
 
+import { formatMes } from "../../i18n/formatMes";
+
 interface DownloadsWidgetProps {
   zonaNombre: string;
   pedido: PedidoZona | null;
-  capa: Capa;
   /** Período del calendario (YYYY-MM); vacío = todo el registro. */
   periodo?: Omit<PeriodoParams, "capa">;
   /** Mes que muestra el mapa (YYYY-MM): define el rango de "Focos CSV". */
@@ -27,7 +27,6 @@ type Tipo = "calendario" | "focos";
 export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
   zonaNombre,
   pedido,
-  capa,
   periodo = {},
   mesMapa,
   fechaMin,
@@ -51,7 +50,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
       const nombre = await descargarCsv(
         pedido,
         tipo === "calendario"
-          ? { tipo, ...periodo, capa }
+          ? { tipo, ...periodo }
           : { tipo, desde: rangoFocos!.desde, hasta: rangoFocos!.hasta, sensor: "todos" },
         `${tipo}_${slug}.csv`,
       );
@@ -66,49 +65,46 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
 
   const disabled = downloading !== null || !pedido;
 
+  const mesInicial = periodo.desde ?? fechaMin?.slice(0, 7);
+  const mesFinal = periodo.hasta ?? fechaMax?.slice(0, 7);
+  const rangoCalendario = mesInicial && mesFinal
+    ? `${formatMes(mesInicial, isEn)} – ${formatMes(mesFinal, isEn)}`
+    : (isEn ? "Full record" : "Todo el registro");
+
   return (
-    <div role="region" aria-label={t("downloads.title")} className={`flex flex-col gap-2 bg-[#0D1816] p-3 text-[#EFF5ED] ${className}`}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-[#B8EE68]" />
-          <div>
-            <span className="font-title text-xs md:text-sm font-bold text-[#EFF5ED]">{t("downloads.title")}</span>
-            <p className="text-xs text-[#93A39C]">{t("downloads.subtitle")}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => handleDownload("calendario")}
-            disabled={disabled}
-            title={isEn ? "Monthly calendar for the selected zone and period" : "Calendario mensual de la zona y el período elegidos"}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-sans text-xs font-medium text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors disabled:opacity-50"
-          >
-            {downloading === "calendario" ? <Loader2 className="h-3.5 w-3.5 text-[#B8EE68] animate-spin" /> : <Download className="h-3.5 w-3.5 text-[#B8EE68]" />}
-            <span>{t("downloads.calendarBtn")}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleDownload("focos")}
-            disabled={disabled || !rangoFocos}
-            title={
-              rangoFocos
-                ? isEn
-                  ? `Individual detections from ${rangoFocos.desde} to ${rangoFocos.hasta} (map month)`
-                  : `Focos individuales del ${rangoFocos.desde} al ${rangoFocos.hasta} (mes del mapa)`
-                : undefined
-            }
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-sans text-xs font-medium text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors disabled:opacity-50"
-          >
-            {downloading === "focos" ? <Loader2 className="h-3.5 w-3.5 text-[#FF9C55] animate-spin" /> : <Download className="h-3.5 w-3.5 text-[#FF9C55]" />}
-            <span>
-              {t("downloads.spotsBtn")}
-              {mesMapa && <span className="ml-1 font-mono text-[#93A39C]">{mesMapa}</span>}
-            </span>
-          </button>
-        </div>
+    <details aria-label={t("downloads.title")} className={`text-[#EFF5ED] ${className}`}>
+      <summary className="min-h-10 cursor-pointer rounded-md px-2 py-2 text-sm text-[#C8D3CE] hover:text-[#EFF5ED]">
+        {isEn ? "Download CSV" : "Descargar CSV"}
+      </summary>
+      <div className="grid gap-2">
+        <button
+          type="button"
+          onClick={() => handleDownload("calendario")}
+          disabled={disabled}
+          className="flex items-start gap-2 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 text-left hover:border-[#B8EE68]/40 disabled:opacity-50"
+        >
+          {downloading === "calendario" ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" /> : <Download className="mt-0.5 h-4 w-4 shrink-0" />}
+          <span className="text-sm">
+            {isEn ? "Calendar" : "Calendario"}
+            <span className="block text-xs text-[#C8D3CE]">{rangoCalendario} · {isEn ? "MODIS, VIIRS and harmonized" : "MODIS, VIIRS y armonizado"}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleDownload("focos")}
+          disabled={disabled || !rangoFocos}
+          className="flex items-start gap-2 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 text-left hover:border-[#B8EE68]/40 disabled:opacity-50"
+        >
+          {downloading === "focos" ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" /> : <Download className="mt-0.5 h-4 w-4 shrink-0" />}
+          <span className="text-sm">
+            {isEn ? "Hot spots" : "Focos"}
+            {mesMapa && (
+              <span className="block text-xs text-[#C8D3CE]">
+                {formatMes(mesMapa, isEn)} · {isEn ? "All sensors" : "Todos los sensores"}
+              </span>
+            )}
+          </span>
+        </button>
       </div>
 
       {mensaje && (
@@ -120,6 +116,6 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
           <span>{mensaje.texto}</span>
         </p>
       )}
-    </div>
+    </details>
   );
 };

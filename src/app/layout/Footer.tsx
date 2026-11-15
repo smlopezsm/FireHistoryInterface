@@ -48,7 +48,7 @@ export const Footer: React.FC = () => {
               className="inline-block h-3.5 w-16 animate-pulse rounded bg-[#111E1B]"
               title={t('footer.loading')}
             />
-          ) : isError ? (
+          ) : isError || !metadata?.data_version ? (
             <span
               data-testid="metadata-error"
               className="flex items-center gap-1 text-xs text-[#FF9C55]"
@@ -62,7 +62,7 @@ export const Footer: React.FC = () => {
               data-testid="metadata-version"
               className="font-mono text-xs font-semibold text-[#B8EE68]"
             >
-              {metadata?.data_version || '2026.10.1'}
+              {metadata.data_version}
             </span>
           )}
         </div>
