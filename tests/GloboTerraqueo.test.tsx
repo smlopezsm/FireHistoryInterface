@@ -306,4 +306,29 @@ describe('GloboTerraqueo 3D Component', () => {
     expect(typeof workerUrl).toBe('string');
     expect(workerUrl.length).toBeGreaterThan(0);
   });
+  it('draws honest markers: count-based legend, no brightness, and "N of total" counter', async () => {
+    vi.mocked(api.getMapaCeldas).mockResolvedValueOnce({
+      type: 'FeatureCollection',
+      features: Array.from({ length: 70 }, (_, i) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Polygon' as const, coordinates: [[[-66, -33], [-65, -33], [-65, -34], [-66, -33]]] },
+        properties: { cell_id: i, provincia_id: '74', modis: 3, viirs: null, estado: 'estimado' as const, valor: 5 + i },
+      })),
+    });
+    const maplibregl = await import('maplibre-gl');
+    vi.mocked(maplibregl.Marker).mockClear();
+    vi.mocked(maplibregl.Popup).mockClear();
+    renderGlobe();
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/60 (of|de) 70 (cells|celdas)/));
+    await waitFor(() => expect(vi.mocked(maplibregl.Marker)).toHaveBeenCalledTimes(60));
+
+    expect(screen.getByText(/Hot spots per cell|Focos por celda/)).toBeInTheDocument();
+    expect(screen.queryByText(/360K|Thermal Detections|Detecciones Térmicas/)).not.toBeInTheDocument();
+    const html = vi.mocked(maplibregl.Popup).mock.results
+      .map((r) => vi.mocked(r.value.setHTML).mock.calls[0]?.[0] as string)
+      .join(' ');
+    expect(html).not.toMatch(/Brightness|Brillo| K<|Calibrat|Calibrad/);
+    expect(html).toMatch(/74 (hot spots|focos)/);
+  });
 });

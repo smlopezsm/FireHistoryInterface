@@ -1,9 +1,19 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getMapaCeldas, rangoDelMes, useMetadata, useProvincias, type GeoJSON } from '../../api';
+import {
+  MIN_FOCOS_MAPA,
+  TRAMOS_FOCOS,
+  celdasAMarcadores,
+  colorDeConteo,
+  etiquetaTramo,
+  popupCeldaHtml,
+  textoContador,
+  type MarcadorCelda,
+} from './celdasMapa';
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(maplibreWorkerUrl);
@@ -140,15 +150,6 @@ const SATELLITE_GLOBE_STYLE: maplibregl.StyleSpecification = {
   ],
 };
 
-interface Hotspot {
-  id: string;
-  lng: number;
-  lat: number;
-  sensor: 'viirs' | 'modis';
-  brightness: number;
-  province: string;
-}
-
 interface GloboTerraqueoProps {
   className?: string;
   onMapReady?: (map: maplibregl.Map) => void;
@@ -182,6 +183,10 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
   const { data: metadata, error: metadataError } = useMetadata();
   const { data: apiProvincias } = useProvincias(true);
+  const nombresProvincias = useMemo(
+    () => new Map((apiProvincias ?? []).map((p) => [p.provincia_id, p.nombre] as [string, string])),
+    [apiProvincias]
+  );
   const minMonth = metadata?.fecha_min?.slice(0, 7) || '2000-11';
   const maxMonth = metadata?.fecha_max?.slice(0, 7) || '2026-11';
 
@@ -285,7 +290,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const [isLoadingCells, setIsLoadingCells] = useState(false);
   const [cellsError, setCellsError] = useState(false);
   const [totalCellsCount, setTotalCellsCount] = useState<number | null>(null);
-  const [realHotspots, setRealHotspots] = useState<Hotspot[]>([]);
+  const [realHotspots, setRealHotspots] = useState<MarcadorCelda[]>([]);
 
   const totalMonths = monthDiff(minMonth, maxMonth);
   const currentMonthIdx = monthDiff(minMonth, selectedMonth);
@@ -361,30 +366,25 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       const el = document.createElement('div');
       el.className = 'hotspot-marker';
 
-      const isViirs = h.sensor === 'viirs';
-      const isExtreme = h.brightness > 360;
-      const color = isExtreme ? '#FF6759' : isViirs ? '#FF9C55' : '#68D9D0';
+      // Color por cantidad de focos de la capa activa; borde punteado = estimado desde MODIS.
+      const color = colorDeConteo(h.valor);
+      const estimado = activeSensorFilter === 'armonizado' && h.estado !== 'observado';
+      const borde = estimado ? '1.5px dashed #EFF5ED' : '1.5px solid #EFF5ED';
       const delayMs = Math.min(idx * 35, 1100);
+      el.dataset.color = color;
+      el.dataset.estado = h.estado;
+      el.setAttribute('aria-label', popupCeldaHtml(h, { capa: activeSensorFilter, isEn }).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 
       el.innerHTML = `
         <div class="hotspot-appear relative flex items-center justify-center cursor-pointer" style="animation-delay: ${delayMs}ms;">
           <div class="hotspot-halo absolute w-4 h-4 rounded-full" style="background: ${color}; animation-delay: ${delayMs}ms;"></div>
-          <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; border: 1.5px solid #EFF5ED; box-shadow: 0 0 8px ${color};"></div>
+          <div style="width: 9px; height: 9px; border-radius: 50%; background: ${color}; border: ${borde}; box-shadow: 0 0 8px ${color};"></div>
         </div>
       `;
 
-      const coordsLabel = `${h.lat.toFixed(4)}, ${h.lng.toFixed(4)}`;
-      const gmapsUrl = `https://www.google.com/maps?q=${h.lat.toFixed(4)},${h.lng.toFixed(4)}`;
-      const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(`
-        <div style="font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px; color: #EFF5ED; background: #0D1816; border: 1px solid #21312D; border-radius: 4px;">
-          <strong style="color: ${color};">${h.sensor.toUpperCase()} · ${h.province}</strong><br/>
-          <span>${isEn ? 'Brightness Temp:' : 'T. Brillo:'} <b>${h.brightness} K</b></span><br/>
-          <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 3px; color: #B8EE68; text-decoration: underline; font-size: 11px;">
-            ${coordsLabel} · Google Maps ↗
-          </a><br/>
-          <span style="color: #93A39C; font-size: 11px;">${isEn ? 'S-NPP Calibrated' : 'S-NPP Calibrado'}</span>
-        </div>
-      `);
+      const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(
+        popupCeldaHtml(h, { capa: activeSensorFilter, isEn })
+      );
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([h.lng, h.lat])
@@ -425,7 +425,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       markersRef.current.push(marker);
     });
-  }, [realHotspots, isEn]);
+  }, [realHotspots, isEn, activeSensorFilter]);
 
   const bboxParam = bbox.join(',');
 
@@ -444,49 +444,17 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       desde,
       hasta,
       capa: activeSensorFilter,
-      min_focos: 5,
+      min_focos: MIN_FOCOS_MAPA,
     })
       .then((fc) => {
         if (isCancelled) return;
-        const features = selectedProvinciaId
-          ? fc.features.filter(({ properties }) => properties.provincia_id === selectedProvinciaId)
-          : fc.features;
-
-        const mappedAll = features.map((f) => {
-          const coords = f.geometry?.coordinates?.[0] || [];
-          let sumLng = 0;
-          let sumLat = 0;
-          coords.forEach(([clng, clat]) => {
-            sumLng += clng;
-            sumLat += clat;
-          });
-          const count = coords.length || 1;
-          const { cell_id, provincia_id, viirs, valor } = f.properties;
-          const sensor = activeSensorFilter === 'armonizado' ? (viirs ? 'viirs' : 'modis') : activeSensorFilter;
-
-          return {
-            id: `real-${cell_id}`,
-            lng: Number((sumLng / count).toFixed(4)),
-            lat: Number((sumLat / count).toFixed(4)),
-            sensor,
-            brightness: Math.min(420, Math.round(310 + valor * 1.5)),
-            valor,
-            province: provincia_id ? `Prov. ${provincia_id} (${Math.round(valor)} focos)` : `Celda ${cell_id}`,
-          };
+        const { marcadores, total } = celdasAMarcadores(fc.features, {
+          provinciaId: selectedProvinciaId,
+          dentro: geometriaZona ? (lng, lat) => isPointInGeometry(lng, lat, geometriaZona) : undefined,
+          nombres: nombresProvincias,
         });
-
-        const scoped = geometriaZona
-          ? mappedAll.filter((spot) => isPointInGeometry(spot.lng, spot.lat, geometriaZona))
-          : mappedAll;
-
-        setTotalCellsCount(scoped.length);
-
-        const topSpots = [...scoped]
-          .sort((a, b) => b.valor - a.valor)
-          .slice(0, 60)
-          .map(({ valor: _v, ...spot }) => spot);
-
-        setRealHotspots(topSpots);
+        setTotalCellsCount(total);
+        setRealHotspots(marcadores);
       })
       .catch(() => {
         if (!isCancelled) {
@@ -500,7 +468,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [activeSensorFilter, selectedMonth, bboxParam, metadata, geometriaZona, selectedProvinciaId]);
+  }, [activeSensorFilter, selectedMonth, bboxParam, metadata, geometriaZona, selectedProvinciaId, nombresProvincias]);
 
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {
@@ -902,12 +870,19 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           </button>
           <span
             role="status"
+            title={
+              totalCellsCount !== null && realHotspots.length < totalCellsCount
+                ? isEn
+                  ? `Showing the ${realHotspots.length} cells with the most hot spots (of ${totalCellsCount} with ≥${MIN_FOCOS_MAPA})`
+                  : `Se muestran las ${realHotspots.length} celdas con más focos (de ${totalCellsCount} con ≥${MIN_FOCOS_MAPA})`
+                : undefined
+            }
             className={`min-w-[148px] text-center tabular-nums rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 text-xs text-[#B8EE68] transition-opacity duration-200 ${
               isLoadingCells ? 'opacity-60' : 'opacity-100'
             }`}
           >
             {totalCellsCount !== null
-              ? `${totalCellsCount} ${isEn ? 'cells' : 'celdas'} · ${selectedMonth}`
+              ? textoContador(realHotspots.length, totalCellsCount, selectedMonth, isEn)
               : cellsStatus}
           </span>
         </div>
@@ -934,21 +909,26 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 rounded-md border border-[#21312D] bg-[#07100F]/90 p-2.5 backdrop-blur-md text-xs">
             <div className="flex items-center gap-1.5 font-sans text-xs font-semibold text-[#EFF5ED] border-b border-[#21312D] pb-1">
               <Flame className="h-3.5 w-3.5 text-[#FF6759]" />
-              <span>{isEn ? 'Thermal Detections' : 'Detecciones Térmicas'}</span>
+              <span>{isEn ? 'Hot spots per cell' : 'Focos por celda'}</span>
             </div>
             <div className="mt-1 flex flex-col gap-1 font-mono text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#68D9D0]" />
-                <span className="text-[#EFF5ED]">MODIS (1 km)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#FF9C55]" />
-                <span className="text-[#EFF5ED]">VIIRS (375 m)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#FF6759]" />
-                <span className="text-[#EFF5ED]">{isEn ? 'High Intensity (>360K)' : 'Alta Intensidad (>360K)'}</span>
-              </div>
+              {TRAMOS_FOCOS.map((tramo) => (
+                <div key={tramo.desde} className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ background: tramo.color }} />
+                  <span className="text-[#EFF5ED]">{etiquetaTramo(tramo, isEn)}</span>
+                </div>
+              ))}
+              {activeSensorFilter === 'armonizado' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full border border-dashed border-[#EFF5ED]" />
+                  <span className="text-[#C8D3CE]">{isEn ? 'Estimated from MODIS' : 'Estimado desde MODIS'}</span>
+                </div>
+              )}
+              <span className="max-w-[170px] font-sans text-[11px] leading-snug text-[#93A39C]">
+                {isEn
+                  ? `5 × 5 km cells with ≥${MIN_FOCOS_MAPA} hot spots in the month`
+                  : `Celdas de 5 × 5 km con ≥${MIN_FOCOS_MAPA} focos en el mes`}
+              </span>
             </div>
             <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
               {totalCellsCount !== null ? (isEn ? 'LIVE API' : 'API EN VIVO') : cellsStatus}
