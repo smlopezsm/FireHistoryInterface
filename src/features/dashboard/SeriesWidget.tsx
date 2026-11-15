@@ -57,7 +57,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
   fechaMax,
   className = '',
 }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
   const locale = isEn ? 'en-US' : 'es-AR';
   const sinDato = isEn ? 'no data' : 'sin dato';
@@ -103,7 +103,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
       else llena += seg;
     }
 
-    // Banda del 80 % (solo armonizado, tramos estimados o mixtos)
+    // Rango nominal del 80 % para tramos estimados o mixtos de la capa armonizada.
     let banda = '';
     if (capa === 'armonizado') {
       let tramo: number[] = [];
@@ -263,7 +263,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
                 {hoverIdx !== null && geom.incompletos[hoverIdx] && (isEn ? ' · incomplete period' : ' · período incompleto')}
               </>
             ) : capa === 'armonizado' ? (
-              isEn ? 'Shaded band: 80 % range where values are estimated.' : 'Banda sombreada: rango del 80 % donde el valor es estimado.'
+              t(granularidad === 'mes' ? 'calendar.rangeBand' : 'calendar.annualRangeBand')
             ) : capa === 'viirs' ? (
               isEn ? 'VIIRS has no data before 2012 (the line starts there).' : 'VIIRS no tiene dato antes de 2012 (la línea empieza ahí).'
             ) : isEn ? (

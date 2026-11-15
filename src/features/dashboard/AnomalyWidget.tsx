@@ -40,6 +40,8 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
     v === null || v === undefined ? sinDato : Math.round(v).toLocaleString(locale);
 
   const categoria = data?.categoria ?? null;
+  const referenceLabel = data?.referencia === 'observada' ? t('anomaly.referenceObserved')
+    : data?.referencia === 'estimada' ? t('anomaly.referenceEstimated') : null;
 
   const getCategoryConfig = () => {
     switch (categoria) {
@@ -96,8 +98,8 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
           {data && categoria === null && !isLoading && (
             <p className="mt-0.5 text-xs text-[#93A39C]">
               {isEs
-                ? `${mes}: hacen falta al menos 10 años de historia y el mes completo para comparar.`
-                : `${mes}: at least 10 years of history and a complete month are needed to compare.`}
+                ? `${mes}: para asignar una categoría hacen falta al menos 10 años de referencia y que el mes esté completo.`
+                : `${mes}: assigning a category requires at least 10 reference years and a complete target month.`}
             </p>
           )}
         </div>
@@ -119,6 +121,10 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
               : 'Preliminary data (near real time): values may change once standard processing is published.'}
           </span>
         </p>
+      )}
+
+      {referenceLabel && !isLoading && !error && (
+        <p className="mt-3 text-xs text-[#93A39C]">{referenceLabel}</p>
       )}
 
       {data && !isLoading && (
