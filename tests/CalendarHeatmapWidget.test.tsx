@@ -75,12 +75,12 @@ describe('CalendarHeatmapWidget · escala de color', () => {
     } as any);
   });
 
-  const renderizar = () =>
-    render(
-      <Providers>
-        <CalendarHeatmapWidget zonaNombre="San Luis" capa="armonizado" pedido={{ provincia_id: '74' }} />
-      </Providers>
-    );
+  const calendarioConEscala = (escalaFija = false) => (
+    <Providers>
+      <CalendarHeatmapWidget zonaNombre="San Luis" capa="armonizado" pedido={{ provincia_id: '74' }} escalaFija={escalaFija} />
+    </Providers>
+  );
+  const renderizar = () => render(calendarioConEscala());
 
   it('la confianza no cambia el color: mismo valor, mismo fondo', async () => {
     renderizar();
@@ -92,14 +92,26 @@ describe('CalendarHeatmapWidget · escala de color', () => {
     expect(baja.getAttribute('aria-label')).toMatch(/confianza baja|low confidence/);
   });
 
+  it('muestra la falta de datos VIIRS sin atribuirle estimaciones del armonizado', async () => {
+    render(
+      <Providers>
+        <CalendarHeatmapWidget zonaNombre="San Luis" capa="viirs" pedido={{ provincia_id: '74' }} />
+      </Providers>
+    );
+    const enero = await screen.findByRole('gridcell', { name: /Ene 2010|Jan 2010/ });
+    expect(enero).toHaveAccessibleName(/sin dato|no data/);
+    expect(enero).not.toHaveClass('pattern-estimado');
+    expect(enero).not.toHaveAttribute('data-confianza');
+  });
+
   it('la leyenda muestra los cortes de la zona y se puede pasar a la escala fija', async () => {
-    renderizar();
+    const { rerender } = renderizar();
     await screen.findByRole('gridcell', { name: /Ene 2010|Jan 2010/ });
     const relativa = screen.getAllByTestId('tramo-leyenda').map((e) => e.textContent);
     expect(relativa).toHaveLength(5);
     expect(screen.queryByText('≥5k')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Fija|Fixed/ }));
+    rerender(calendarioConEscala(true));
     const fija = screen.getAllByTestId('tramo-leyenda').map((e) => e.textContent?.replace(',', '.'));
     expect(fija).toEqual(['<50', '50–500', '500–2.5k', '2.5k–10k', '≥10k']);
   });
@@ -134,5 +146,10 @@ describe('CalendarHeatmapWidget · mes del mapa', () => {
     expect(onElegirMes).toHaveBeenLastCalledWith('2024-07');
     fireEvent.keyDown(screen.getByRole('gridcell', { name: /Sep 2024/ }), { key: 'Enter' });
     expect(onElegirMes).toHaveBeenLastCalledWith('2024-09');
+
+    fireEvent.click(screen.getByRole('button', { name: /Table View|Ver Tabla/i }));
+    expect(screen.getByRole('button', { name: '2024-08' })).toHaveAttribute('aria-current', 'date');
+    fireEvent.click(screen.getByRole('button', { name: '2024-07' }));
+    expect(onElegirMes).toHaveBeenLastCalledWith('2024-07');
   });
 });

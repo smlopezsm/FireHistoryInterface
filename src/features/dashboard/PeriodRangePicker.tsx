@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface Periodo {
   desde: string; // YYYY-MM
@@ -11,6 +11,7 @@ interface PeriodRangePickerProps {
   onChangePeriodo: (periodo: Periodo) => void;
   mesMin?: string;
   mesMax?: string;
+  metadataError?: boolean;
   isEn: boolean;
 }
 
@@ -23,13 +24,6 @@ const shiftMonth = (ym: string, deltaMonths: number): string => {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 };
 
-const monthDiffInclusive = (fromYm: string, toYm: string): number => {
-  if (!fromYm || !toYm || toYm < fromYm) return 0;
-  const [fy, fm] = fromYm.split("-").map(Number);
-  const [ty, tm] = toYm.split("-").map(Number);
-  return (ty - fy) * 12 + (tm - fm) + 1;
-};
-
 const formatMonthLabel = (ym: string, months: string[]): string => {
   if (!ym || !ym.includes("-")) return ym || "—";
   const [y, m] = ym.split("-");
@@ -38,13 +32,34 @@ const formatMonthLabel = (ym: string, months: string[]): string => {
 };
 
 export const PeriodRangePicker: React.FC<PeriodRangePickerProps> = ({
+  mesMin, mesMax, metadataError, ...props
+}) => {
+  if (mesMin && mesMax) return <PeriodRangeControl {...props} mesMin={mesMin} mesMax={mesMax} />;
+
+  const label = props.isEn ? "Period" : "Período";
+  const status = metadataError
+    ? (props.isEn ? "Period unavailable" : "Período no disponible")
+    : (props.isEn ? "Loading available dates…" : "Cargando fechas disponibles…");
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <span className="block text-sm font-medium">{label}</span>
+      <p role="status" className="min-h-10 rounded-md border border-[#2A3F3A] bg-[#111E1B] px-3 py-2 text-sm text-[#C8D3CE]">
+        {status}
+      </p>
+    </div>
+  );
+};
+
+const PeriodRangeControl: React.FC<PeriodRangePickerProps & { mesMin: string; mesMax: string }> = ({
   periodo,
   onChangePeriodo,
-  mesMin = "2000-11",
-  mesMax = "2026-11",
+  mesMin,
+  mesMax,
   isEn,
 }) => {
   const months = isEn ? MONTHS_EN : MONTHS_ES;
+  const periodId = React.useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -80,7 +95,10 @@ export const PeriodRangePicker: React.FC<PeriodRangePickerProps> = ({
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsOpen(false);
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     document.addEventListener("mousedown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
@@ -107,32 +125,24 @@ export const PeriodRangePicker: React.FC<PeriodRangePickerProps> = ({
       },
       {
         id: "10y",
-        label: isEn ? "10Y" : "10A",
+        label: isEn ? "Last 10 years" : "Últimos 10 años",
         desde: clampMin(shiftMonth(mesMax, -119)),
         hasta: mesMax,
       },
       {
         id: "5y",
-        label: isEn ? "5Y" : "5A",
+        label: isEn ? "Last 5 years" : "Últimos 5 años",
         desde: clampMin(shiftMonth(mesMax, -59)),
         hasta: mesMax,
       },
       {
         id: "1y",
-        label: isEn ? "1Y" : "1A",
+        label: isEn ? "Last year" : "Último año",
         desde: clampMin(shiftMonth(mesMax, -11)),
         hasta: mesMax,
       },
     ];
   }, [mesMin, mesMax, isEn]);
-
-  const activeTotalMonths = monthDiffInclusive(effectiveMin, effectiveMax);
-  const durationBadge =
-    activeTotalMonths >= 24 && activeTotalMonths % 12 === 0
-      ? `${activeTotalMonths / 12}${isEn ? "y" : "a"}`
-      : activeTotalMonths > 12
-        ? `${Math.floor(activeTotalMonths / 12)}${isEn ? "y" : "a"} ${activeTotalMonths % 12}m`
-        : `${activeTotalMonths}m`;
 
   // Rango visualizado en la grilla (durante selección o rango ya aplicado)
   const [rangeStart, rangeEnd] = useMemo(() => {
@@ -150,10 +160,7 @@ export const PeriodRangePicker: React.FC<PeriodRangePickerProps> = ({
       return;
     }
     const [desde, hasta] = ym < draftStart ? [ym, draftStart] : [draftStart, ym];
-    onChangePeriodo({ desde, hasta });
-    setDraftStart(null);
-    setHoveredMonth(null);
-    setIsOpen(false);
+    applyPreset(desde, hasta);
   };
 
   const applyPreset = (desde: string, hasta: string) => {
@@ -161,67 +168,61 @@ export const PeriodRangePicker: React.FC<PeriodRangePickerProps> = ({
     setDraftStart(null);
     setHoveredMonth(null);
     setIsOpen(false);
+    triggerRef.current?.focus();
   };
 
   return (
-    <div ref={containerRef} className="relative flex flex-wrap items-center gap-2 font-sans text-xs">
+    <div ref={containerRef} className="relative min-w-0 space-y-1.5">
+      <label htmlFor={periodId} className="block text-sm font-medium">{isEn ? "Period" : "Período"}</label>
       <button
+        ref={triggerRef}
+        id={periodId}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
+        aria-describedby={`${periodId}-range`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label={isEn ? "Select period range" : "Seleccionar rango de período"}
-        className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 font-sans text-xs transition-colors ${
+        className={`flex min-h-10 w-full items-center justify-between gap-2 rounded-md border px-3 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B8EE68] ${
           isOpen
             ? "border-[#B8EE68]/60 bg-[#111E1B] text-[#EFF5ED]"
-            : "border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/40"
+            : "border-[#2A3F3A] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/40"
         }`}
       >
-        <CalendarRange className="h-3.5 w-3.5 text-[#B8EE68]" aria-hidden="true" />
-        <span className="text-[#93A39C]">{isEn ? "Calendar range:" : "Rango del calendario:"}</span>
-        <span className="font-mono font-medium text-[#EFF5ED]">
-          {formatMonthLabel(effectiveMin, months)} → {formatMonthLabel(effectiveMax, months)}
-        </span>
-        {activeTotalMonths > 0 && (
-          <span className="rounded bg-[#B8EE68]/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#B8EE68]">
-            {durationBadge}
-          </span>
-        )}
+        <span id={`${periodId}-range`}>{formatMonthLabel(effectiveMin, months)} – {formatMonthLabel(effectiveMax, months)}</span>
         <ChevronDown
           className={`h-3.5 w-3.5 text-[#93A39C] transition-transform ${isOpen ? "rotate-180" : ""}`}
           aria-hidden="true"
         />
       </button>
 
-      {/* Atajos rápidos visibles en barra */}
-      <div className="flex items-center gap-1" role="group" aria-label={isEn ? "Quick period presets" : "Atajos de período"}>
-        {presets.map((p) => {
-          const isActive = effectiveMin === p.desde && effectiveMax === p.hasta;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => applyPreset(p.desde, p.hasta)}
-              aria-pressed={isActive}
-              className={`rounded border px-2 py-1 font-mono text-[11px] font-medium transition-colors ${
-                isActive
-                  ? "border-[#B8EE68]/50 bg-[#B8EE68]/15 text-[#B8EE68]"
-                  : "border-[#21312D] bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A]"
-              }`}
-            >
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
-
       {/* Popover calendario mensual */}
       {isOpen && (
         <div
           role="dialog"
           aria-label={isEn ? "Month range calendar" : "Calendario de rango mensual"}
-          className="absolute left-0 top-full z-40 mt-1.5 w-[300px] sm:w-[328px] rounded-xl border border-[#21312D] bg-[#0D1816] p-3 shadow-2xl"
+          className="relative w-full max-w-[360px] rounded-md border border-[#2A3F3A] bg-[#0D1816] p-3 text-xs"
         >
+          <div className="mb-3 flex flex-wrap items-center gap-1" role="group" aria-label={isEn ? "Quick period presets" : "Atajos de período"}>
+            {presets.map((p) => {
+              const isActive = effectiveMin === p.desde && effectiveMax === p.hasta;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyPreset(p.desde, p.hasta)}
+                  aria-pressed={isActive}
+                  className={`rounded border px-2 py-1.5 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "border-[#B8EE68]/50 bg-[#B8EE68]/15 text-[#B8EE68]"
+                      : "border-[#21312D] bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A]"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
           {/* Guía de estado de selección */}
           <div className="mb-2.5 flex items-center justify-between border-b border-[#21312D] pb-2 text-[11px]">
             <span className={draftStart ? "font-medium text-[#B8EE68]" : "text-[#93A39C]"}>
@@ -230,8 +231,8 @@ export const PeriodRangePicker: React.FC<PeriodRangePickerProps> = ({
                   ? `Start: ${formatMonthLabel(draftStart, months)} · Pick end month`
                   : `Inicio: ${formatMonthLabel(draftStart, months)} · Elegí el fin`
                 : isEn
-                  ? "Click a month to start range"
-                  : "Hacé clic en un mes para iniciar"}
+                  ? "Choose the start month"
+                  : "Elegí el mes de inicio"}
             </span>
             {draftStart && (
               <button

@@ -69,6 +69,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
   const { data, isLoading, isFetching, isPlaceholderData, error } = useSerie(pedido, { ...periodo, capa, granularidad });
   // Curva de la consulta anterior (solo si cambió la granularidad): se ve atenuada.
   const desactualizado = isPlaceholderData;
+  const granularidadVisible = data?.granularidad ?? granularidad;
   const puntos = useMemo(() => data?.puntos ?? [], [data]);
   const color = COLOR_CAPA[capa];
 
@@ -81,7 +82,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
   const geom = useMemo(() => {
     if (puntos.length === 0) return null;
     const valores = puntos.map((p) => valorDeCapa(p, capa));
-    const incompletos = puntos.map((p) => esIncompleto(p, granularidad, mesDesde, mesHasta));
+    const incompletos = puntos.map((p) => esIncompleto(p, granularidadVisible, mesDesde, mesHasta));
     const techo = Math.max(
       1,
       ...valores.filter((v): v is number => v !== null),
@@ -123,7 +124,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
     // Etiquetas del eje X según el espacio disponible (~70 px por etiqueta)
     const maxEtiquetas = Math.max(2, Math.floor((W - PAD.left - PAD.right) / 70));
     const ticksX =
-      granularidad === 'anio'
+      granularidadVisible === 'anio'
         ? puntos
             .map((p, i) => ({ i, label: p.periodo }))
             .filter(({ i }) => i % Math.max(1, Math.ceil(n / maxEtiquetas)) === 0)
@@ -135,7 +136,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
               .filter(({ label, mes }) => mes === '01' && Number(label) % pasoAnios === 0);
           })();
     return { x, y, llena, punteada, banda, ticksY, ticksX, valores, incompletos };
-  }, [puntos, capa, granularidad, mesDesde, mesHasta, W, H]);
+  }, [puntos, capa, granularidadVisible, mesDesde, mesHasta, W, H]);
 
   const fmt = (v: number | null) => (v === null ? sinDato : Math.round(v).toLocaleString(locale));
   const compact = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `${Math.round(v)}`);
@@ -209,7 +210,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
             onMouseMove={onMove}
             onMouseLeave={() => setHoverIdx(null)}
             role="img"
-            aria-label={isEn ? `Fire spots per ${granularidad === 'anio' ? 'year' : 'month'}` : `Focos por ${granularidad === 'anio' ? 'año' : 'mes'}`}
+            aria-label={isEn ? `Fire spots per ${granularidadVisible === 'anio' ? 'year' : 'month'}` : `Focos por ${granularidadVisible === 'anio' ? 'año' : 'mes'}`}
           >
             {geom.ticksY.map((v) => (
               <g key={v}>
@@ -227,7 +228,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
             {geom.banda && <path d={geom.banda} fill={color} opacity={0.14} />}
             <path d={geom.llena} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
             <path d={geom.punteada} fill="none" stroke={color} strokeWidth={2} strokeDasharray="4 4" opacity={0.6} />
-            {granularidad === 'anio' &&
+            {granularidadVisible === 'anio' &&
               puntos.map((_, i) =>
                 geom.valores[i] === null ? null : (
                   <circle

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '../src/i18n';
 import { Providers } from '../src/app/providers';
 import * as api from '../src/api/client';
@@ -19,6 +19,9 @@ vi.mock('maplibre-gl', () => {
       __emit: (event: string, payload?: any) => {
         (handlers[event] || []).forEach((fn) => fn(payload));
       },
+      getSource: vi.fn(),
+      addSource: vi.fn(),
+      addLayer: vi.fn(),
       remove: vi.fn(),
       setProjection: vi.fn(),
       setStyle: vi.fn(),
@@ -140,7 +143,7 @@ describe('GloboTerraqueo 3D Component', () => {
 
     renderGlobe({ selectedProvinciaId: '74' });
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1 (cells|celdas) · 2026-11/));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1 (cell|celda)/));
     fireEvent.click(screen.getByRole('button', { name: /Previous month|Mes anterior/i }));
     // Los errores de red se reintentan 2 veces (retryServidor) antes de mostrarse.
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Hot spots unavailable|Focos no disponibles/), { timeout: 6000 });
@@ -198,7 +201,8 @@ describe('GloboTerraqueo 3D Component', () => {
     expect(mapInstance.setStyle).toHaveBeenCalledWith(
       expect.objectContaining({
         projection: { type: 'globe' },
-      })
+      }),
+      { diff: false },
     );
   });
 
@@ -230,25 +234,45 @@ describe('GloboTerraqueo 3D Component', () => {
     expect(htmlArg).toContain('Google Maps');
   });
 
-  it('scrubs timeline via horizontal range slider without collapsing readout', async () => {
-    renderGlobe();
+  it('limits map navigation to the selected period', async () => {
+    renderGlobe({ mesDesde: '2024-07', mesHasta: '2024-08' });
 
     await waitFor(() => {
       expect(api.getMapaCeldas).toHaveBeenCalledTimes(1);
     });
 
-    const slider = screen.getByLabelText(/Timeline slider|Deslizador temporal/i);
-    fireEvent.change(slider, { target: { value: '0' } });
+    const anterior = screen.getByRole('button', { name: /Previous month|Mes anterior/i });
+    const siguiente = screen.getByRole('button', { name: /Next month|Mes siguiente/i });
+    expect(siguiente).toBeDisabled();
+    fireEvent.click(anterior);
+    expect(anterior).toBeDisabled();
+    expect(siguiente).toBeEnabled();
 
     await waitFor(() => {
       expect(api.getMapaCeldas).toHaveBeenCalledWith(
         expect.objectContaining({
-          desde: '2000-11-01',
-          hasta: '2000-11-30',
+          desde: '2024-07-01',
+          hasta: '2024-07-31',
         }),
         expect.any(AbortSignal)
       );
     });
+  });
+
+  it('draws the applied rectangle again when the base map changes', async () => {
+    const maplibregl = await import('maplibre-gl');
+    renderGlobe({ bbox: [-66.6, -34, -65.8, -33], mostrarLimites: true });
+    const map = vi.mocked(maplibregl.Map).mock.results[0]?.value;
+    await waitFor(() => expect(map.addSource).toHaveBeenCalledWith('zona-coordenadas', {
+      type: 'geojson',
+      data: {
+        type: 'Polygon',
+        coordinates: [[[-66.6, -34], [-65.8, -34], [-65.8, -33], [-66.6, -33], [-66.6, -34]]],
+      },
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /Satellite|Satélite/i }));
+    act(() => map.__emit('style.load'));
+    expect(map.addSource.mock.calls.filter(([id]: [string]) => id === 'zona-coordenadas')).toHaveLength(2);
   });
 
   it('respects prefers-reduced-motion and initializes auto-rotation paused', () => {

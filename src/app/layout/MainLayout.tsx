@@ -24,6 +24,7 @@ import {
   zoomParaBbox,
   aMes,
   mesAnterior,
+  rangoDelMes,
   ZONA_ARGENTINA,
   type Capa,
   type ZonaSeleccionada,
@@ -58,30 +59,39 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
 
   // Estado inicial desde la URL (docs/02 §6): se puede compartir y sobrevive a recargar.
   const [inicial] = useState(() => (typeof window !== 'undefined' ? leerEstado(window.location.search) : {}));
-  const [zona, setZona] = useState<ZonaSeleccionada>(ZONA_ARGENTINA);
-  // La zona de la URL se resuelve cuando llegan las provincias (nombre, región, bbox).
-  const [zonaPendiente, setZonaPendiente] = useState<string | null>(inicial.zona ?? null);
+  const [zona, setZona] = useState<ZonaSeleccionada>(() => zonaDeClave(inicial.zona ?? 'arg', []) ?? ZONA_ARGENTINA);
+  // Las provincias y regiones de la URL requieren el catálogo.
+  const [zonaPendiente, setZonaPendiente] = useState(() => {
+    const clave = inicial.zona;
+    return clave?.startsWith('prov:') || clave?.startsWith('region:') ? clave : null;
+  });
+  const [escalaFija, setEscalaFija] = useState(false);
   const [capa, setCapa] = useState<Capa>(inicial.capa ?? 'armonizado');
   const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(
     inicial.desde && inicial.hasta ? { desde: inicial.desde, hasta: inicial.hasta } : null
   );
   const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(inicial.mes ?? null);
 
-  const { data: metadata } = useMetadata();
+  const { data: metadata, isError: metadataError } = useMetadata();
   const { data: apiProvincias } = useProvincias();
   const mesMin = metadata ? aMes(metadata.fecha_min) : undefined;
   const mesMax = metadata ? aMes(metadata.fecha_max) : undefined;
 
-  // Sin elección del usuario, la API usa todo el registro por defecto.
-  const periodo: Periodo = periodoUsuario ?? { desde: mesMin ?? '2000-11', hasta: mesMax ?? '' };
-  const periodoParams = periodoUsuario ?? {};
+  const fueraDeDatos = Boolean(periodoUsuario && mesMin && mesMax &&
+    (periodoUsuario.desde < mesMin || periodoUsuario.hasta > mesMax));
+  const periodoElegido = fueraDeDatos ? null : periodoUsuario;
+  const periodo: Periodo = periodoElegido ?? { desde: mesMin ?? '', hasta: mesMax ?? '' };
+  const periodoParams = periodoElegido ?? {};
+  const mesEnRango = mesMapaUsuario && periodo.hasta &&
+    mesMapaUsuario >= periodo.desde && mesMapaUsuario <= periodo.hasta ? mesMapaUsuario : null;
 
-  // El mapa muestra un mes; por defecto el último mes completo.
-  const mesPrevio = mesMax ? mesAnterior(mesMax) : null;
-  const mesInicialMapa = mesMin && mesPrevio && mesPrevio >= mesMin ? mesPrevio : mesMax;
-  const mesMapa = mesMapaUsuario && mesMin && mesMax && mesMapaUsuario >= mesMin && mesMapaUsuario <= mesMax
-    ? mesMapaUsuario
-    : mesInicialMapa ?? null;
+  // Se prioriza el último mes con todos sus días disponibles dentro del rango.
+  let mesSugerido = periodo.hasta || null;
+  if (mesSugerido && metadata) {
+    if (rangoDelMes(mesSugerido).hasta > metadata.fecha_max) mesSugerido = mesAnterior(mesSugerido);
+    if (mesSugerido < periodo.desde || rangoDelMes(mesSugerido).desde < metadata.fecha_min) mesSugerido = periodo.hasta;
+  }
+  const mesMapa = metadata ? (mesEnRango ?? mesSugerido) : null;
 
   useEffect(() => {
     if (!zonaPendiente || !apiProvincias) return;
@@ -90,30 +100,39 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
     setZonaPendiente(null);
   }, [zonaPendiente, apiProvincias]);
 
-  // Un rango de la URL fuera de los datos disponibles vuelve al registro completo.
   useEffect(() => {
-    if (periodoUsuario && mesMin && mesMax && (periodoUsuario.desde < mesMin || periodoUsuario.hasta > mesMax)) {
-      setPeriodoUsuario(null);
-    }
-  }, [periodoUsuario, mesMin, mesMax]);
+    if (!metadata) return;
+    if (fueraDeDatos) setPeriodoUsuario(null);
+    if (mesMapaUsuario && !mesEnRango) setMesMapaUsuario(null);
+  }, [metadata, fueraDeDatos, mesMapaUsuario, mesEnRango]);
+
+  const cambiarPeriodo = (siguiente: Periodo) => {
+    setPeriodoUsuario(siguiente);
+    setMesMapaUsuario((mes) => mes && mes >= siguiente.desde && mes <= siguiente.hasta ? mes : null);
+  };
+
+  const cambiarZona = (siguiente: ZonaSeleccionada) => {
+    setZonaPendiente(null);
+    setZona(siguiente);
+  };
 
   // Cada cambio se refleja en la URL (sin agregar entradas al historial).
   useEffect(() => {
     if (zonaPendiente || typeof window === 'undefined') return;
     const query = escribirEstado(window.location.search, {
       zona: claveDeZona(zona) ?? undefined,
-      desde: periodoUsuario?.desde,
-      hasta: periodoUsuario?.hasta,
+      desde: periodoElegido?.desde,
+      hasta: periodoElegido?.hasta,
       capa,
-      mes: mesMapaUsuario ?? undefined,
+      mes: (metadata ? mesEnRango : mesMapaUsuario) ?? undefined,
     });
     if (query !== window.location.search) {
       window.history.replaceState(window.history.state, '', `${window.location.pathname}${query}${window.location.hash}`);
     }
-  }, [zona, zonaPendiente, periodoUsuario, capa, mesMapaUsuario]);
+  }, [zona, zonaPendiente, periodoElegido, capa, mesMapaUsuario, mesEnRango, metadata]);
 
-  const pedido = useMemo(() => pedidoDeZona(zona), [zona]);
-  const anomalia = useAnomalia(pedido);
+  const pedido = useMemo(() => (zonaPendiente ? null : pedidoDeZona(zona)), [zona, zonaPendiente]);
+  const anomalia = useAnomalia(mesMapa ? pedido : null, mesMapa ?? undefined);
 
   const preliminar = Boolean(
     metadata && anomalia.data && anomalia.data.mes > aMes(metadata.fecha_ultimo_sp),
@@ -136,43 +155,29 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
           zoom: zoomParaBbox(match.bbox),
           bbox: match.bbox,
         });
-      } else {
-        setZona({
-          id: provinciaId,
-          provincia_id: provinciaId,
-          nombre: `Provincia ${provinciaId}`,
-          region: 'Argentina',
-          center: zona.center,
-          zoom: 5.5,
-        });
       }
     },
-    [apiProvincias, zona.center]
+    [apiProvincias]
   );
 
-  // Abrir un mes del calendario en el mapa (en celular, el mapa queda más abajo).
-  const verMesEnMapa = useCallback(
-    (mes: string) => {
-      setMesMapaUsuario(mes);
-      if (!isDesktop) document.getElementById('mapa')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-    },
-    [isDesktop]
-  );
-
-  const zonaNombre =
-    zona.id === ZONA_ARGENTINA.id ? t('zone.allCountry') : zona.nombre;
+  const zonaPorCoordenadas = zona.id.startsWith('bbox-');
+  const zonaNombre = zonaPorCoordenadas
+    ? t('zone.coordinates')
+    : zona.id === ZONA_ARGENTINA.id ? t('zone.allCountry') : zona.nombre;
 
   const selector = (
     <ZoneSelectorWidget
       selectedZone={zona}
-      onSelectZone={setZona}
+      onSelectZone={cambiarZona}
       capa={capa}
       onChangeCapa={setCapa}
+      escalaFija={escalaFija}
+      onChangeEscala={setEscalaFija}
       periodo={periodo}
-      onChangePeriodo={setPeriodoUsuario}
+      onChangePeriodo={cambiarPeriodo}
       mesMin={mesMin}
       mesMax={mesMax}
-      className="border-b border-[#21312D]"
+      metadataError={metadataError}
     />
   );
 
@@ -198,21 +203,26 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
 
   const globo = (heightClass: string) => (
     <CargarAlVer esqueleto={esqueletoGlobo(heightClass)}>
-      <Suspense fallback={esqueletoGlobo(heightClass)}>
-        <GloboTerraqueo
-      center={zona.center}
-      zoom={zona.zoom}
-      bbox={zona.bbox}
-      capa={capa}
-      month={mesMapa ?? undefined}
-      onMonthChange={setMesMapaUsuario}
-      geometriaZona={zona.geometria}
-      selectedProvinciaId={zona.provincia_id}
-      selectedProvinciaIds={selectedProvinciaIds}
-      onSelectProvincia={handleSelectProvinciaFromMap}
-      className={`w-full ${heightClass} rounded-none border-0`}
-        />
-      </Suspense>
+      {zonaPendiente ? esqueletoGlobo(heightClass) : (
+        <Suspense fallback={esqueletoGlobo(heightClass)}>
+          <GloboTerraqueo
+            center={zona.center}
+            zoom={zona.zoom}
+            bbox={zona.bbox}
+            mostrarLimites={zonaPorCoordenadas}
+            capa={capa}
+            month={mesMapa ?? undefined}
+            mesDesde={periodo.desde || undefined}
+            mesHasta={periodo.hasta || undefined}
+            onMonthChange={setMesMapaUsuario}
+            geometriaZona={zona.geometria}
+            selectedProvinciaId={zona.provincia_id}
+            selectedProvinciaIds={selectedProvinciaIds}
+            onSelectProvincia={handleSelectProvinciaFromMap}
+            className={`w-full ${heightClass} rounded-none border-0`}
+          />
+        </Suspense>
+      )}
     </CargarAlVer>
   );
 
@@ -220,7 +230,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
     <DownloadsWidget
       zonaNombre={zonaNombre}
       pedido={pedido}
-      capa={capa}
       periodo={periodoParams}
       mesMapa={mesMapa}
       fechaMin={metadata?.fecha_min}
@@ -245,14 +254,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
 
   const diagnostico = (
     <>
-      <AnomalyWidget
-        zonaNombre={zonaNombre}
-        data={anomalia.data}
-        isLoading={anomalia.isLoading}
-        error={anomalia.error}
-        preliminar={preliminar}
-        className="rounded-none border-0 bg-transparent"
-      />
       <div id="calendario" className="scroll-mt-20">
         <CalendarHeatmapWidget
           zonaNombre={zonaNombre}
@@ -262,50 +263,45 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
           periodo={periodoParams}
           fechaUltimoSp={metadata?.fecha_ultimo_sp}
           mesMapa={mesMapa}
-          onElegirMes={verMesEnMapa}
+          onElegirMes={setMesMapaUsuario}
+          escalaFija={escalaFija}
           className="rounded-none border-0 bg-transparent"
         />
       </div>
+      <AnomalyWidget
+        zonaNombre={zonaNombre}
+        data={anomalia.data}
+        isLoading={anomalia.isLoading}
+        error={anomalia.error}
+        preliminar={preliminar}
+        className="rounded-none border-0 bg-transparent"
+      />
     </>
   );
 
   return (
     <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 md:px-8 space-y-6">
-      <div id="explorar" className="scroll-mt-20">
-        {isDesktop ? (
-          <div className="grid grid-cols-12 gap-5 items-start">
-            <section
-              aria-label="Etapa de observación cartográfica"
-              className="col-span-7 rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col"
-            >
-              {selector}
-              {globo('h-[560px] xl:h-[620px]')}
-              {descargas('border-t border-[#21312D]')}
-            </section>
-            <section
-              aria-label="Muelle de diagnóstico y serie temporal"
-              className="col-span-5 rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]"
-            >
-              {diagnostico}
-            </section>
-            {serie('col-span-12 rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden')}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {/* Orden en celular (docs/02 §1): zona → anomalía y calendario → mapa → serie → descargas */}
-            <div className="rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
-              {selector}
-            </div>
-            <div className="rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]">
-              {diagnostico}
-            </div>
-            <div id="mapa" className="scroll-mt-20 rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
-              {globo('h-[420px]')}
-            </div>
-            {serie('rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden')}
-            {descargas('rounded-xl border border-[#21312D]')}
-          </div>
-        )}
+      <div id="explorar" className="scroll-mt-20 space-y-4">
+        <div className="flex flex-col gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 lg:flex-row lg:items-start">
+          {selector}
+          {descargas('lg:max-w-64 lg:pt-6')}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5">
+          <section
+            aria-label={t('zone.calendarAndComparison')}
+            className="min-w-0 overflow-hidden rounded-xl border border-[#21312D] bg-[#0D1816] divide-y divide-[#21312D] lg:col-span-5 lg:col-start-8 lg:row-start-1"
+          >
+            {diagnostico}
+          </section>
+          <section
+            id="mapa"
+            aria-label={t('globe.title')}
+            className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-[#21312D] bg-[#07100F] lg:col-span-7 lg:col-start-1 lg:row-start-1"
+          >
+            {globo(isDesktop ? 'h-[560px] xl:h-[620px]' : 'h-[420px]')}
+          </section>
+          {serie('min-w-0 overflow-hidden rounded-xl border border-[#21312D] bg-[#0D1816] lg:col-span-12')}
+        </div>
       </div>
 
       <aside

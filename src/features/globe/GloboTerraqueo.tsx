@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { rangoDelMes, useMapaCeldas, useMetadata, useProvincias, type GeoJSON } from '../../api';
+import { formatMes } from '../../i18n/formatMes';
+import { rangoDelMes, useMapaCeldas, useMetadata, useProvincias, type GeoJSON, type BBox } from '../../api';
 import {
   MIN_FOCOS_MAPA,
   TRAMOS_FOCOS,
@@ -20,7 +21,6 @@ if (typeof maplibregl.setWorkerUrl === 'function') {
 }
 import {
   attachProvinciasLayer,
-  PROVINCIAS_GEOJSON_URL,
   type ProvinciaFeatureProperties,
   type ProvinciasLayerController,
 } from './provinciasLayer';
@@ -38,7 +38,6 @@ import {
   ChevronRight,
   Play,
   Pause,
-  Calendar,
   Layers,
 } from 'lucide-react';
 
@@ -46,12 +45,6 @@ const shiftMonth = (ym: string, delta: number): string => {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + delta, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-};
-
-const monthDiff = (fromYm: string, toYm: string): number => {
-  const [fy, fm] = fromYm.split('-').map(Number);
-  const [ty, tm] = toYm.split('-').map(Number);
-  return Math.max(0, (ty - fy) * 12 + (tm - fm));
 };
 
 const isPointInRing = (lng: number, lat: number, ring: number[][]): boolean => {
@@ -150,12 +143,44 @@ const SATELLITE_GLOBE_STYLE: maplibregl.StyleSpecification = {
   ],
 };
 
+const ID_LIMITES = 'zona-coordenadas';
+
+function mostrarRectangulo(map: maplibregl.Map, limites: BBox | null) {
+  const source = map.getSource<maplibregl.GeoJSONSource>(ID_LIMITES);
+  if (!limites) {
+    if (source) {
+      map.removeLayer(ID_LIMITES);
+      map.removeSource(ID_LIMITES);
+    }
+    return;
+  }
+  const [oeste, sur, este, norte] = limites;
+  const data: Parameters<maplibregl.GeoJSONSource['setData']>[0] = {
+    type: 'Polygon',
+    coordinates: [[[oeste, sur], [este, sur], [este, norte], [oeste, norte], [oeste, sur]]],
+  };
+  if (source) {
+    source.setData(data);
+    return;
+  }
+  map.addSource(ID_LIMITES, { type: 'geojson', data });
+  map.addLayer({
+    id: ID_LIMITES,
+    type: 'line',
+    source: ID_LIMITES,
+    paint: { 'line-color': '#B8EE68', 'line-width': 2.5, 'line-opacity': 0.95 },
+  });
+}
+
 interface GloboTerraqueoProps {
   className?: string;
   onMapReady?: (map: maplibregl.Map) => void;
   center?: [number, number];
   zoom?: number;
-  bbox?: [number, number, number, number];
+  bbox?: BBox;
+  mostrarLimites?: boolean;
+  mesDesde?: string;
+  mesHasta?: string;
   capa?: 'armonizado' | 'modis' | 'viirs';
   month?: string;
   onMonthChange?: (month: string) => void;
@@ -171,6 +196,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   center = [-64, -36], // Centrado en Argentina
   zoom = 2.0,
   bbox = [-73.6, -55.1, -53.6, -21.8],
+  mostrarLimites = false,
+  mesDesde,
+  mesHasta,
   capa = 'armonizado',
   month,
   onMonthChange,
@@ -187,10 +215,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     () => new Map((apiProvincias ?? []).map((p) => [p.provincia_id, p.nombre] as [string, string])),
     [apiProvincias]
   );
-  const minMonth = metadata?.fecha_min?.slice(0, 7) || '2000-11';
-  const maxMonth = metadata?.fecha_max?.slice(0, 7) || '2026-11';
+  const minMonth = metadata ? mesDesde ?? metadata.fecha_min.slice(0, 7) : undefined;
+  const maxMonth = metadata ? mesHasta ?? metadata.fecha_max.slice(0, 7) : undefined;
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const limites = mostrarLimites ? bbox : null;
+  const limitesRef = useRef(limites);
+  limitesRef.current = limites;
+  const estiloListoRef = useRef(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const provinciasControllerRef = useRef<ProvinciasLayerController | null>(null);
@@ -281,19 +313,19 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     mapStyleModeRef.current = mapStyleMode;
   }, [mapStyleMode]);
 
-  const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
   const [localMonth, setLocalMonth] = useState<string | null>(null);
   const requestedMonth = month ?? localMonth ?? maxMonth;
-  const selectedMonth = requestedMonth >= minMonth && requestedMonth <= maxMonth ? requestedMonth : maxMonth;
+  const selectedMonth = requestedMonth && minMonth && maxMonth &&
+    requestedMonth >= minMonth && requestedMonth <= maxMonth ? requestedMonth : maxMonth;
   const updateMonth = onMonthChange ?? setLocalMonth;
   const [isPlayingTimeline, setIsPlayingTimeline] = useState(!onMonthChange && !prefersReducedMotion);
   // Celdas del mes con TanStack Query: caché por mes/zona/capa y cancelación de lo obsoleto.
   const bboxParam = bbox.join(',');
   const paramsCeldas = useMemo(() => {
-    if (!metadata) return null;
+    if (!metadata || !selectedMonth) return null;
     const { desde, hasta } = rangoDelMes(selectedMonth, metadata.fecha_min, metadata.fecha_max);
-    return { bbox: bboxParam, desde, hasta, capa: activeSensorFilter, min_focos: MIN_FOCOS_MAPA };
-  }, [metadata, selectedMonth, bboxParam, activeSensorFilter]);
+    return { bbox: bboxParam, desde, hasta, capa, min_focos: MIN_FOCOS_MAPA };
+  }, [metadata, selectedMonth, bboxParam, capa]);
   const celdas = useMapaCeldas(paramsCeldas);
   const isLoadingCells = celdas.isFetching;
   const cellsError = celdas.isError;
@@ -310,30 +342,27 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     });
   }, [celdas.data, selectedProvinciaId, selectedProvinciaIds, geometriaZona, nombresProvincias]);
 
-  const totalMonths = monthDiff(minMonth, maxMonth);
-  const currentMonthIdx = monthDiff(minMonth, selectedMonth);
   const cellsStatus = metadataError || cellsError
     ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
     : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
 
   const selectMonth = (nextMonth: string) => {
-    if (nextMonth < minMonth || nextMonth > maxMonth) return;
+    if (!minMonth || !maxMonth || nextMonth < minMonth || nextMonth > maxMonth) return;
     setIsPlayingTimeline(false);
     updateMonth(nextMonth);
   };
 
   useEffect(() => {
-    if (!isPlayingTimeline || !metadata || minMonth === maxMonth) return;
+    if (onMonthChange) setIsPlayingTimeline(false);
+  }, [mesDesde, mesHasta, onMonthChange]);
+
+  useEffect(() => {
+    if (!isPlayingTimeline || !selectedMonth || !minMonth || !maxMonth || minMonth === maxMonth) return;
     const timer = window.setTimeout(() => {
       updateMonth(selectedMonth >= maxMonth ? minMonth : shiftMonth(selectedMonth, 1));
     }, 2200);
     return () => window.clearTimeout(timer);
-  }, [isPlayingTimeline, metadata, selectedMonth, minMonth, maxMonth, updateMonth]);
-
-  // Sincronizar con prop externa
-  useEffect(() => {
-    setActiveSensorFilter(capa);
-  }, [capa]);
+  }, [isPlayingTimeline, selectedMonth, minMonth, maxMonth, updateMonth]);
 
   // Rotación orbital (grados/segundo efectivos en ciclos de 1000 ms encadenados con moveend)
   const secondsPerRevolution = 150;
@@ -386,12 +415,12 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       // Color por cantidad de focos de la capa activa; borde punteado = estimado desde MODIS.
       const color = colorDeConteo(h.valor);
-      const estimado = activeSensorFilter === 'armonizado' && h.estado !== 'observado';
+      const estimado = capa === 'armonizado' && h.estado !== 'observado';
       const borde = estimado ? '1.5px dashed #EFF5ED' : '1.5px solid #EFF5ED';
       const delayMs = Math.min(idx * 35, 1100);
       el.dataset.color = color;
       el.dataset.estado = h.estado;
-      el.setAttribute('aria-label', popupCeldaHtml(h, { capa: activeSensorFilter, isEn }).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+      el.setAttribute('aria-label', popupCeldaHtml(h, { capa, isEn }).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 
       el.innerHTML = `
         <div class="hotspot-appear relative flex items-center justify-center cursor-pointer" style="animation-delay: ${delayMs}ms;">
@@ -401,7 +430,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       `;
 
       const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(
-        popupCeldaHtml(h, { capa: activeSensorFilter, isEn })
+        popupCeldaHtml(h, { capa, isEn })
       );
 
       const marker = new maplibregl.Marker({ element: el })
@@ -443,7 +472,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       markersRef.current.push(marker);
     });
-  }, [realHotspots, isEn, activeSensorFilter]);
+  }, [realHotspots, isEn, capa]);
 
 
   // Inicializar MapLibre GL JS (sin token)
@@ -473,6 +502,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       mapRef.current = map;
 
       map.on('style.load', () => {
+        estiloListoRef.current = true;
         try {
           const projectionType = mapStyleModeRef.current === 'satellite' ? 'globe' : 'mercator';
           map.setProjection?.({ type: projectionType });
@@ -493,6 +523,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
         }
 
+        if (limitesRef.current) mostrarRectangulo(map, limitesRef.current);
         setIsLoaded(true);
         if (onMapReady) onMapReady(map);
       });
@@ -534,6 +565,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         provinciasControllerRef.current?.destroy();
         provinciasControllerRef.current = null;
         markersRef.current.forEach((m) => m.remove());
+        estiloListoRef.current = false;
         map.remove();
         mapRef.current = null;
       };
@@ -543,52 +575,24 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     }
   }, [handleInteractionStart, handleInteractionEnd, spinGlobe, onMapReady]);
 
-  // Cargar geometrías de provincias desde el backend local (con fallback al GeoJSON estático)
   useEffect(() => {
-    if (!isLoaded || !provinciasControllerRef.current) return;
+    const map = mapRef.current;
+    if (map && estiloListoRef.current) mostrarRectangulo(map, limites);
+  }, [limites]);
 
-    const apiFeatures = (apiProvincias ?? [])
-      .filter((p) => Boolean(p.geometria && p.geometria.type))
-      .map((p) => ({
-        type: 'Feature' as const,
-        geometry: p.geometria as GeoJSON.Geometry,
-        properties: {
-          provincia_id: p.provincia_id,
-          nombre: p.nombre,
-        },
-      }));
+  // Las geometrías seleccionables vienen del mismo catálogo que usa el selector.
+  useEffect(() => {
+    if (!isLoaded || !provinciasControllerRef.current || !apiProvincias) return;
 
-    if (apiFeatures.length > 0) {
-      const fc: GeoJSON.FeatureCollection<GeoJSON.Geometry, ProvinciaFeatureProperties> = {
-        type: 'FeatureCollection',
-        features: apiFeatures,
-      };
-      provinciasGeoJSONRef.current = fc;
-      provinciasControllerRef.current.setGeoJSON(fc);
-      provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
-      return;
-    }
-
-    if (provinciasGeoJSONRef.current) {
-      provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
-      provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
-      return;
-    }
-
-    const controller = new AbortController();
-    fetch(PROVINCIAS_GEOJSON_URL, { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!data || data.type !== 'FeatureCollection' || !provinciasControllerRef.current) return;
-        provinciasGeoJSONRef.current = data;
-        provinciasControllerRef.current.setGeoJSON(data);
-        provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
-      })
-      .catch(() => {
-        // Silencioso en entornos sin red o tests jsdom
-      });
-
-    return () => controller.abort();
+    const fc: GeoJSON.FeatureCollection<GeoJSON.Geometry, ProvinciaFeatureProperties> = {
+      type: 'FeatureCollection',
+      features: apiProvincias.flatMap(({ geometria, provincia_id, nombre }) =>
+        geometria ? [{ type: 'Feature', geometry: geometria, properties: { provincia_id, nombre } }] : []
+      ),
+    };
+    provinciasGeoJSONRef.current = fc;
+    provinciasControllerRef.current.setGeoJSON(fc);
+    provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
   }, [isLoaded, apiProvincias]);
 
   // Sincronizar selección externa (provincia o región) con el estado GPU del mapa
@@ -639,7 +643,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     if (!map) return;
 
     const nextStyle = nextMode === 'satellite' ? SATELLITE_GLOBE_STYLE : DEFAULT_GLOBE_STYLE;
-    map.setStyle?.(nextStyle);
+    estiloListoRef.current = false;
+    map.setStyle?.(nextStyle, { diff: false });
     if (nextMode === 'satellite') {
       const shouldSpin = !prefersReducedMotion;
       isSpinningRef.current = shouldSpin;
@@ -697,17 +702,17 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         <div className="hidden sm:flex items-center gap-2 rounded-md border border-[#21312D] bg-[#07100F] px-2.5 py-1 font-mono text-xs text-[#EFF5ED]">
           <span
             className={`h-2 w-2 rounded-full ${
-              activeSensorFilter === 'armonizado'
+              capa === 'armonizado'
                 ? 'bg-[#B8EE68]'
-                : activeSensorFilter === 'modis'
+                : capa === 'modis'
                 ? 'bg-[#68D9D0]'
                 : 'bg-[#FF9C55]'
             }`}
           />
           <span className="font-semibold">
-            {activeSensorFilter === 'armonizado'
+            {capa === 'armonizado'
               ? (isEn ? 'HARMONIZED · VIIRS EQUIV' : 'ARMONIZADO · ESCALA VIIRS')
-              : activeSensorFilter === 'modis'
+              : capa === 'modis'
               ? 'MODIS · 1 km'
               : 'VIIRS · 375 m'}
           </span>
@@ -789,61 +794,53 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       {/* Barra de navegación temporal histórica */}
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#07100F] border-b border-[#21312D] text-xs font-mono">
         <div className="flex items-center gap-1.5 text-[#93A39C]">
-          <Calendar className="h-3.5 w-3.5 text-[#B8EE68]" />
-          <span className="hidden sm:inline">{isEn ? 'Map month:' : 'Mes del mapa:'}</span>
           <button
             type="button"
-            disabled={selectedMonth <= minMonth}
-            onClick={() => selectMonth(shiftMonth(selectedMonth, -1))}
+            disabled={!selectedMonth || !minMonth || selectedMonth <= minMonth}
+            onClick={() => selectedMonth && selectMonth(shiftMonth(selectedMonth, -1))}
             aria-label={isEn ? 'Previous month' : 'Mes anterior'}
-            className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
-          <input
-            type="month"
-            min={minMonth}
-            max={maxMonth}
-            value={selectedMonth}
-            onChange={(e) => selectMonth(e.target.value)}
-            aria-label={isEn ? 'Select historical month' : 'Seleccionar mes histórico'}
-            className="h-7 rounded border border-[#21312D] bg-[#111E1B] px-2 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none [color-scheme:dark]"
-          />
+          {selectedMonth ? (
+            <time dateTime={selectedMonth} className="px-1 font-sans text-sm font-medium text-[#EFF5ED]">
+              {formatMes(selectedMonth, isEn)}
+            </time>
+          ) : (
+            <span className="px-1 font-sans text-sm text-[#93A39C]">—</span>
+          )}
           <button
             type="button"
-            disabled={selectedMonth >= maxMonth}
-            onClick={() => selectMonth(shiftMonth(selectedMonth, 1))}
+            disabled={!selectedMonth || !maxMonth || selectedMonth >= maxMonth}
+            onClick={() => selectedMonth && selectMonth(shiftMonth(selectedMonth, 1))}
             aria-label={isEn ? 'Next month' : 'Mes siguiente'}
-            className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <input
-          type="range"
-          min={0}
-          max={totalMonths}
-          value={currentMonthIdx}
-          onChange={(e) => selectMonth(shiftMonth(minMonth, Number(e.target.value)))}
-          aria-label={isEn ? 'Timeline slider' : 'Deslizador temporal'}
-          className="h-1.5 flex-1 min-w-[110px] cursor-pointer accent-[#B8EE68]"
-        />
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPlayingTimeline((p) => !p)}
-            aria-pressed={isPlayingTimeline}
-            className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-medium transition-colors ${
-              isPlayingTimeline
-                ? 'border-[#B8EE68]/50 bg-[#B8EE68]/20 text-[#B8EE68]'
-                : 'border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/40'
-            }`}
-          >
-            {isPlayingTimeline ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-            <span>{isPlayingTimeline ? (isEn ? 'Pause' : 'Pausar') : (isEn ? 'Timelapse' : 'Recorrer')}</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <details className="font-sans">
+            <summary className="min-h-7 cursor-pointer py-1 text-[#C8D3CE] hover:text-[#EFF5ED]">
+              {isEn ? 'Map options' : 'Opciones del mapa'}
+            </summary>
+            <button
+              type="button"
+              disabled={!selectedMonth || minMonth === maxMonth}
+              onClick={() => setIsPlayingTimeline((p) => !p)}
+              aria-pressed={isPlayingTimeline}
+              className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+                isPlayingTimeline
+                  ? 'border-[#B8EE68]/50 bg-[#B8EE68]/20 text-[#B8EE68]'
+                  : 'border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/40'
+              }`}
+            >
+              {isPlayingTimeline ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              <span>{isPlayingTimeline ? (isEn ? 'Pause' : 'Pausar') : (isEn ? 'Timelapse' : 'Recorrer')}</span>
+            </button>
+          </details>
           <span
             role="status"
             title={
@@ -853,12 +850,12 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                   : `Se muestran las ${realHotspots.length} celdas con más focos (de ${totalCellsCount} con ≥${MIN_FOCOS_MAPA})`
                 : undefined
             }
-            className={`min-w-[148px] text-center tabular-nums rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 text-xs text-[#B8EE68] transition-opacity duration-200 ${
+            className={`tabular-nums text-xs text-[#C8D3CE] transition-opacity duration-200 ${
               isLoadingCells ? 'opacity-60' : 'opacity-100'
             }`}
           >
             {totalCellsCount !== null
-              ? textoContador(realHotspots.length, totalCellsCount, selectedMonth, isEn)
+              ? textoContador(realHotspots.length, totalCellsCount, isEn)
               : cellsStatus}
           </span>
         </div>
@@ -866,7 +863,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       {/* Viewport del Mapa 3D */}
       <div
-        className="relative flex-1 w-full h-full min-h-[380px]"
+        className="relative flex-1 w-full min-h-[220px]"
         style={{ background: 'radial-gradient(circle at 50% 45%, #0c221f 0%, #050c0b 65%, #020505 100%)' }}
       >
         <div ref={mapContainerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
@@ -894,7 +891,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
                   <span className="text-[#EFF5ED]">{etiquetaTramo(tramo, isEn)}</span>
                 </div>
               ))}
-              {activeSensorFilter === 'armonizado' && (
+              {mostrarLimites && (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 border-t-2 border-[#B8EE68]" aria-hidden="true" />
+                  <span>{isEn ? 'Area boundary' : 'Límite de la zona'}</span>
+                </div>
+              )}
+              {capa === 'armonizado' && (
                 <div className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full border border-dashed border-[#EFF5ED]" />
                   <span className="text-[#C8D3CE]">{isEn ? 'Estimated from MODIS' : 'Estimado desde MODIS'}</span>

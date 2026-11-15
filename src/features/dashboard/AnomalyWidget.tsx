@@ -75,7 +75,7 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-sans text-xs font-medium text-[#93A39C]">
-              {t('anomaly.label')} · {zonaNombre}
+              {t('anomaly.label')} · {t('zone.harmonized')} · {zonaNombre}
             </span>
             {data && (
               <span className="rounded px-2 py-0.5 font-mono text-xs font-bold" style={{ color: config.color, backgroundColor: `${config.color}20` }}>

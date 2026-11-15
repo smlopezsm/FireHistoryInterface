@@ -14,7 +14,7 @@ import {
   zonaDeRegion,
   zoomParaBbox,
   zonaDeBbox,
-  type BBox,
+  validarBbox,
   type Capa,
   type Provincia,
   type ZonaSeleccionada,
@@ -96,9 +96,10 @@ export function zonaDeClave(clave: string, provincias: Provincia[]): ZonaSelecci
     return provincias.some((p) => p.region === valor) ? zonaDeRegion(provincias, valor) : null;
   }
   if (tipo === 'bbox') {
-    const n = valor.split(',').map(Number);
-    if (n.length !== 4 || n.some((x) => !Number.isFinite(x)) || n[0] >= n[2] || n[1] >= n[3]) return null;
-    return zonaDeBbox(n as BBox, 'Rectángulo', 'Argentina');
+    const [oeste, sur, este, norte, extra] = valor.split(',').map(Number);
+    if (extra !== undefined) return null;
+    const validada = validarBbox(oeste, sur, este, norte);
+    return validada.ok ? zonaDeBbox(validada.bbox, 'Rectángulo', 'lat/lon') : null;
   }
   return null;
 }
