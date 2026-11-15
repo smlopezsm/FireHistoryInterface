@@ -24,6 +24,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const { t, i18n } = useTranslation();
   const [selectedZone, setSelectedZone] = useState<ZoneItem>(PROVINCIAS_ARG[0]); // Argentina por defecto
   const [capa, setCapa] = useState<'armonizado' | 'modis' | 'viirs'>('armonizado');
+  const [selectedMonth, setSelectedMonth] = useState<string | undefined>(undefined);
 
   const isSpanish = Boolean(i18n?.language?.startsWith('es'));
   const currentMonthName = isSpanish ? 'Septiembre' : 'September';
@@ -139,12 +140,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 md:px-8 space-y-6">
       {/* Zona Principal en Dos Columnas Integradas (Explorar) */}
       <div id="explorar" className="scroll-mt-20">
-        {/* Vista Escritorio (≥ 1024 px): 7 cols izquierda (Globo integrado) / 5 cols derecha (Telemetría integrada) */}
+        {/* Vista Escritorio (≥ 1024 px): 6 cols izquierda (Globo) / 6 cols derecha (Telemetría y Calendario) */}
         <div className="hidden lg:grid lg:grid-cols-12 lg:gap-5 items-start">
-          {/* Columna Izquierda (7 de 12) - Etapa Cartográfica Unificada */}
+          {/* Columna Izquierda (6 de 12) - Etapa Cartográfica Unificada */}
           <section
             aria-label="Etapa de observación cartográfica"
-            className="lg:col-span-7 rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col"
+            className="lg:col-span-6 rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col"
           >
             {/* Barra superior de selección territorial y sensor */}
             <ZoneSelectorWidget
@@ -161,6 +162,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               zoom={selectedZone.zoom}
               bbox={selectedZone.bbox}
               capa={capa}
+              externalMonth={selectedMonth}
               className="w-full h-[560px] xl:h-[620px] rounded-none border-0"
             />
 
@@ -174,10 +176,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             />
           </section>
 
-          {/* Columna Derecha (5 de 12) - Muelle Integrado de Diagnóstico y Serie Temporal */}
+          {/* Columna Derecha (6 de 12) - Muelle Integrado de Diagnóstico y Serie Temporal */}
           <section
             aria-label="Muelle de diagnóstico y serie temporal"
-            className="lg:col-span-5 rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]"
+            className="lg:col-span-6 rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]"
           >
             {/* Widget de Anomalía vs Mediana histórica */}
             <AnomalyWidget
@@ -202,6 +204,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 capa={capa}
                 provincia_id={selectedZone.provincia_id}
                 bbox={selectedZone.bbox}
+                selectedZone={selectedZone}
+                onSelectZone={setSelectedZone}
+                selectedMonth={selectedMonth}
+                onSelectMonth={setSelectedMonth}
                 className="rounded-none border-0 bg-transparent"
               />
             </div>
@@ -224,6 +230,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               zoom={selectedZone.zoom}
               bbox={selectedZone.bbox}
               capa={capa}
+              externalMonth={selectedMonth}
               className="w-full h-[420px] rounded-none border-0"
             />
           </div>
@@ -250,6 +257,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 capa={capa}
                 provincia_id={selectedZone.provincia_id}
                 bbox={selectedZone.bbox}
+                selectedZone={selectedZone}
+                onSelectZone={setSelectedZone}
+                selectedMonth={selectedMonth}
+                onSelectMonth={setSelectedMonth}
                 className="rounded-none border-0 bg-transparent"
               />
             </div>

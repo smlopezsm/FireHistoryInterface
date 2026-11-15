@@ -128,6 +128,7 @@ interface GloboTerraqueoProps {
   zoom?: number;
   bbox?: [number, number, number, number];
   capa?: 'armonizado' | 'modis' | 'viirs';
+  externalMonth?: string;
 }
 
 export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
@@ -137,6 +138,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   zoom = 2.0,
   bbox = [-73.6, -55.1, -53.6, -21.8],
   capa = 'armonizado',
+  externalMonth,
 }) => {
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
@@ -188,10 +190,18 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const currentMonthIdx = Math.min(totalMonths, monthDiff(minMonth, selectedMonth));
 
   useEffect(() => {
-    if (metadata?.fecha_max && !userPickedMonthRef.current) {
+    if (metadata?.fecha_max && !userPickedMonthRef.current && !externalMonth) {
       setSelectedMonth(metadata.fecha_max.slice(0, 7));
     }
-  }, [metadata?.fecha_max]);
+  }, [metadata?.fecha_max, externalMonth]);
+
+  useEffect(() => {
+    if (externalMonth) {
+      userPickedMonthRef.current = true;
+      setIsPlayingTimeline(false);
+      setSelectedMonth(externalMonth);
+    }
+  }, [externalMonth]);
 
   useEffect(() => {
     if (!isPlayingTimeline) return;

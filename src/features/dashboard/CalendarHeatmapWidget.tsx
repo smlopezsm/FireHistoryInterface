@@ -1,13 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Table, Loader2, Hash } from 'lucide-react';
+import { Table, Loader2, Hash, MapPin, Calendar } from 'lucide-react';
 import { useCalendario, type MesArmonizado } from '../../api';
+import { PROVINCIAS_ARG, type ZoneItem } from './ZoneSelectorWidget';
 
 interface CalendarHeatmapWidgetProps {
   zonaNombre: string;
   capa: "armonizado" | "modis" | "viirs";
   provincia_id?: string;
   bbox?: [number, number, number, number];
+  selectedZone?: ZoneItem;
+  onSelectZone?: (zone: ZoneItem) => void;
+  selectedMonth?: string;
+  onSelectMonth?: (ym: string) => void;
   className?: string;
 }
 
@@ -46,6 +51,10 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   capa,
   provincia_id,
   bbox,
+  selectedZone,
+  onSelectZone,
+  selectedMonth: controlledMonth,
+  onSelectMonth,
   className = '',
 }) => {
   const { t, i18n } = useTranslation();
@@ -53,11 +62,23 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   const months = isEn ? MONTHS_EN : MONTHS_ES;
   const locale = isEn ? "en-US" : "es-AR";
 
+  const [fromYear, setFromYear] = useState<number>(2000);
+  const [toYear, setToYear] = useState<number>(2026);
+  const [localSelectedMonth, setLocalSelectedMonth] = useState<string>('');
+  const activeMonth = controlledMonth ?? localSelectedMonth;
+
+  const filteredYears = useMemo(
+    () => YEARS.filter((y) => y >= fromYear && y <= toYear),
+    [fromYear, toYear]
+  );
+
   const bboxStr = !provincia_id && bbox ? bbox.join(',') : undefined;
   const { data: apiData, isLoading: isLoadingCalendar } = useCalendario({
     provincia_id,
     bbox: bboxStr,
     capa,
+    desde: `${fromYear}-01-01`,
+    hasta: `${toYear}-12-31`,
   });
 
   const apiMesesMap = useMemo(() => {
@@ -283,6 +304,137 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
         </div>
       </div>
 
+      {/* Barra moderna de filtros: zona, rango rápido y selección puntual de mes */}
+      <div className="mt-3 flex flex-col gap-2 rounded-lg border border-[#21312D] bg-[#07100F] p-2.5 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {onSelectZone && (
+            <label className="flex items-center gap-1.5 text-[#93A39C]">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-[#B8EE68]" />
+              <select
+                aria-label={isEn ? "Calendar zone" : "Zona del calendario"}
+                value={selectedZone?.id || PROVINCIAS_ARG[0].id}
+                onChange={(e) => {
+                  const found = PROVINCIAS_ARG.find((z) => z.id === e.target.value);
+                  if (found) onSelectZone(found);
+                }}
+                className="h-7 rounded-md border border-[#21312D] bg-[#111E1B] px-2 font-sans text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none"
+              >
+                {PROVINCIAS_ARG.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {/* Presets modernos de rango de años */}
+          <div className="flex flex-wrap items-center gap-1 font-mono">
+            {[
+              { label: isEn ? "All" : "Todo", from: 2000, to: 2026 },
+              { label: "10y", from: 2017, to: 2026 },
+              { label: "5y", from: 2022, to: 2026 },
+              { label: "2026", from: 2026, to: 2026 },
+            ].map((preset) => {
+              const isActive = fromYear === preset.from && toYear === preset.to;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    setFromYear(preset.from);
+                    setToYear(preset.to);
+                  }}
+                  aria-pressed={isActive}
+                  className={`h-7 rounded-md px-2 text-xs transition-colors ${
+                    isActive
+                      ? "bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40 font-semibold"
+                      : "bg-[#111E1B] text-[#93A39C] border border-[#21312D] hover:text-[#EFF5ED]"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 font-mono">
+          {/* Rango personalizado */}
+          <div className="flex items-center gap-1.5 text-[#93A39C]">
+            <Calendar className="h-3.5 w-3.5 text-[#68D9D0]" />
+            <select
+              aria-label={isEn ? "From year" : "Año desde"}
+              value={fromYear}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setFromYear(next);
+                if (next > toYear) setToYear(next);
+              }}
+              className="h-7 rounded-md border border-[#21312D] bg-[#111E1B] px-1.5 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none"
+            >
+              {[...YEARS].reverse().map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <span>→</span>
+            <select
+              aria-label={isEn ? "To year" : "Año hasta"}
+              value={toYear}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setToYear(next);
+                if (next < fromYear) setFromYear(next);
+              }}
+              className="h-7 rounded-md border border-[#21312D] bg-[#111E1B] px-1.5 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none"
+            >
+              {YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Selector moderno de mes puntual (sin input[type=month] nativo) */}
+          <div className="flex items-center gap-1.5">
+            <select
+              aria-label={isEn ? "Focus month" : "Mes puntual"}
+              value={activeMonth ? Number(activeMonth.slice(5, 7)) - 1 : ""}
+              onChange={(e) => {
+                if (e.target.value === "") return;
+                const yr = activeMonth ? Number(activeMonth.slice(0, 4)) : toYear;
+                const ym = `${yr}-${String(Number(e.target.value) + 1).padStart(2, "0")}`;
+                setLocalSelectedMonth(ym);
+                onSelectMonth?.(ym);
+              }}
+              className="h-7 rounded-md border border-[#21312D] bg-[#111E1B] px-2 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none"
+            >
+              <option value="">{isEn ? "Pick month..." : "Elegir mes..."}</option>
+              {months.map((m, i) => (
+                <option key={m} value={i}>{m}</option>
+              ))}
+            </select>
+            <select
+              aria-label={isEn ? "Focus year" : "Año puntual"}
+              value={activeMonth ? Number(activeMonth.slice(0, 4)) : toYear}
+              onChange={(e) => {
+                const yr = Number(e.target.value);
+                const mo = activeMonth ? activeMonth.slice(5, 7) : "09";
+                const ym = `${yr}-${mo}`;
+                if (yr < fromYear) setFromYear(yr);
+                if (yr > toYear) setToYear(yr);
+                setLocalSelectedMonth(ym);
+                onSelectMonth?.(ym);
+              }}
+              className="h-7 rounded-md border border-[#21312D] bg-[#111E1B] px-1.5 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none"
+            >
+              {YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Resumen de cantidades y máximos históricos */}
       <div className="my-2.5 flex flex-wrap items-center justify-between gap-y-2 rounded-lg bg-[#07100F] px-3 py-1.5 font-sans text-xs border border-[#21312D]">
         <div className="flex items-center gap-2">
@@ -316,9 +468,9 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
       {/* Matriz Heatmap o Vista en Tabla */}
       {!showTableView ? (
         <div className="overflow-x-auto pb-1">
-          <div className="min-w-[580px]">
+          <div className="w-full min-w-[440px]">
             {/* Cabecera con meses y Total Anual */}
-            <div className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 mb-1 font-mono text-xs text-[#93A39C] text-center items-center">
+            <div className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 mb-1 font-mono text-[11px] text-[#93A39C] text-center items-center">
               <span className="text-left pl-1">{isEn ? "Year" : "Año"}</span>
               {months.map((m) => (
                 <span key={m}>{m}</span>
@@ -327,14 +479,14 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
             </div>
 
             {/* Filas de años */}
-            <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1">
-              {YEARS.map((year) => {
+            <div className="flex flex-col gap-0.5 max-h-[380px] overflow-y-auto pr-1">
+              {filteredYears.map((year) => {
                 const yearTotal = getYearTotal(year);
 
                 return (
                   <div
                     key={year}
-                    className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 items-center"
+                    className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 items-center"
                   >
                     <span className="font-mono text-xs font-semibold text-[#93A39C]">
                       {year}
@@ -343,10 +495,17 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                     {Array.from({ length: 12 }, (_, monthIdx) => {
                       const data = getCellData(year, monthIdx);
                       const bgColor = getCellColor(data.val);
+                      const cellYm = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+                      const isSelected = activeMonth === cellYm && data.val !== null;
 
                       return (
                         <div
                           key={monthIdx}
+                          onClick={() => {
+                            if (data.val === null) return;
+                            setLocalSelectedMonth(cellYm);
+                            onSelectMonth?.(cellYm);
+                          }}
                           onMouseEnter={() =>
                             data.val !== null &&
                             setHoveredCell({
@@ -364,7 +523,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                           onMouseLeave={() => setHoveredCell(null)}
                           className={`group relative h-7 sm:h-8 rounded-sm transition-transform duration-100 hover:scale-110 hover:z-20 cursor-pointer flex items-center justify-center ${
                             data.isEstimated ? "pattern-estimado" : ""
-                          }`}
+                          } ${isSelected ? "ring-2 ring-[#B8EE68] z-10" : ""}`}
                           style={{
                             backgroundColor: bgColor,
                             border:
@@ -375,6 +534,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                                   : "1px solid rgba(0,0,0,0.3)",
                           }}
                           role="gridcell"
+                          aria-selected={isSelected}
                           aria-label={`${months[monthIdx]} ${year}: ${
                             data.val !== null
                               ? `${data.val.toLocaleString(locale)} ${isEn ? "spots" : "focos"}`
