@@ -202,20 +202,20 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
           {!showTableView ? (
             <div className="overflow-x-auto pb-1">
-              <div className="min-w-[580px]">
-                <div className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 mb-1 font-mono text-xs text-[#93A39C] text-center items-center">
-                  <span className="text-left pl-1">{isEn ? 'Year' : 'Año'}</span>
+              <div className="w-full min-w-[360px]">
+                <div className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 mb-1 font-mono text-[10px] sm:text-xs text-[#93A39C] text-center items-center">
+                  <span className="text-left pl-0.5">{isEn ? 'Year' : 'Año'}</span>
                   {months.map((m) => (
-                    <span key={m}>{m}</span>
+                    <span key={m} className="truncate">{m}</span>
                   ))}
-                  <span className="text-right pr-1 font-semibold text-[#EFF5ED]">Total</span>
+                  <span className="text-right pr-0.5 font-semibold text-[#EFF5ED]">Total</span>
                 </div>
 
-                <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1" role="grid">
+                <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-0.5" role="grid">
                   {years.map((year) => {
                     const yearTotal = getYearTotal(year);
                     return (
-                      <div key={year} role="row" className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 items-center">
+                      <div key={year} role="row" className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 items-center">
                         <span className="font-mono text-xs font-semibold text-[#93A39C]">{year}</span>
 
                         {Array.from({ length: 12 }, (_, monthIdx) => {
