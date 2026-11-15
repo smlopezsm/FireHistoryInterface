@@ -15,13 +15,11 @@ import {
   useMetadata,
   useProvincias,
   pedidoDeZona,
-  zonaDePoligono,
   zoomParaBbox,
   aMes,
   mesAnterior,
   ZONA_ARGENTINA,
   type Capa,
-  type GeoJSON,
   type ZonaSeleccionada,
 } from '../../api';
 
@@ -49,14 +47,12 @@ function useIsDesktop() {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = () => {
-  const { t, i18n } = useTranslation();
-  const isEn = !Boolean(i18n?.language?.startsWith('es'));
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
 
   const [zona, setZona] = useState<ZonaSeleccionada>(ZONA_ARGENTINA);
   const [capa, setCapa] = useState<Capa>('armonizado');
   const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(null);
-  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(null);
 
   const { data: metadata } = useMetadata();
   const { data: apiProvincias } = useProvincias();
@@ -68,7 +64,7 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
   const periodoParams = periodoUsuario ?? {};
 
   // El mapa muestra un mes; por defecto el último mes completo.
-  const mesMapa = mesMapaUsuario ?? (mesMax ? mesAnterior(mesMax) : null);
+  const mesMapa = mesMax ? mesAnterior(mesMax) : null;
 
   const pedido = useMemo(() => pedidoDeZona(zona), [zona]);
   const anomalia = useAnomalia(pedido);
@@ -76,9 +72,6 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
   const preliminar = Boolean(
     metadata && anomalia.data && anomalia.data.mes > aMes(metadata.fecha_ultimo_sp),
   );
-
-  const handlePoligono = (poligono: GeoJSON.Polygon) =>
-    setZona(zonaDePoligono(poligono, isEn ? 'Drawn area' : 'Zona dibujada', isEn ? 'Polygon' : 'Polígono'));
 
   const handleSelectProvinciaFromMap = useCallback(
     (provinciaId: string | null) => {
@@ -132,15 +125,9 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
     <GloboTerraqueo
       center={zona.center}
       zoom={zona.zoom}
+      bbox={zona.bbox}
       capa={capa}
-      mesMapa={mesMapa}
-      onChangeMesMapa={setMesMapaUsuario}
-      mesMin={mesMin}
-      mesMax={mesMax}
-      fechaMin={metadata?.fecha_min}
-      fechaMax={metadata?.fecha_max}
-      geometriaZona={zona.geometria}
-      onPoligonoDibujado={handlePoligono}
+      externalMonth={mesMapa ?? undefined}
       selectedProvinciaId={zona.provincia_id}
       onSelectProvincia={handleSelectProvinciaFromMap}
       className={`w-full ${heightClass} rounded-none border-0`}
