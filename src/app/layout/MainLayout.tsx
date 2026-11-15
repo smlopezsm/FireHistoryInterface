@@ -9,6 +9,7 @@ import {
   SeriesWidget,
   type Periodo,
 } from '../../features/dashboard';
+import { claveDeZona, escribirEstado, leerEstado, zonaDeClave } from '../estadoUrl';
 import { CargarAlVer } from '../CargarAlVer';
 
 // El globo trae MapLibre (~300 kB gzip): se descarga recién cuando el mapa se acerca a la
@@ -55,10 +56,16 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
 
+  // Estado inicial desde la URL (docs/02 §6): se puede compartir y sobrevive a recargar.
+  const [inicial] = useState(() => (typeof window !== 'undefined' ? leerEstado(window.location.search) : {}));
   const [zona, setZona] = useState<ZonaSeleccionada>(ZONA_ARGENTINA);
-  const [capa, setCapa] = useState<Capa>('armonizado');
-  const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(null);
-  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(null);
+  // La zona de la URL se resuelve cuando llegan las provincias (nombre, región, bbox).
+  const [zonaPendiente, setZonaPendiente] = useState<string | null>(inicial.zona ?? null);
+  const [capa, setCapa] = useState<Capa>(inicial.capa ?? 'armonizado');
+  const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(
+    inicial.desde && inicial.hasta ? { desde: inicial.desde, hasta: inicial.hasta } : null
+  );
+  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(inicial.mes ?? null);
 
   const { data: metadata } = useMetadata();
   const { data: apiProvincias } = useProvincias();
@@ -75,6 +82,35 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
   const mesMapa = mesMapaUsuario && mesMin && mesMax && mesMapaUsuario >= mesMin && mesMapaUsuario <= mesMax
     ? mesMapaUsuario
     : mesInicialMapa ?? null;
+
+  useEffect(() => {
+    if (!zonaPendiente || !apiProvincias) return;
+    const resuelta = zonaDeClave(zonaPendiente, apiProvincias);
+    if (resuelta) setZona(resuelta);
+    setZonaPendiente(null);
+  }, [zonaPendiente, apiProvincias]);
+
+  // Un rango de la URL fuera de los datos disponibles vuelve al registro completo.
+  useEffect(() => {
+    if (periodoUsuario && mesMin && mesMax && (periodoUsuario.desde < mesMin || periodoUsuario.hasta > mesMax)) {
+      setPeriodoUsuario(null);
+    }
+  }, [periodoUsuario, mesMin, mesMax]);
+
+  // Cada cambio se refleja en la URL (sin agregar entradas al historial).
+  useEffect(() => {
+    if (zonaPendiente || typeof window === 'undefined') return;
+    const query = escribirEstado(window.location.search, {
+      zona: claveDeZona(zona) ?? undefined,
+      desde: periodoUsuario?.desde,
+      hasta: periodoUsuario?.hasta,
+      capa,
+      mes: mesMapaUsuario ?? undefined,
+    });
+    if (query !== window.location.search) {
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${query}${window.location.hash}`);
+    }
+  }, [zona, zonaPendiente, periodoUsuario, capa, mesMapaUsuario]);
 
   const pedido = useMemo(() => pedidoDeZona(zona), [zona]);
   const anomalia = useAnomalia(pedido);
@@ -112,6 +148,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
       }
     },
     [apiProvincias, zona.center]
+  );
+
+  // Abrir un mes del calendario en el mapa (en celular, el mapa queda más abajo).
+  const verMesEnMapa = useCallback(
+    (mes: string) => {
+      setMesMapaUsuario(mes);
+      if (!isDesktop) document.getElementById('mapa')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    },
+    [isDesktop]
   );
 
   const zonaNombre =
@@ -216,6 +261,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
           pedido={pedido}
           periodo={periodoParams}
           fechaUltimoSp={metadata?.fecha_ultimo_sp}
+          mesMapa={mesMapa}
+          onElegirMes={verMesEnMapa}
           className="rounded-none border-0 bg-transparent"
         />
       </div>
@@ -252,7 +299,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
             <div className="rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]">
               {diagnostico}
             </div>
-            <div className="rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
+            <div id="mapa" className="scroll-mt-20 rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
               {globo('h-[420px]')}
             </div>
             {serie('rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden')}

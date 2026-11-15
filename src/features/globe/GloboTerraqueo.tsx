@@ -304,10 +304,11 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     if (!celdas.data) return { marcadores: [], total: null };
     return celdasAMarcadores(celdas.data.features, {
       provinciaId: selectedProvinciaId,
+      provinciaIds: selectedProvinciaId ? undefined : selectedProvinciaIds,
       dentro: geometriaZona ? (lng, lat) => isPointInGeometry(lng, lat, geometriaZona) : undefined,
       nombres: nombresProvincias,
     });
-  }, [celdas.data, selectedProvinciaId, geometriaZona, nombresProvincias]);
+  }, [celdas.data, selectedProvinciaId, selectedProvinciaIds, geometriaZona, nombresProvincias]);
 
   const totalMonths = monthDiff(minMonth, maxMonth);
   const currentMonthIdx = monthDiff(minMonth, selectedMonth);
@@ -789,7 +790,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#07100F] border-b border-[#21312D] text-xs font-mono">
         <div className="flex items-center gap-1.5 text-[#93A39C]">
           <Calendar className="h-3.5 w-3.5 text-[#B8EE68]" />
-          <span className="hidden sm:inline">{isEn ? 'Period:' : 'Período:'}</span>
+          <span className="hidden sm:inline">{isEn ? 'Map month:' : 'Mes del mapa:'}</span>
           <button
             type="button"
             disabled={selectedMonth <= minMonth}

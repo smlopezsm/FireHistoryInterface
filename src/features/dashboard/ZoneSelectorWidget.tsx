@@ -1,10 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { MapPin, Compass, Crosshair, Loader2, AlertCircle } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   useProvincias,
-  getProvincias,
   regionesDe,
   zonaDeRegion,
   esZonaRegion,
@@ -67,31 +65,22 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
     return [ZONA_ARGENTINA, ...provZones];
   }, [apiProvincias]);
 
-  const queryClient = useQueryClient();
   const regiones = useMemo(() => regionesDe(apiProvincias ?? []), [apiProvincias]);
   const regionActual = selectedZone.provincia_id || esZonaRegion(selectedZone) ? selectedZone.region : "";
   const zonaPropia =
     selectedZone.id !== ZONA_ARGENTINA.id && !selectedZone.provincia_id && !esZonaRegion(selectedZone) ? selectedZone : null;
-  const [cargandoRegion, setCargandoRegion] = useState(false);
+  const cargandoRegion = false;
   const [regionError, setRegionError] = useState<string | null>(null);
 
-  // Región completa: se consulta como polígono (unión de sus provincias)
-  const elegirRegion = async (region: string) => {
+  // Región completa: se consulta con `region=` (la API suma las celdas de sus provincias).
+  const elegirRegion = (region: string) => {
     setRegionError(null);
     if (!region) return onSelectZone(ZONA_ARGENTINA);
-    setCargandoRegion(true);
-    try {
-      const conGeometria = await queryClient.fetchQuery({
-        queryKey: ["provincias", { geometria: true }],
-        queryFn: ({ signal }) => getProvincias(true, signal),
-        staleTime: Infinity,
-      });
-      onSelectZone(await zonaDeRegion(conGeometria, region));
-    } catch (err) {
-      setRegionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setCargandoRegion(false);
+    if (!apiProvincias?.some((p) => p.region === region)) {
+      setRegionError(isEn ? `Unknown region: ${region}` : `Región desconocida: ${region}`);
+      return;
     }
+    onSelectZone(zonaDeRegion(apiProvincias, region));
   };
 
   const selectCls =
@@ -203,13 +192,6 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
               {zonaPropia && <option value={zonaPropia.id}>{zoneLabel(zonaPropia)}</option>}
             </select>
           </div>
-          {esZonaRegion(selectedZone) && (
-            <span className="text-xs text-[#93A39C]">
-              {isEn
-                ? "Region = union of its provinces' outlines; may differ 1–5 % from the sum by province."
-                : "Región = unión de los contornos de sus provincias; puede diferir 1–5 % de la suma por provincia."}
-            </span>
-          )}
           {(error || regionError) && (
             <span role="alert" className="flex items-center gap-1 text-xs text-[#FF9C55]">
               <AlertCircle className="h-3 w-3 shrink-0" />

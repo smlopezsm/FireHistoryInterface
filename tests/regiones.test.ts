@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { geometriaDeRegion, regionesDe, zonaDeRegion, pedidoDeZona, type Provincia } from '../src/api';
+import { regionesDe, zonaDeRegion, pedidoDeZona, type Provincia } from '../src/api';
 
 const cuadrado = (x: number, y: number, lado: number): number[][][][] => [
   [[[x, y], [x + lado, y], [x + lado, y + lado], [x, y + lado], [x, y]]],
@@ -20,18 +20,10 @@ describe('regiones', () => {
     expect(regionesDe(provincias)).toEqual(['Cuyo', 'NOA']);
   });
 
-  it('une las provincias vecinas en un solo contorno sin el borde compartido', async () => {
-    const g = await geometriaDeRegion(provincias, 'Cuyo');
-    const anillos = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
-    expect(anillos).toHaveLength(1);
-    const xs = anillos[0][0].map((p) => p[0]);
-    expect(Math.min(...xs)).toBeCloseTo(-68);
-    expect(Math.max(...xs)).toBeCloseTo(-66);
-  });
-
-  it('arma una zona que viaja como geometría (POST)', async () => {
-    const zona = await zonaDeRegion(provincias, 'Cuyo');
+  it('arma una zona que viaja como `region=` (la API suma las celdas asignadas a sus provincias)', () => {
+    const zona = zonaDeRegion(provincias, 'Cuyo');
     expect(zona.bbox).toEqual([-68, -34, -66, -33]);
-    expect(pedidoDeZona(zona)).toHaveProperty('geometria');
+    expect(zona.geometria).toBeUndefined();
+    expect(pedidoDeZona(zona)).toEqual({ region: 'Cuyo' });
   });
 });

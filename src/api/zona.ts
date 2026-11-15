@@ -18,6 +18,8 @@ export interface ZonaSeleccionada {
 /** Traduce la zona de la interfaz a la única zona que acepta la API. */
 export function pedidoDeZona(zona: ZonaSeleccionada): PedidoZona | null {
   if (zona.provincia_id) return { provincia_id: zona.provincia_id };
+  // Región completa: la API la resuelve con `region=` (ver regiones.ts).
+  if (zona.id.startsWith('region-')) return { region: zona.region };
   if (zona.geometria) return { geometria: zona.geometria };
   if (zona.bbox) return { bbox: zona.bbox.join(',') };
   return null;

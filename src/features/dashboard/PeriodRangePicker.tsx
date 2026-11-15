@@ -178,7 +178,7 @@ export const PeriodRangePicker: React.FC<PeriodRangePickerProps> = ({
         }`}
       >
         <CalendarRange className="h-3.5 w-3.5 text-[#B8EE68]" aria-hidden="true" />
-        <span className="text-[#93A39C]">{isEn ? "Period:" : "Período:"}</span>
+        <span className="text-[#93A39C]">{isEn ? "Calendar range:" : "Rango del calendario:"}</span>
         <span className="font-mono font-medium text-[#EFF5ED]">
           {formatMonthLabel(effectiveMin, months)} → {formatMonthLabel(effectiveMax, months)}
         </span>
