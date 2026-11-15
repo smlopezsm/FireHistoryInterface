@@ -35,27 +35,8 @@ interface MainLayoutProps {
   onOpenSatellites?: () => void;
 }
 
-/** true en escritorio (≥ 1024 px). Evita montar dos mapas a la vez. */
-function useIsDesktop() {
-  const query = '(min-width: 1024px)';
-  const get = () =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia(query).matches
-      : true;
-  const [isDesktop, setIsDesktop] = useState(get);
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia(query);
-    const onChange = () => setIsDesktop(mql.matches);
-    mql.addEventListener?.('change', onChange);
-    return () => mql.removeEventListener?.('change', onChange);
-  }, []);
-  return isDesktop;
-}
-
 export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
   const { t } = useTranslation();
-  const isDesktop = useIsDesktop();
 
   // Estado inicial desde la URL (docs/02 §6): se puede compartir y sobrevive a recargar.
   const [inicial] = useState(() => (typeof window !== 'undefined' ? leerEstado(window.location.search) : {}));
@@ -191,9 +172,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
     return [];
   }, [zona, apiProvincias]);
 
-  const esqueletoGlobo = (heightClass: string) => (
+  const esqueletoGlobo = (
     <div
-      className={`w-full ${heightClass} flex items-center justify-center bg-[#07100F] text-xs text-[#93A39C]`}
+      className="flex w-full flex-1 items-center justify-center bg-[#07100F] text-xs text-[#93A39C]"
       role="status"
       aria-label={t('globe.loadingMap')}
     >
@@ -201,10 +182,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
     </div>
   );
 
-  const globo = (heightClass: string) => (
-    <CargarAlVer esqueleto={esqueletoGlobo(heightClass)}>
-      {zonaPendiente ? esqueletoGlobo(heightClass) : (
-        <Suspense fallback={esqueletoGlobo(heightClass)}>
+  const globo = (
+    <CargarAlVer esqueleto={esqueletoGlobo} className="flex flex-1 flex-col">
+      {zonaPendiente ? esqueletoGlobo : (
+        <Suspense fallback={esqueletoGlobo}>
           <GloboTerraqueo
             center={zona.center}
             zoom={zona.zoom}
@@ -219,7 +200,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
             selectedProvinciaId={zona.provincia_id}
             selectedProvinciaIds={selectedProvinciaIds}
             onSelectProvincia={handleSelectProvinciaFromMap}
-            className={`w-full ${heightClass} rounded-none border-0`}
+            className="flex-1 rounded-none border-0"
           />
         </Suspense>
       )}
@@ -296,9 +277,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
           <section
             id="mapa"
             aria-label={t('globe.title')}
-            className="min-w-0 scroll-mt-20 overflow-hidden rounded-xl border border-[#21312D] bg-[#07100F] lg:col-span-7 lg:col-start-1 lg:row-start-1"
+            className="flex h-[420px] min-w-0 flex-col scroll-mt-20 overflow-hidden rounded-xl border border-[#21312D] bg-[#07100F] lg:col-span-7 lg:col-start-1 lg:row-start-1 lg:h-auto lg:min-h-[560px] lg:self-stretch xl:min-h-[620px]"
           >
-            {globo(isDesktop ? 'h-[560px] xl:h-[620px]' : 'h-[420px]')}
+            {globo}
           </section>
           {serie('min-w-0 overflow-hidden rounded-xl border border-[#21312D] bg-[#0D1816] lg:col-span-12')}
         </div>

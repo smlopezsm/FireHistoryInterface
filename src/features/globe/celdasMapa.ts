@@ -1,5 +1,5 @@
 /**
- * Celdas del mapa: de la respuesta de `/mapa/celdas` a marcadores honestos.
+ * Celdas del mapa: de la respuesta de `/mapa/celdas` a polígonos interactivos.
  *
  * El mapa muestra **conteos de focos** por celda de 5 × 5 km en el mes elegido. No hay
  * temperaturas ni sensores deducidos: el color sale del conteo de la capa activa y el
@@ -12,8 +12,6 @@ export type CapaMapa = 'armonizado' | 'modis' | 'viirs';
 
 /** Focos mínimos por celda que se piden a la API (`min_focos`). */
 export const MIN_FOCOS_MAPA = 5;
-/** Marcadores que se dibujan como máximo (los de más focos). */
-export const MAX_MARCADORES = 60;
 
 export interface TramoFocos {
   desde: number;
@@ -43,18 +41,22 @@ export const etiquetaTramo = (tramo: TramoFocos, isEn: boolean): string => {
   return tramo.hasta === null ? `≥${tramo.desde} ${unidad}` : `${tramo.desde}–${tramo.hasta} ${unidad}`;
 };
 
-export interface MarcadorCelda {
-  id: string;
+interface DetalleCelda {
   cellId: number;
   lng: number;
   lat: number;
   valor: number;
   estado: Estado;
-  provinciaId: string | null;
   provinciaNombre: string | null;
 }
 
-interface OpcionesMarcadores {
+export type CeldaMapa = GeoJSON.Feature<GeoJSON.Polygon, DetalleCelda & {
+  color: string;
+  estimado: boolean;
+}>;
+
+interface OpcionesCeldas {
+  capa?: CapaMapa;
   /** Si se indica, solo cuentan las celdas asignadas a esa provincia. */
   provinciaId?: string;
   /** Si se indica (una región), solo cuentan las celdas de esas provincias. */
@@ -63,7 +65,6 @@ interface OpcionesMarcadores {
   dentro?: (lng: number, lat: number) => boolean;
   /** `provincia_id` → nombre, para el popup. */
   nombres?: Map<string, string>;
-  max?: number;
 }
 
 const centroide = (f: CeldaFeature): [number, number] | null => {
@@ -78,34 +79,35 @@ const centroide = (f: CeldaFeature): [number, number] | null => {
   return [Number((sx / vertices.length).toFixed(4)), Number((sy / vertices.length).toFixed(4))];
 };
 
-/** Filtra, ordena por focos y limita. `total` son las celdas de la zona, no las dibujadas. */
-export function celdasAMarcadores(
+/** Conserva la geometría y el valor de cada celda devuelta para la zona seleccionada. */
+export function celdasParaMapa(
   features: CeldaFeature[],
-  { provinciaId, provinciaIds, dentro, nombres, max = MAX_MARCADORES }: OpcionesMarcadores = {},
-): { marcadores: MarcadorCelda[]; total: number } {
-  const enZona = features
+  { capa = 'armonizado', provinciaId, provinciaIds, dentro, nombres }: OpcionesCeldas = {},
+): CeldaMapa[] {
+  return features
     .filter((f) => !provinciaId || f.properties.provincia_id === provinciaId)
     .filter((f) => !provinciaIds?.length || provinciaIds.includes(f.properties.provincia_id ?? ''))
-    .flatMap((f): MarcadorCelda[] => {
+    .flatMap((f): CeldaMapa[] => {
       const centro = centroide(f);
-      if (!centro) return [];
+      if (!centro || (dentro && !dentro(...centro))) return [];
       const [lng, lat] = centro;
       const { cell_id, provincia_id, valor, estado } = f.properties;
       return [{
-        id: `celda-${cell_id}`,
-        cellId: cell_id,
-        lng,
-        lat,
-        valor,
-        estado,
-        provinciaId: provincia_id,
-        provinciaNombre: (provincia_id && nombres?.get(provincia_id)) || null,
+        type: 'Feature',
+        id: cell_id,
+        geometry: f.geometry,
+        properties: {
+          cellId: cell_id,
+          lng,
+          lat,
+          valor,
+          estado,
+          provinciaNombre: (provincia_id && nombres?.get(provincia_id)) || null,
+          color: colorDeConteo(valor),
+          estimado: capa === 'armonizado' && estado !== 'observado',
+        },
       }];
-    })
-    .filter((m) => !dentro || dentro(m.lng, m.lat));
-
-  const marcadores = [...enZona].sort((a, b) => b.valor - a.valor).slice(0, max);
-  return { marcadores, total: enZona.length };
+    });
 }
 
 const escapar = (texto: string) =>
@@ -117,7 +119,7 @@ const ESTADOS: Record<Estado, [string, string]> = {
   mixto: ['partly estimated from MODIS', 'en parte estimado desde MODIS'],
 };
 
-export function popupCeldaHtml(m: MarcadorCelda, { capa, isEn }: { capa: CapaMapa; isEn: boolean }): string {
+export function popupCeldaHtml(m: DetalleCelda, { capa, isEn }: { capa: CapaMapa; isEn: boolean }): string {
   const locale = isEn ? 'en' : 'es-AR';
   const conteo = m.valor.toLocaleString(locale, { maximumFractionDigits: 1 });
   const unidad = isEn ? 'hot spots' : 'focos';
@@ -140,9 +142,7 @@ export function popupCeldaHtml(m: MarcadorCelda, { capa, isEn }: { capa: CapaMap
   `;
 }
 
-/** Indica cuántas de las celdas devueltas se muestran. */
-export function textoContador(dibujadas: number, total: number, isEn: boolean): string {
+export function textoContador(total: number, isEn: boolean): string {
   const celdas = total === 1 ? (isEn ? 'cell' : 'celda') : (isEn ? 'cells' : 'celdas');
-  if (dibujadas >= total) return `${total} ${celdas}`;
-  return `${dibujadas} ${isEn ? 'of' : 'de'} ${total} ${celdas}`;
+  return `${total} ${celdas}`;
 }

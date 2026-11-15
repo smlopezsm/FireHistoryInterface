@@ -24,6 +24,7 @@ export interface ProvinciaFeatureProperties {
 
 export interface ProvinciasLayerOptions {
   onSelectProvincia?: (provinciaId: string | null) => void;
+  sobreCelda?: (e: maplibregl.MapMouseEvent) => boolean;
 }
 
 export interface ProvinciasLayerController {
@@ -202,13 +203,8 @@ export function attachProvinciasLayer(
     setCursor('');
   };
 
-  const isHotspotEvent = (e: { originalEvent?: Event }) => {
-    const target = e.originalEvent?.target as HTMLElement | null | undefined;
-    return Boolean(target?.closest?.('.hotspot-marker'));
-  };
-
   const handleLayerClick = (e: maplibregl.MapLayerMouseEvent) => {
-    if (isHotspotEvent(e)) return;
+    if (options.sobreCelda?.(e)) return;
     const feature = e.features?.[0];
     if (!feature || feature.id === undefined || feature.id === null) return;
 
@@ -228,7 +224,7 @@ export function attachProvinciasLayer(
   };
 
   const handleMapClick = (e: maplibregl.MapMouseEvent) => {
-    if (isHotspotEvent(e)) return;
+    if (options.sobreCelda?.(e)) return;
     if (!map.getLayer?.(PROVINCIAS_FILL_LAYER_ID)) return;
     if (typeof map.queryRenderedFeatures !== 'function') return;
 
