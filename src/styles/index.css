@@ -79,3 +79,14 @@ h1, h2, h3, h4, .font-title {
     scroll-behavior: auto !important;
   }
 }
+
+/* Mes mixto: parte observado, parte estimado (rayado más espaciado y tenue) */
+.pattern-mixto {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    rgba(239, 245, 237, 0.12) 6px,
+    rgba(239, 245, 237, 0.12) 8px
+  );
+}

@@ -5,8 +5,8 @@ import type { Provincia } from './types';
 export function useProvincias(geometria: boolean = false) {
   return useQuery<Provincia[], Error>({
     queryKey: ['provincias', { geometria }],
-    queryFn: () => getProvincias(geometria),
-    staleTime: 1000 * 60 * 60 * 24, // 24 horas de caché
+    queryFn: ({ signal }) => getProvincias(geometria, signal),
+    staleTime: Infinity, // Cambian solo con un nuevo despliegue de datos
     retry: 2,
   });
 }
