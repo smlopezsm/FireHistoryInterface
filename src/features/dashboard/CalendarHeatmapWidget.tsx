@@ -14,6 +14,7 @@ import {
 
 interface CalendarHeatmapWidgetProps {
   zonaNombre: string;
+  onOpenMethod?: () => void;
   capa: Capa;
   pedido: PedidoZona | null;
   periodo?: Omit<PeriodoParams, 'capa'>;
@@ -31,6 +32,7 @@ const valorDeCapa = (p: Punto, capa: Capa): number | null =>
 
 export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   zonaNombre,
+  onOpenMethod,
   capa,
   pedido,
   periodo = {},
@@ -220,6 +222,11 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
             </span>
           )}
         </p>
+        {onOpenMethod && (
+          <button type="button" onClick={onOpenMethod} className="w-fit rounded-sm py-1 text-xs text-[#B8EE68] underline underline-offset-2 focus-visible:outline focus-visible:outline-[#B8EE68]">
+            {t('calendar.methodLink')}
+          </button>
+        )}
       </div>
 
       {isExpanded && (
@@ -363,7 +370,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                   <tr className="border-b border-[#21312D] font-sans font-semibold text-[#93A39C]">
                     <th className="py-2 text-left">{isEn ? 'Period' : 'Período'}</th>
                     <th className="py-2 text-right">{isEn ? 'Harmonized' : 'Armonizado'}</th>
-                    <th className="py-2 text-right">{isEn ? 'Range 80%' : 'Rango 80 %'}</th>
+                    <th className="py-2 text-right">{t('calendar.nominalRange')}</th>
                     <th className="py-2 text-right">MODIS</th>
                     <th className="py-2 text-right">VIIRS</th>
                     <th className="py-2 text-center">{isEn ? 'Status' : 'Estado'}</th>
@@ -426,13 +433,16 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                 </span>
                 {hovered.estado !== 'observado' && capa === 'armonizado' && (
                   <span className="ml-1 font-mono text-xs text-[#93A39C]">
-                    ({isEn ? 'between' : 'entre'} {fmt(hovered.minimo)} {isEn ? 'and' : 'y'} {fmt(hovered.maximo)}, 80 %)
+                    ({t('calendar.nominalRange')} · {fmt(hovered.minimo)}–{fmt(hovered.maximo)})
                   </span>
                 )}
                 <span className="ml-2 rounded bg-[#111E1B] px-1.5 py-0.5 font-mono text-[10px] text-[#68D9D0] border border-[#21312D]">
                   {isEn ? 'Confidence' : 'Confianza'}: {hovered.confianza}
                 </span>
               </div>
+              {(hovered.dias_sin_modis ?? 0) > 0 && (
+                <p className="mt-1 text-[#FF9C55]">{t('calendar.modisGap', { count: hovered.dias_sin_modis })}</p>
+              )}
               <div className="mt-1 flex gap-3 font-mono tabular-nums text-xs text-[#93A39C] border-t border-[#21312D] pt-1">
                 <span>MODIS: {fmt(hovered.modis)}</span>
                 <span>VIIRS: {fmt(hovered.viirs)}</span>

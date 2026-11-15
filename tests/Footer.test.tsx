@@ -27,7 +27,7 @@ describe('Footer Component & Metadata (User Story 2)', () => {
 
     expect(
       screen.getByText(
-        /Prior to 2012, data originates from MODIS|Antes de 2012 los datos provienen del satélite MODIS/i
+        /periods before VIIRS are estimated from MODIS|los períodos anteriores a VIIRS se estiman con MODIS/i
       )
     ).toBeInTheDocument();
   });

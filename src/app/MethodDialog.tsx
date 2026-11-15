@@ -1,12 +1,19 @@
 import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HelpCircle, X, ShieldAlert } from 'lucide-react';
+import { HelpCircle, X } from 'lucide-react';
 import { useDialogA11y } from './useDialogA11y';
 
 export interface MethodDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const sources = [
+  { label: 'sourceFirms', url: 'https://firms.modaps.eosdis.nasa.gov/' },
+  { label: 'sourcePipeline', url: 'https://github.com/DenisPablo/ML_NasaSpaceApp/blob/eaa733f4038d0b0600aebfa27410fa573f0ac8c1/CLASIFICACION.md' },
+  { label: 'sourceValidation', url: 'https://github.com/DenisPablo/ML_NasaSpaceApp/tree/eaa733f4038d0b0600aebfa27410fa573f0ac8c1/analisis/veredicto-armonizacion' },
+  { label: 'sourceApi', url: 'https://github.com/smlopezsm/FireHistoryInterfaceAPI/blob/2b2ec70/docs/04-logica-de-armonizacion.md' },
+];
 
 export const MethodDialog: React.FC<MethodDialogProps> = ({ isOpen, onClose }) => {
   const { t } = useTranslation();
@@ -33,10 +40,10 @@ export const MethodDialog: React.FC<MethodDialogProps> = ({ isOpen, onClose }) =
       }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200"
     >
-      <div className="w-full max-w-lg rounded-xl border border-[#21312D] bg-[#0D1816] p-6 text-[#EFF5ED] shadow-[0_12px_32px_rgba(0,0,0,0.65)]">
-        <div className="flex items-center justify-between border-b border-[#21312D] pb-3">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-xl border border-[#21312D] bg-[#0D1816] text-[#EFF5ED] shadow-[0_12px_32px_rgba(0,0,0,0.65)]">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#21312D] px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-[#B8EE68]" aria-hidden="true" />
+            <HelpCircle className="h-5 w-5 shrink-0 text-[#B8EE68]" aria-hidden="true" />
             <h2
               id="method-dialog-title"
               className="font-title text-base font-bold text-[#EFF5ED]"
@@ -48,41 +55,76 @@ export const MethodDialog: React.FC<MethodDialogProps> = ({ isOpen, onClose }) =
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] transition-colors"
+            className="shrink-0 rounded-md p-2 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-2 focus:ring-[#B8EE68] transition-colors"
             aria-label={t('methodDialog.closeDialog', { defaultValue: 'Close' })}
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="mt-4 space-y-3.5 text-xs leading-relaxed text-[#93A39C]">
-          <p>
-            <strong className="text-[#EFF5ED]">{t('methodDialog.p1_strong')} </strong>
-            {t('methodDialog.p1')}
-          </p>
-
-          <div className="rounded-lg border border-[#21312D] bg-[#111E1B] p-3.5">
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-7 rounded border border-dashed border-[#93A39C] pattern-estimado" aria-hidden="true" />
-              <span className="font-semibold text-[#EFF5ED]">
-                {t('methodDialog.estimated_title')}
-              </span>
-            </div>
-            <p className="mt-1.5 text-xs text-[#93A39C]">
-              {t('methodDialog.estimated_desc')}
+        <div
+          role="region"
+          aria-labelledby="method-dialog-title"
+          tabIndex={0}
+          className="min-h-0 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 text-sm leading-relaxed text-[#C2D2C9] focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-[#B8EE68] sm:px-6 [&_h3]:font-semibold [&_h3]:text-[#EFF5ED]"
+        >
+          <section className="space-y-2">
+            <h3>{t('methodDialog.measureTitle')}</h3>
+            <p>{t('methodDialog.measure')}</p>
+          </section>
+          <section className="space-y-2">
+            <h3>{t('methodDialog.calculationTitle')}</h3>
+            <p>{t('methodDialog.observation')}</p>
+            <p className="rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 font-semibold text-[#B8EE68]">
+              {t('methodDialog.formula')}
             </p>
-          </div>
-
-          <div className="flex items-start gap-2.5 rounded-md border border-[#21312D]/80 bg-[#07100F] p-3">
-            <ShieldAlert className="h-4 w-4 shrink-0 text-[#FF9C55] mt-0.5" aria-hidden="true" />
-            <p className="text-xs text-[#93A39C]">
-              <strong className="text-[#EFF5ED]">{t('methodDialog.nodata_strong')} </strong>
-              {t('methodDialog.nodata_desc')}
-            </p>
-          </div>
+            <p>{t('methodDialog.referenceSatellites')}</p>
+            <p>{t('methodDialog.calibration')}</p>
+            <p>{t('methodDialog.example')}</p>
+          </section>
+          <section className="space-y-2">
+            <h3>{t('methodDialog.readingTitle')}</h3>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>{t('methodDialog.observed')}</li>
+              <li>{t('methodDialog.mixed')}</li>
+              <li>{t('methodDialog.estimated')}</li>
+            </ul>
+            <p>{t('methodDialog.availability')}</p>
+          </section>
+          <section className="space-y-2">
+            <h3>{t('methodDialog.uncertaintyTitle')}</h3>
+            <p>{t('methodDialog.uncertainty')}</p>
+            <p>{t('methodDialog.validation')}</p>
+            <p>{t('methodDialog.confidence')}</p>
+          </section>
+          <section className="space-y-2">
+            <h3>{t('methodDialog.comparisonTitle')}</h3>
+            <p>{t('methodDialog.comparison')}</p>
+            <p>{t('methodDialog.comparisonThresholds')}</p>
+          </section>
+          <section className="space-y-2">
+            <h3>{t('methodDialog.limitsTitle')}</h3>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>{t('methodDialog.limitBeforeViirs')}</li>
+              <li>{t('methodDialog.limitAvailability')}</li>
+              <li>{t('methodDialog.limitOrbit')}</li>
+            </ul>
+          </section>
+          <section className="space-y-2">
+            <h3>{t('methodDialog.sourcesTitle')}</h3>
+            <ul className="list-disc space-y-1 pl-5">
+              {sources.map(({ label, url }) => (
+                <li key={label}>
+                  <a href={url} target="_blank" rel="noreferrer" className="text-[#B8EE68] underline underline-offset-2">
+                    {t(`methodDialog.${label}`)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="flex shrink-0 justify-end border-t border-[#21312D] px-4 py-3 sm:px-6">
           <button
             type="button"
             onClick={onClose}

@@ -47,7 +47,7 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = () => {
+export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
 
@@ -193,6 +193,7 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
       <div id="calendario" className="scroll-mt-20">
         <CalendarHeatmapWidget
           zonaNombre={zonaNombre}
+          onOpenMethod={onOpenMethod}
           capa={capa}
           pedido={pedido}
           periodo={periodoParams}

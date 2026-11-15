@@ -64,12 +64,33 @@ describe('App Shell Layout & i18n (English Default)', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByText(/MODIS and VIIRS/i)[0]).toBeInTheDocument();
+    expect(screen.getByText(/77\.1% of province-month cases/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Validation and scripts' })).toHaveAttribute(
+      'href', expect.stringContaining('/analisis/veredicto-armonizacion'),
+    );
 
     // Close button
     const closeBtn = screen.getByRole('button', { name: /Understood/i });
     fireEvent.click(closeBtn);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens the methodology from the Spanish calendar and shows the validation example', () => {
+    i18n.changeLanguage('es');
+    render(
+      <Providers>
+        <App />
+      </Providers>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Método y validación' }));
+
+    expect(screen.getByRole('dialog', { name: 'Cómo calculamos los focos armonizados' })).toBeInTheDocument();
+    expect(screen.getByText(/624,1 focos equivalentes VIIRS/)).toBeInTheDocument();
+    expect(screen.getByText(/77,1 % de los casos provincia–mes/)).toBeInTheDocument();
+    expect(screen.getByText(/desde febrero de 2012 se compara con años observados por VIIRS/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Límites conocidos' })).toBeInTheDocument();
   });
 
   it('closes method dialog with Escape key and restores focus to trigger button', () => {

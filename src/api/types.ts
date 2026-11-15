@@ -71,6 +71,7 @@ export interface Punto {
   maximo: number;
   estado: Estado;
   frac_estimada: number; // 0–1
+  dias_sin_modis?: number;
   confianza: Confianza;
   parcial: boolean; // mes en curso
 }
@@ -108,6 +109,7 @@ export type CategoriaAnomalia =
 export interface AnomaliaResponse {
   mes: string;
   valor: number;
+  referencia?: 'observada' | 'estimada';
   mediana: number | null;
   p25: number | null;
   p75: number | null;
