@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Table, Loader2, Hash, AlertCircle } from 'lucide-react';
+import { Table, Loader2, Hash, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCalendario, type Capa, type PedidoZona, type PeriodoParams, type Punto } from '../../api';
 
 interface CalendarHeatmapWidgetProps {
@@ -68,6 +68,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
   const [hovered, setHovered] = useState<Punto | null>(null);
   const [showTableView, setShowTableView] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [showNumbers, setShowNumbers] = useState(true);
 
   const fmt = (v: number | null) => (v === null ? sinDato : Math.round(v).toLocaleString(locale));
@@ -123,14 +124,14 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   return (
     <div role="region" aria-label={t('calendar.title')} aria-busy={isLoading} className={`bg-[#0D1816] p-4 text-[#EFF5ED] ${className}`}>
       {/* Encabezado */}
-      <div className="flex flex-col gap-2 border-b border-[#21312D] pb-3">
+      <div className={`flex flex-col gap-2 ${isExpanded ? 'border-b border-[#21312D] pb-3' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <h3 className="font-title text-sm md:text-base font-bold text-[#EFF5ED]">{t('calendar.title')}</h3>
             {isFetching && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#B8EE68]" />}
           </div>
           <div className="flex items-center gap-1.5">
-            {!showTableView && (
+            {isExpanded && !showTableView && (
               <button
                 type="button"
                 onClick={() => setShowNumbers((prev) => !prev)}
@@ -141,13 +142,25 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                 <span>{showNumbers ? (isEn ? 'Hide values' : 'Ocultar valores') : (isEn ? 'Show values' : 'Mostrar valores')}</span>
               </button>
             )}
+            {isExpanded && (
+              <button
+                type="button"
+                onClick={() => setShowTableView((prev) => !prev)}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
+              >
+                <Table className="h-3.5 w-3.5" />
+                <span>{showTableView ? t('calendar.viewMatrix') : t('calendar.viewTable')}</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setShowTableView((prev) => !prev)}
+              onClick={() => setIsExpanded((prev) => !prev)}
+              aria-expanded={isExpanded}
+              aria-controls="calendar-heatmap-content"
               className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
             >
-              <Table className="h-3.5 w-3.5" />
-              <span>{showTableView ? t('calendar.viewMatrix') : t('calendar.viewTable')}</span>
+              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              <span>{isExpanded ? (isEn ? 'Collapse' : 'Ocultar') : (isEn ? 'Expand' : 'Desplegar')}</span>
             </button>
           </div>
         </div>
@@ -165,6 +178,9 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
           )}
         </p>
       </div>
+
+      {isExpanded && (
+        <div id="calendar-heatmap-content">
 
       {error && (
         <p role="alert" className="mt-3 flex items-start gap-1.5 rounded-md border border-[#FF6759]/40 bg-[#FF6759]/10 px-2.5 py-1.5 text-xs text-[#FF6759]">
@@ -397,6 +413,8 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
           <span className="text-[#687771]">{isEn ? 'Fainter = lower confidence' : 'Más tenue = menor confianza'}</span>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 };

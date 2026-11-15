@@ -89,7 +89,10 @@ describe('GloboTerraqueo 3D Component', () => {
     expect(screen.queryByPlaceholderText('pk.eyJ1Ijoi...')).not.toBeInTheDocument();
     expect(maplibregl.Map).toHaveBeenCalledWith(
       expect.objectContaining({
-        cooperativeGestures: true,
+        cooperativeGestures: false,
+        dragPan: true,
+        dragRotate: true,
+        scrollZoom: true,
       })
     );
   });
@@ -256,5 +259,18 @@ describe('GloboTerraqueo 3D Component', () => {
     expect(revealBtn.className).toContain('min-h-[36px]');
     expect(recenterBtn.className).toContain('min-h-[36px]');
     expect(fullscreenBtn.className).toContain('min-h-[36px]');
+  });
+
+  it('toggles fullscreen state via fullscreen button and Escape key', () => {
+    renderGlobe();
+
+    const fsBtn = screen.getByRole('button', { name: /Fullscreen|Pantalla completa/i });
+    expect(fsBtn).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(fsBtn);
+    expect(fsBtn).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(fsBtn).toHaveAttribute('aria-pressed', 'false');
   });
 });

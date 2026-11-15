@@ -226,7 +226,56 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     isUserInteractingRef.current = isUserInteracting;
   }, [isUserInteracting]);
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const handleToggleFullscreen = useCallback(() => {
+    const el = rootRef.current;
+    if (typeof document !== 'undefined') {
+      if (document.fullscreenElement === el) {
+        document.exitFullscreen?.().catch(() => {});
+        setIsFullscreen(false);
+        return;
+      }
+      if (!isFullscreen && el && typeof el.requestFullscreen === 'function') {
+        el.requestFullscreen()
+          .then(() => setIsFullscreen(true))
+          .catch(() => setIsFullscreen((prev) => !prev));
+        return;
+      }
+    }
+    setIsFullscreen((prev) => !prev);
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === rootRef.current);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isFullscreen || typeof window === 'undefined') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && document.fullscreenElement !== rootRef.current) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const raf = window.requestAnimationFrame(() => map.resize?.());
+    const timer = window.setTimeout(() => map.resize?.(), 80);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+    };
+  }, [isFullscreen]);
   const [mapStyleMode, setMapStyleMode] = useState<'ign' | 'satellite'>('ign');
   const [revealSeed, setRevealSeed] = useState(0);
   const mapStyleModeRef = useRef<'ign' | 'satellite'>(mapStyleMode);
@@ -480,7 +529,11 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         bearing: -10,
         minZoom: 1,
         maxZoom: 14,
-        cooperativeGestures: true,
+        cooperativeGestures: false,
+        dragPan: true,
+        dragRotate: true,
+        scrollZoom: true,
+        touchZoomRotate: true,
         attributionControl: false,
       });
 
@@ -684,9 +737,10 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
   return (
     <div
+      ref={rootRef}
       className={`relative flex flex-col rounded-xl overflow-hidden border border-[#21312D] bg-[#07100F] ${
         isFullscreen
-          ? 'fixed inset-0 z-50 rounded-none w-screen h-screen'
+          ? 'fixed inset-0 z-[100] rounded-none w-screen h-screen'
           : `w-full h-[520px] lg:h-[580px] ${className}`
       }`}
     >
@@ -788,7 +842,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
           <button
             type="button"
-            onClick={() => setIsFullscreen((prev) => !prev)}
+            onClick={handleToggleFullscreen}
+            aria-pressed={isFullscreen}
+            aria-label={isFullscreen ? (isEn ? 'Exit fullscreen' : 'Salir de pantalla completa') : (isEn ? 'Fullscreen' : 'Pantalla completa')}
             title={isFullscreen ? (isEn ? 'Exit fullscreen' : 'Salir de pantalla completa') : (isEn ? 'Fullscreen' : 'Pantalla completa')}
             className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded-md border border-[#21312D] bg-[#111E1B] p-2 sm:p-1.5 text-[#93A39C] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
           >
