@@ -171,6 +171,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapStyleMode, setMapStyleMode] = useState<'ign' | 'satellite'>('ign');
+  const [revealSeed, setRevealSeed] = useState(0);
   const mapStyleModeRef = useRef<'ign' | 'satellite'>(mapStyleMode);
   useEffect(() => {
     mapStyleModeRef.current = mapStyleMode;
@@ -214,12 +215,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const spinGlobe = useCallback(() => {
     const map = mapRef.current;
     if (!map || !isSpinningRef.current || isUserInteractingRef.current) return;
-
-    if (mapStyleModeRef.current === 'ign') {
-      const nextBearing = ((map.getBearing?.() ?? 0) + 4) % 360;
-      map.easeTo({ bearing: nextBearing, duration: 1000, easing: (n: number) => n });
-      return;
-    }
+    if (mapStyleModeRef.current !== 'satellite') return;
 
     const currentZoom = map.getZoom();
     if (currentZoom < maxSpinZoom) {
@@ -262,17 +258,18 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       return h.sensor === filter;
     });
 
-    visibleHotspots.forEach((h) => {
+    visibleHotspots.forEach((h, idx) => {
       const el = document.createElement('div');
       el.className = 'hotspot-marker';
 
       const isViirs = h.sensor === 'viirs';
       const isExtreme = h.brightness > 360;
       const color = isExtreme ? '#FF6759' : isViirs ? '#FF9C55' : '#68D9D0';
+      const delayMs = Math.min(idx * 45, 2200);
 
       el.innerHTML = `
-        <div class="relative flex items-center justify-center cursor-pointer">
-          <div class="hotspot-halo absolute w-4 h-4 rounded-full" style="background: ${color};"></div>
+        <div class="hotspot-appear relative flex items-center justify-center cursor-pointer" style="animation-delay: ${delayMs}ms;">
+          <div class="hotspot-halo absolute w-4 h-4 rounded-full" style="background: ${color}; animation-delay: ${delayMs}ms;"></div>
           <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; border: 1.5px solid #EFF5ED; box-shadow: 0 0 8px ${color};"></div>
         </div>
       `;
@@ -406,6 +403,27 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       map.on('mouseup', handleInteractionEnd);
       map.on('touchend', handleInteractionEnd);
       map.on('moveend', spinGlobe);
+      map.on('click', (e: maplibregl.MapMouseEvent) => {
+        const target = e.originalEvent?.target as HTMLElement | null;
+        if (target?.closest?.('.hotspot-marker')) return;
+
+        isSpinningRef.current = false;
+        setIsSpinning(false);
+        map.stop?.();
+
+        const currentPitch = map.getPitch?.() ?? 0;
+        const currentBearing = map.getBearing?.() ?? 0;
+        if (currentPitch > 1 || Math.abs(currentBearing) > 1) {
+          map.easeTo({
+            center: e.lngLat ? [e.lngLat.lng, e.lngLat.lat] : map.getCenter(),
+            zoom: Math.max(map.getZoom(), 4.2),
+            pitch: 0,
+            bearing: 0,
+            duration: 600,
+            essential: true,
+          });
+        }
+      });
 
       return () => {
         if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
@@ -419,12 +437,12 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     }
   }, [handleInteractionStart, handleInteractionEnd, spinGlobe, onMapReady]);
 
-  // Actualizar marcadores al cambiar filtro de sensor
+  // Actualizar marcadores al cambiar filtro de sensor o reiniciar animación
   useEffect(() => {
     if (mapRef.current && isLoaded) {
       renderHotspotMarkers(mapRef.current, activeSensorFilter);
     }
-  }, [activeSensorFilter, isLoaded, renderHotspotMarkers]);
+  }, [activeSensorFilter, isLoaded, revealSeed, renderHotspotMarkers]);
 
   // Vuelo suave cuando cambian las coordenadas de selección externa
   useEffect(() => {
@@ -461,9 +479,16 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     const nextStyle = nextMode === 'satellite' ? SATELLITE_GLOBE_STYLE : DEFAULT_GLOBE_STYLE;
     map.setStyle?.(nextStyle);
     if (nextMode === 'satellite') {
+      const shouldSpin = !prefersReducedMotion;
+      isSpinningRef.current = shouldSpin;
+      setIsSpinning(shouldSpin);
       map.setProjection?.({ type: 'globe' });
       map.flyTo({ center: [-64, -36], zoom: 2.2, pitch: 0, bearing: 0, duration: 1200, essential: true });
     } else {
+      isSpinningRef.current = false;
+      setIsSpinning(false);
+      map.stop?.();
+      setRevealSeed((s) => s + 1);
       map.setProjection?.({ type: 'mercator' });
       map.flyTo({ center: [-64, -36], zoom: 3.5, pitch: 42, bearing: -10, duration: 1200, essential: true });
     }
@@ -542,27 +567,39 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             <span className="hidden sm:inline">{mapStyleMode === 'satellite' ? (isEn ? 'IGN Dark' : 'IGN Oscuro') : (isEn ? 'Satellite' : 'Satélite')}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setIsSpinning((prev) => {
-                const next = !prev;
-                isSpinningRef.current = next;
-                if (!next) mapRef.current?.stop?.();
-                return next;
-              });
-            }}
-            aria-pressed={isSpinning}
-            title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
-            className={`inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-              isSpinning
-                ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40'
-                : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
-            }`}
-          >
-            <RotateCw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t('globe.spin')}</span>
-          </button>
+          {mapStyleMode === 'satellite' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsSpinning((prev) => {
+                  const next = !prev;
+                  isSpinningRef.current = next;
+                  if (!next) mapRef.current?.stop?.();
+                  return next;
+                });
+              }}
+              aria-pressed={isSpinning}
+              title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
+              className={`inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                isSpinning
+                  ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40'
+                  : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
+              }`}
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t('globe.spin')}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRevealSeed((s) => s + 1)}
+              title={isEn ? 'Replay gradual hotspot reveal' : 'Reproducir aparición gradual de focos'}
+              className="inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md border border-[#B8EE68]/40 bg-[#B8EE68]/15 px-2.5 py-1 text-xs font-medium text-[#B8EE68] transition-colors hover:bg-[#B8EE68]/25"
+            >
+              <Flame className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{isEn ? 'Reveal' : 'Animar'}</span>
+            </button>
+          )}
 
           <button
             type="button"

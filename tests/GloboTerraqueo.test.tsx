@@ -7,22 +7,31 @@ import { GloboTerraqueo } from '../src/features/globe/GloboTerraqueo';
 
 // Mock maplibre-gl para entorno jsdom
 vi.mock('maplibre-gl', () => {
-  const Map = vi.fn().mockImplementation(() => ({
-    on: vi.fn((event: string, cb: () => void) => {
-      if (event === 'style.load') Promise.resolve().then(cb);
-    }),
-    remove: vi.fn(),
-    setProjection: vi.fn(),
-    setStyle: vi.fn(),
-    stop: vi.fn(),
-    getBearing: vi.fn().mockReturnValue(0),
-    getZoom: vi.fn().mockReturnValue(3.5),
-    getCenter: vi.fn().mockReturnValue({ lng: -64, lat: -36 }),
-    easeTo: vi.fn(),
-    flyTo: vi.fn(),
-    zoomIn: vi.fn(),
-    zoomOut: vi.fn(),
-  }));
+  const Map = vi.fn().mockImplementation(() => {
+    const handlers: Record<string, ((e?: any) => void)[]> = {};
+    return {
+      on: vi.fn((event: string, cb: (e?: any) => void) => {
+        handlers[event] = handlers[event] || [];
+        handlers[event].push(cb);
+        if (event === 'style.load') Promise.resolve().then(() => cb());
+      }),
+      __emit: (event: string, payload?: any) => {
+        (handlers[event] || []).forEach((fn) => fn(payload));
+      },
+      remove: vi.fn(),
+      setProjection: vi.fn(),
+      setStyle: vi.fn(),
+      stop: vi.fn(),
+      getPitch: vi.fn().mockReturnValue(42),
+      getBearing: vi.fn().mockReturnValue(-10),
+      getZoom: vi.fn().mockReturnValue(3.5),
+      getCenter: vi.fn().mockReturnValue({ lng: -64, lat: -36 }),
+      easeTo: vi.fn(),
+      flyTo: vi.fn(),
+      zoomIn: vi.fn(),
+      zoomOut: vi.fn(),
+    };
+  });
   const Marker = vi.fn().mockImplementation(() => ({
     setLngLat: vi.fn().mockReturnThis(),
     setPopup: vi.fn().mockReturnThis(),
@@ -68,7 +77,7 @@ describe('GloboTerraqueo 3D Component', () => {
 
     expect(screen.getAllByText(/3D Earth Globe|Globo Terráqueo 3D/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/MapLibre 3D/i)[0]).toBeInTheDocument();
-    expect(screen.getAllByTitle(/auto-rotation|rotación automática/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByTitle(/Replay gradual hotspot reveal|Reproducir aparición gradual/i)[0]).toBeInTheDocument();
     expect(screen.getAllByTitle(/Recenter on Argentina|Centrar en Argentina/i)[0]).toBeInTheDocument();
   });
 
@@ -109,9 +118,12 @@ describe('GloboTerraqueo 3D Component', () => {
     });
   });
 
-  it('allows user to toggle auto-rotation button and stops map animation when paused', async () => {
+  it('allows user to toggle auto-rotation in satellite mode and stops animation when paused', async () => {
     const maplibregl = await import('maplibre-gl');
     renderGlobe();
+
+    const styleBtn = screen.getByTitle(/Switch to satellite|Cambiar a vista satelital/i);
+    fireEvent.click(styleBtn);
 
     const rotateBtn = screen.getByTitle(/Pause auto-rotation|Pausar rotación automática/i);
     expect(rotateBtn).toHaveAttribute('aria-pressed', 'true');
@@ -121,6 +133,26 @@ describe('GloboTerraqueo 3D Component', () => {
 
     const mapInstance = vi.mocked(maplibregl.Map).mock.results.at(-1)?.value;
     expect(mapInstance.stop).toHaveBeenCalled();
+  });
+
+  it('levels pitch and bearing on map click so user can navigate freely', async () => {
+    const maplibregl = await import('maplibre-gl');
+    renderGlobe();
+
+    const mapInstance = vi.mocked(maplibregl.Map).mock.results.at(-1)?.value;
+    mapInstance.__emit('click', {
+      lngLat: { lng: -60.5, lat: -32.9 },
+      originalEvent: { target: document.createElement('canvas') },
+    });
+
+    expect(mapInstance.stop).toHaveBeenCalled();
+    expect(mapInstance.easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        center: [-60.5, -32.9],
+        pitch: 0,
+        bearing: 0,
+      })
+    );
   });
 
   it('toggles between IGN dark 3D map and Esri satellite view', async () => {
@@ -204,6 +236,8 @@ describe('GloboTerraqueo 3D Component', () => {
       }));
 
       renderGlobe();
+      const styleBtn = screen.getByTitle(/Switch to satellite|Cambiar a vista satelital/i);
+      fireEvent.click(styleBtn);
       const rotateBtn = screen.getByTitle(/Start auto-rotation|Resume auto-rotation|Reanudar rotación/i);
       expect(rotateBtn).toHaveAttribute('aria-pressed', 'false');
     } finally {
@@ -214,11 +248,11 @@ describe('GloboTerraqueo 3D Component', () => {
   it('ensures control buttons meet minimum touch target size classes', () => {
     renderGlobe();
 
-    const rotateBtn = screen.getByTitle(/auto-rotation|rotación automática/i);
+    const revealBtn = screen.getByTitle(/Replay gradual hotspot reveal|Reproducir aparición gradual/i);
     const recenterBtn = screen.getByTitle(/Recenter on Argentina|Centrar en Argentina/i);
     const fullscreenBtn = screen.getByTitle(/Fullscreen|Pantalla completa/i);
 
-    expect(rotateBtn.className).toContain('min-h-[36px]');
+    expect(revealBtn.className).toContain('min-h-[36px]');
     expect(recenterBtn.className).toContain('min-h-[36px]');
     expect(fullscreenBtn.className).toContain('min-h-[36px]');
   });
