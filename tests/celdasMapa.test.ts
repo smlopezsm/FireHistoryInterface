@@ -63,6 +63,13 @@ describe('celdasAMarcadores', () => {
     expect(marcadores.map((m) => m.cellId)).toEqual([1]);
   });
 
+  it('filtra por un conjunto de provincias (región)', () => {
+    const features = [celda(1, 20), celda(2, 30, { provincia_id: '42' }), celda(3, 9, { provincia_id: '70' })];
+    const { total, marcadores } = celdasAMarcadores(features, { provinciaIds: ['74', '70'] });
+    expect(total).toBe(2);
+    expect(marcadores.map((m) => m.cellId).sort()).toEqual([1, 3]);
+  });
+
   it('usa el nombre de la provincia y conserva el estado de la celda', () => {
     const { marcadores } = celdasAMarcadores([celda(1, 20)], { nombres: new Map([['74', 'San Luis']]) });
     expect(marcadores[0]).toMatchObject({ provinciaNombre: 'San Luis', estado: 'estimado', valor: 20 });

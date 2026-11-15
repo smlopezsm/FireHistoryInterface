@@ -57,6 +57,8 @@ export interface MarcadorCelda {
 interface OpcionesMarcadores {
   /** Si se indica, solo cuentan las celdas asignadas a esa provincia. */
   provinciaId?: string;
+  /** Si se indica (una región), solo cuentan las celdas de esas provincias. */
+  provinciaIds?: string[];
   /** Filtro espacial adicional (por ejemplo, el polígono de una región). */
   dentro?: (lng: number, lat: number) => boolean;
   /** `provincia_id` → nombre, para el popup. */
@@ -79,10 +81,11 @@ const centroide = (f: CeldaFeature): [number, number] => {
 /** Filtra, ordena por focos y limita. `total` son las celdas de la zona, no las dibujadas. */
 export function celdasAMarcadores(
   features: CeldaFeature[],
-  { provinciaId, dentro, nombres, max = MAX_MARCADORES }: OpcionesMarcadores = {},
+  { provinciaId, provinciaIds, dentro, nombres, max = MAX_MARCADORES }: OpcionesMarcadores = {},
 ): { marcadores: MarcadorCelda[]; total: number } {
   const enZona = features
     .filter((f) => !provinciaId || f.properties.provincia_id === provinciaId)
+    .filter((f) => !provinciaIds?.length || provinciaIds.includes(f.properties.provincia_id ?? ''))
     .map((f): MarcadorCelda => {
       const [lng, lat] = centroide(f);
       const { cell_id, provincia_id, valor, estado } = f.properties;

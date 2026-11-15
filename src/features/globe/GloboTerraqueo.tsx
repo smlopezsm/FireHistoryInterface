@@ -450,6 +450,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         if (isCancelled) return;
         const { marcadores, total } = celdasAMarcadores(fc.features, {
           provinciaId: selectedProvinciaId,
+          provinciaIds: selectedProvinciaId ? undefined : selectedProvinciaIds,
           dentro: geometriaZona ? (lng, lat) => isPointInGeometry(lng, lat, geometriaZona) : undefined,
           nombres: nombresProvincias,
         });
@@ -468,7 +469,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [activeSensorFilter, selectedMonth, bboxParam, metadata, geometriaZona, selectedProvinciaId, nombresProvincias]);
+  }, [activeSensorFilter, selectedMonth, bboxParam, metadata, geometriaZona, selectedProvinciaId, selectedProvinciaIds, nombresProvincias]);
 
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {
@@ -814,7 +815,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#07100F] border-b border-[#21312D] text-xs font-mono">
         <div className="flex items-center gap-1.5 text-[#93A39C]">
           <Calendar className="h-3.5 w-3.5 text-[#B8EE68]" />
-          <span className="hidden sm:inline">{isEn ? 'Period:' : 'Período:'}</span>
+          <span className="hidden sm:inline">{isEn ? 'Map month:' : 'Mes del mapa:'}</span>
           <button
             type="button"
             disabled={selectedMonth <= minMonth}

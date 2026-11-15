@@ -19,6 +19,10 @@ interface CalendarHeatmapWidgetProps {
   periodo?: Omit<PeriodoParams, 'capa'>;
   /** Después de esta fecha los datos son NRT (preliminares). */
   fechaUltimoSp?: string;
+  /** Mes que muestra el mapa (`YYYY-MM`): se marca en el calendario. */
+  mesMapa?: string | null;
+  /** Clic o Enter sobre un mes: abrirlo en el mapa. */
+  onElegirMes?: (mes: string) => void;
   className?: string;
 }
 
@@ -35,6 +39,8 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   pedido,
   periodo = {},
   fechaUltimoSp,
+  mesMapa,
+  onElegirMes,
   className = '',
 }) => {
   const { t, i18n } = useTranslation();
@@ -106,6 +112,11 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   };
 
   const onTeclaCelda = (e: React.KeyboardEvent, actual: string) => {
+    if ((e.key === 'Enter' || e.key === ' ') && onElegirMes) {
+      e.preventDefault();
+      onElegirMes(actual);
+      return;
+    }
     if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
     e.preventDefault();
     const siguiente = destino(actual, e.key);
@@ -295,6 +306,8 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                                 else celdasRef.current.delete(key);
                               }}
                               onKeyDown={(e) => onTeclaCelda(e, key)}
+                              onClick={onElegirMes ? () => onElegirMes(key) : undefined}
+                              aria-current={key === mesMapa ? 'date' : undefined}
                               onMouseEnter={() => setHovered(p)}
                               onFocus={() => {
                                 setHovered(p);
@@ -313,9 +326,11 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                                     : p.estado === 'mixto'
                                       ? '1px dashed rgba(255,156,85,0.55)'
                                       : '1px solid rgba(0,0,0,0.3)',
+                                // Mes del mapa: anillo celeste por fuera (no compite con el borde de estado).
+                                boxShadow: key === mesMapa ? '0 0 0 2px #68D9D0' : undefined,
                               }}
                               role="gridcell"
-                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)}${p.estado !== 'observado' && capa === 'armonizado' ? (isEn ? ` · 80 % range ${fmt(p.minimo)}–${fmt(p.maximo)}` : ` · rango 80 % ${fmt(p.minimo)}–${fmt(p.maximo)}`) : ''} · ${confianzaLabel(p.confianza)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}`}
+                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)}${p.estado !== 'observado' && capa === 'armonizado' ? (isEn ? ` · 80 % range ${fmt(p.minimo)}–${fmt(p.maximo)}` : ` · rango 80 % ${fmt(p.minimo)}–${fmt(p.maximo)}`) : ''} · ${confianzaLabel(p.confianza)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}${key === mesMapa ? (isEn ? ' · map month' : ' · mes del mapa') : ''}`}
                               data-confianza={p.confianza}
                             >
                               {p.confianza !== 'alta' && val !== null && (
@@ -502,6 +517,12 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C8D3CE]" />
             <span>{isEn ? 'Low confidence' : 'Confianza baja'}</span>
           </div>
+          {mesMapa && (
+            <div className="flex items-center gap-1">
+              <span className="inline-block h-3 w-3 rounded-sm" style={{ boxShadow: '0 0 0 2px #68D9D0' }} />
+              <span>{isEn ? 'Map month (click a month to open it)' : 'Mes del mapa (clic en un mes para abrirlo)'}</span>
+            </div>
+          )}
         </div>
       </div>
         </div>

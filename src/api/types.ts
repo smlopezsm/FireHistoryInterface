@@ -41,12 +41,13 @@ export type BBox = [number, number, number, number]; // oeste, sur, este, norte
 /** Zona de consulta: exactamente una. `geometria` solo viaja por POST. */
 export type PedidoZona =
   | { provincia_id: string }
+  | { region: string }
   | { bbox: string }
   | { geometria: GeoJSON.Polygon | GeoJSON.MultiPolygon };
 
 /** Zona tal como la describe la respuesta. */
 export interface Zona {
-  tipo: 'provincia' | 'bbox' | 'geometria';
+  tipo: 'provincia' | 'region' | 'bbox' | 'geometria';
   id: string | null;
   bbox: BBox | null;
   celdas: number;
