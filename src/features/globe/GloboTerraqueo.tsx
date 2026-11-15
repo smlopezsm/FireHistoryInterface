@@ -397,7 +397,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 3px; color: #B8EE68; text-decoration: underline; font-size: 11px;">
             ${coordsLabel} · Google Maps ↗
           </a><br/>
-          <span style="color: #93A39C; font-size: 11px;">${isEn ? 'NASA FIRMS S-NPP Calibrated' : 'NASA FIRMS S-NPP Calibrado'}</span>
+          <span style="color: #93A39C; font-size: 11px;">${isEn ? 'S-NPP Calibrated' : 'S-NPP Calibrado'}</span>
         </div>
       `);
 
@@ -961,7 +961,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 rounded-md border border-[#21312D] bg-[#07100F]/90 p-2.5 backdrop-blur-md text-xs">
             <div className="flex items-center gap-1.5 font-sans text-xs font-semibold text-[#EFF5ED] border-b border-[#21312D] pb-1">
               <Flame className="h-3.5 w-3.5 text-[#FF6759]" />
-              <span>Detecciones Térmicas</span>
+              <span>{isEn ? 'Thermal Detections' : 'Detecciones Térmicas'}</span>
             </div>
             <div className="mt-1 flex flex-col gap-1 font-mono text-xs">
               <div className="flex items-center gap-1.5">
@@ -974,11 +974,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-[#FF6759]" />
-                <span className="text-[#EFF5ED]">Alta Intensidad (&gt;360K)</span>
+                <span className="text-[#EFF5ED]">{isEn ? 'High Intensity (>360K)' : 'Alta Intensidad (>360K)'}</span>
               </div>
             </div>
             <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
-              {realHotspots ? 'API EN VIVO · FIRMS' : 'DATOS DE MUESTRA · FIRMS'}
+              {realHotspots
+                ? (isEn ? 'LIVE API' : 'API EN VIVO')
+                : (isEn ? 'SAMPLE DATA' : 'DATOS DE MUESTRA')}
             </div>
           </div>
         )}
@@ -989,7 +991,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             <button
               type="button"
               onClick={() => mapRef.current?.zoomIn({ duration: 300 })}
-              aria-label="Acercar mapa"
+              aria-label={isEn ? 'Zoom in' : 'Acercar mapa'}
               className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -998,7 +1000,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             <button
               type="button"
               onClick={() => mapRef.current?.zoomOut({ duration: 300 })}
-              aria-label="Alejar mapa"
+              aria-label={isEn ? 'Zoom out' : 'Alejar mapa'}
               className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded p-1.5 text-[#93A39C] hover:bg-[#111E1B] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
             >
               <Minus className="h-3.5 w-3.5" />
