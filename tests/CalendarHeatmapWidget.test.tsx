@@ -104,3 +104,35 @@ describe('CalendarHeatmapWidget · escala de color', () => {
     expect(fija).toEqual(['<50', '50–500', '500–2.5k', '2.5k–10k', '≥10k']);
   });
 });
+
+describe('CalendarHeatmapWidget · mes del mapa', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, 'getCalendario').mockResolvedValue({
+      zona: { tipo: 'provincia', id: '74' },
+      unidad: 'focos (escala VIIRS S-NPP)',
+      meses: ['2024-07', '2024-08', '2024-09'].map((periodo) => ({
+        periodo, armonizado: 10, modis: 1, viirs: 10, minimo: 10, maximo: 10,
+        estado: 'observado', frac_estimada: 0, confianza: 'alta', parcial: false,
+      })),
+      resumen: { total: 30, max_mes: '2024-08', max_anio: 2024, mediana_mensual: 10 },
+    } as any);
+  });
+
+  it('marca el mes que muestra el mapa y abre otro mes con clic o Enter', async () => {
+    const onElegirMes = vi.fn();
+    render(
+      <Providers>
+        <CalendarHeatmapWidget zonaNombre="San Luis" capa="armonizado" pedido={{ provincia_id: '74' }} mesMapa="2024-08" onElegirMes={onElegirMes} />
+      </Providers>
+    );
+    const agosto = await screen.findByRole('gridcell', { name: /(Ago|Aug) 2024/ });
+    expect(agosto).toHaveAttribute('aria-current', 'date');
+    expect(agosto.getAttribute('aria-label')).toMatch(/mes del mapa|map month/);
+
+    fireEvent.click(screen.getByRole('gridcell', { name: /Jul 2024/ }));
+    expect(onElegirMes).toHaveBeenLastCalledWith('2024-07');
+    fireEvent.keyDown(screen.getByRole('gridcell', { name: /Sep 2024/ }), { key: 'Enter' });
+    expect(onElegirMes).toHaveBeenLastCalledWith('2024-09');
+  });
+});
