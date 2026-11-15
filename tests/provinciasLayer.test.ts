@@ -188,10 +188,20 @@ describe('provinciasLayer', () => {
     );
     expect(onSelectProvincia).toHaveBeenLastCalledWith(null);
 
-    // Select again, then click background (no features hit)
+    // Background click from a hotspot marker must NOT deselect province
     map.__emitLayer('click', PROVINCIAS_FILL_LAYER_ID, {
       features: [{ id: 2, properties: { provincia_id: '18' } }],
     });
+    map.setFeatureState.mockClear();
+    onSelectProvincia.mockClear();
+    map.__emitMap('click', {
+      point: { x: 10, y: 10 },
+      originalEvent: { target: { closest: (sel: string) => sel === '.hotspot-marker' } },
+    });
+    expect(map.setFeatureState).not.toHaveBeenCalled();
+    expect(onSelectProvincia).not.toHaveBeenCalled();
+
+    // Background click outside any province or hotspot deselects
     map.queryRenderedFeatures.mockReturnValue([]);
     map.__emitMap('click', { point: { x: 10, y: 10 } });
     expect(map.setFeatureState).toHaveBeenCalledWith(

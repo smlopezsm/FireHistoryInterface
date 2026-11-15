@@ -321,6 +321,38 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         .setPopup(popup)
         .addTo(map);
 
+      let closeTimer: number | null = null;
+      const cancelClose = () => {
+        if (closeTimer !== null) {
+          window.clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+      };
+      const scheduleClose = () => {
+        cancelClose();
+        closeTimer = window.setTimeout(() => {
+          popup.remove?.();
+        }, 140);
+      };
+
+      el.addEventListener('mouseenter', () => {
+        cancelClose();
+        popup.setLngLat([h.lng, h.lat]).addTo(map);
+        const popupEl = popup.getElement?.();
+        if (popupEl && !popupEl.dataset.hoverBound) {
+          popupEl.dataset.hoverBound = '1';
+          popupEl.addEventListener('mouseenter', cancelClose);
+          popupEl.addEventListener('mouseleave', scheduleClose);
+        }
+      });
+
+      el.addEventListener('mouseleave', scheduleClose);
+
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        cancelClose();
+      });
+
       markersRef.current.push(marker);
     });
   }, [realHotspots, isEn]);
