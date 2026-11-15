@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    optimizeDeps: {
+      exclude: ['maplibre-gl'],
+    },
     server: {
       port: 5173,
       host: true,
