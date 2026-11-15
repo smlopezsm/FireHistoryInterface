@@ -10,7 +10,25 @@ export default defineConfig(({ mode }) => {
     : 'http://localhost:8000';
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        name: 'emit-maplibre-worker-mjs',
+        async generateBundle() {
+          const fsSpec: string = 'node:fs';
+          const { readFileSync } = (await import(fsSpec)) as {
+            readFileSync: (path: URL) => Uint8Array;
+          };
+          this.emitFile({
+            type: 'asset',
+            fileName: 'assets/maplibre-gl-worker.mjs',
+            source: readFileSync(
+              new URL('./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url)
+            ),
+          });
+        },
+      },
+    ],
     optimizeDeps: {
       exclude: ['maplibre-gl'],
     },

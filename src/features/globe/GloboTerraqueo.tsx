@@ -1,8 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getMapaCeldas, rangoDelMes, useMetadata, useProvincias, type GeoJSON } from '../../api';
+
+if (typeof maplibregl.setWorkerUrl === 'function') {
+  maplibregl.setWorkerUrl(maplibreWorkerUrl);
+}
 import {
   attachProvinciasLayer,
   PROVINCIAS_GEOJSON_URL,
