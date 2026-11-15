@@ -2,6 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Table, Loader2, Hash, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCalendario, type Capa, type PedidoZona, type PeriodoParams, type Punto } from '../../api';
+import {
+  CORTES_FIJOS,
+  COLOR_CERO,
+  colorDeValor,
+  coloresEnUso,
+  cortesPorZona,
+  etiquetasTramos,
+  textoSobre,
+} from './escalaCalendario';
 
 interface CalendarHeatmapWidgetProps {
   zonaNombre: string;
@@ -19,20 +28,6 @@ const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'
 /** Valor a mostrar según la capa. null = sin dato (nunca 0). */
 const valorDeCapa = (p: Punto, capa: Capa): number | null =>
   capa === 'modis' ? p.modis : capa === 'viirs' ? p.viirs : p.armonizado;
-
-// Rampa de color proporcional a la cantidad de focos del mes
-const getCellColor = (val: number | null) => {
-  if (val === null) return '#111E1B';
-  if (val === 0) return '#0D1816';
-  if (val < 50) return '#162C25';
-  if (val < 250) return '#234C3E';
-  if (val < 800) return '#357161';
-  if (val < 2500) return '#D97736';
-  if (val < 5000) return '#E85338';
-  return '#FF3B30';
-};
-
-const OPACIDAD_CONFIANZA = { alta: 1, media: 0.85, baja: 0.68 } as const;
 
 export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   zonaNombre,
@@ -70,6 +65,15 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   const [showTableView, setShowTableView] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [showNumbers, setShowNumbers] = useState(true);
+  // Escala relativa a la zona (por defecto) o fija para comparar zonas entre sí.
+  const [escalaFija, setEscalaFija] = useState(false);
+  const cortes = useMemo(
+    () => (escalaFija ? CORTES_FIJOS : cortesPorZona((data?.meses ?? []).map((p) => valorDeCapa(p, capa)))),
+    [escalaFija, data, capa]
+  );
+  const etiquetas = etiquetasTramos(cortes, locale);
+  const confianzaLabel = (c: Punto['confianza']) =>
+    c === 'alta' ? (isEn ? 'high confidence' : 'confianza alta') : c === 'media' ? (isEn ? 'medium confidence' : 'confianza media') : isEn ? 'low confidence' : 'confianza baja';
 
   const fmt = (v: number | null) => (v === null ? sinDato : Math.round(v).toLocaleString(locale));
 
@@ -243,6 +247,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                           }
                           const val = valorDeCapa(p, capa);
                           const pattern = p.estado === 'estimado' ? 'pattern-estimado' : p.estado === 'mixto' ? 'pattern-mixto' : '';
+                          const fondo = colorDeValor(val, cortes);
                           return (
                             <div
                               key={monthIdx}
@@ -253,8 +258,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                               tabIndex={0}
                               className={`group relative h-7 sm:h-8 rounded-sm transition-transform duration-100 hover:scale-110 hover:z-20 focus:z-20 focus:outline focus:outline-1 focus:outline-[#B8EE68] cursor-pointer flex items-center justify-center ${pattern}`}
                               style={{
-                                backgroundColor: getCellColor(val),
-                                opacity: OPACIDAD_CONFIANZA[p.confianza],
+                                backgroundColor: fondo,
                                 border: p.parcial
                                   ? '1px solid #B8EE68'
                                   : val === null
@@ -264,13 +268,27 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                                       : '1px solid rgba(0,0,0,0.3)',
                               }}
                               role="gridcell"
-                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}`}
+                              aria-label={`${months[monthIdx]} ${year}: ${val === null ? sinDato : `${fmt(val)} ${spots}`} · ${estadoLabel(p)} · ${confianzaLabel(p.confianza)}${p.parcial ? (isEn ? ' · month in progress' : ' · mes en curso') : ''}`}
+                              data-confianza={p.confianza}
                             >
+                              {p.confianza !== 'alta' && val !== null && (
+                                // Confianza fuera del color: anillo = media, punto lleno = baja.
+                                <span
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full"
+                                  style={
+                                    p.confianza === 'baja'
+                                      ? { background: textoSobre(fondo) }
+                                      : { border: `1px solid ${textoSobre(fondo)}` }
+                                  }
+                                />
+                              )}
                               {showNumbers && val !== null && (
                                 <span
                                   className={`font-mono text-[9px] sm:text-[10px] tabular-nums font-semibold select-none leading-none pointer-events-none ${
-                                    Math.round(val) === 0 ? 'text-[#475753]' : val >= 800 ? 'text-[#07100F] font-bold' : 'text-[#EFF5ED]'
+                                    Math.round(val) === 0 ? 'text-[#475753]' : ''
                                   }`}
+                                  style={Math.round(val) === 0 ? undefined : { color: textoSobre(fondo) }}
                                 >
                                   {formatCellCount(val)}
                                 </span>
@@ -380,37 +398,63 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
       {/* Leyenda */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#21312D] pt-3 font-sans text-xs text-[#93A39C]">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-semibold text-[#C8D3CE]">{isEn ? 'Spots/month' : 'Focos/mes'}</span>
           <div className="flex items-center gap-1">
-            <span className="inline-block h-3 w-3 rounded-sm border border-[#162420] bg-[#0D1816]" />
+            <span className="inline-block h-3 w-3 rounded-sm border border-[#162420]" style={{ backgroundColor: COLOR_CERO }} />
             <span>0</span>
           </div>
-          <div className="flex h-3 gap-0.5">
-            {['#162C25', '#234C3E', '#357161', '#D97736', '#E85338', '#FF3B30'].map((c) => (
-              <span key={c} className="w-3 rounded-sm" style={{ backgroundColor: c }} />
+          {coloresEnUso(cortes).map((c, i) => (
+            <div key={c} className="flex items-center gap-1" data-testid="tramo-leyenda">
+              <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: c }} />
+              <span className="tabular-nums">{etiquetas[i] ?? (isEn ? '> 0' : '> 0')}</span>
+            </div>
+          ))}
+          <div className="ml-1 flex rounded border border-[#21312D] p-0.5" role="group" aria-label={isEn ? 'Color scale' : 'Escala de color'}>
+            {[false, true].map((fija) => (
+              <button
+                key={String(fija)}
+                type="button"
+                aria-pressed={escalaFija === fija}
+                onClick={() => setEscalaFija(fija)}
+                className={`rounded px-1.5 py-0.5 ${escalaFija === fija ? 'bg-[#21312D] text-[#EFF5ED]' : 'text-[#93A39C] hover:text-[#EFF5ED]'}`}
+                title={
+                  fija
+                    ? isEn ? 'Same scale for every zone: compare zones' : 'Misma escala para todas las zonas: sirve para comparar'
+                    : isEn ? 'Scale fitted to this zone and period' : 'Escala ajustada a esta zona y período'
+                }
+              >
+                {fija ? (isEn ? 'Fixed' : 'Fija') : isEn ? 'This zone' : 'Esta zona'}
+              </button>
             ))}
           </div>
-          <span className="text-[#FF3B30]">≥5k</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1">
-            <div className="h-3 w-5 rounded border border-[#93A39C] bg-[#285448] pattern-estimado" />
+            <div className="h-3 w-5 rounded border border-[#93A39C] bg-[#6A3519] pattern-estimado" />
             <span>{isEn ? 'Estimated' : 'Estimado'}</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-5 rounded bg-[#285448] pattern-mixto" style={{ border: '1px dashed rgba(255,156,85,0.7)' }} />
+            <div className="h-3 w-5 rounded bg-[#6A3519] pattern-mixto" style={{ border: '1px dashed rgba(255,156,85,0.7)' }} />
             <span>{isEn ? 'Mixed' : 'Mixto'}</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded bg-[#285448] border border-[#B8EE68]" />
+            <div className="h-3 w-3 rounded bg-[#6A3519] border border-[#B8EE68]" />
             <span>{isEn ? 'In progress' : 'En curso'}</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="h-3 w-3 rounded bg-[#111E1B] border border-dashed border-[#2A3F3A]" />
             <span>{t('calendar.noDataLegend')}</span>
           </div>
-          <span className="text-[#687771]">{isEn ? 'Fainter = lower confidence' : 'Más tenue = menor confianza'}</span>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-1.5 rounded-full border border-[#C8D3CE]" />
+            <span>{isEn ? 'Medium confidence' : 'Confianza media'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C8D3CE]" />
+            <span>{isEn ? 'Low confidence' : 'Confianza baja'}</span>
+          </div>
         </div>
       </div>
         </div>
