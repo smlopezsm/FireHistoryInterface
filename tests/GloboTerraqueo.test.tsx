@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '../src/i18n';
+import { Providers } from '../src/app/providers';
+import * as api from '../src/api/client';
 import { GloboTerraqueo } from '../src/features/globe/GloboTerraqueo';
 
 // Mock maplibre-gl para entorno jsdom
@@ -29,8 +31,35 @@ vi.mock('maplibre-gl', () => {
 });
 
 describe('GloboTerraqueo 3D Component', () => {
+  const renderGlobe = () =>
+    render(
+      <Providers>
+        <GloboTerraqueo />
+      </Providers>
+    );
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(api, 'getMetadata').mockResolvedValue({
+      schema_version: '1.1.0',
+      data_version: '2026-11-14T17:49:45-03:00',
+      factores_version: '2026.11-b1',
+      fecha_min: '2000-11-01',
+      fecha_max: '2026-11-13',
+      fecha_ultimo_sp: '2026-08-31',
+      fuentes: ['MODIS', 'VIIRS'],
+      referencia_viirs: [{ satelite: 'SNPP', desde: '2012-01-20', hasta: null }],
+      celdas_total: 112711,
+      provincias_total: 24,
+    });
+    vi.spyOn(api, 'getMapaCeldas').mockResolvedValue({
+      type: 'FeatureCollection',
+      features: [],
+    });
+  });
+
   it('renders 3D globe header with title and MapLibre badge', () => {
-    render(<GloboTerraqueo />);
+    renderGlobe();
 
     expect(screen.getAllByText(/3D Earth Globe|Globo Terráqueo 3D/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/MapLibre 3D/i)[0]).toBeInTheDocument();
@@ -40,7 +69,7 @@ describe('GloboTerraqueo 3D Component', () => {
 
   it('initializes MapLibre 3D globe immediately without requiring an access token', async () => {
     const maplibregl = await import('maplibre-gl');
-    render(<GloboTerraqueo />);
+    renderGlobe();
 
     expect(screen.queryByPlaceholderText('pk.eyJ1Ijoi...')).not.toBeInTheDocument();
     expect(maplibregl.Map).toHaveBeenCalledWith(
@@ -50,8 +79,33 @@ describe('GloboTerraqueo 3D Component', () => {
     );
   });
 
+  it('queries latest month from metadata and navigates to previous historical month', async () => {
+    renderGlobe();
+
+    await waitFor(() => {
+      expect(api.getMapaCeldas).toHaveBeenCalledWith(
+        expect.objectContaining({
+          desde: '2026-11-01',
+          hasta: '2026-11-13',
+        })
+      );
+    });
+
+    const prevBtn = screen.getByRole('button', { name: /Previous month|Mes anterior/i });
+    fireEvent.click(prevBtn);
+
+    await waitFor(() => {
+      expect(api.getMapaCeldas).toHaveBeenCalledWith(
+        expect.objectContaining({
+          desde: '2026-10-01',
+          hasta: '2026-10-31',
+        })
+      );
+    });
+  });
+
   it('allows user to toggle auto-rotation button', () => {
-    render(<GloboTerraqueo />);
+    renderGlobe();
 
     const rotateBtn = screen.getByTitle(/Pause auto-rotation|Pausar rotación automática/i);
     expect(rotateBtn).toHaveAttribute('aria-pressed', 'true');
@@ -74,7 +128,7 @@ describe('GloboTerraqueo 3D Component', () => {
         dispatchEvent: vi.fn(),
       }));
 
-      render(<GloboTerraqueo />);
+      renderGlobe();
       const rotateBtn = screen.getByTitle(/Start auto-rotation|Resume auto-rotation|Reanudar rotación/i);
       expect(rotateBtn).toHaveAttribute('aria-pressed', 'false');
     } finally {
@@ -83,7 +137,7 @@ describe('GloboTerraqueo 3D Component', () => {
   });
 
   it('ensures control buttons meet minimum touch target size classes', () => {
-    render(<GloboTerraqueo />);
+    renderGlobe();
 
     const rotateBtn = screen.getByTitle(/auto-rotation|rotación automática/i);
     const recenterBtn = screen.getByTitle(/Recenter on Argentina|Centrar en Argentina/i);

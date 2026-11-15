@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getMapaCeldas } from '../../api';
+import { getMapaCeldas, useMetadata } from '../../api';
 import {
   RotateCw,
   RefreshCw,
@@ -13,7 +13,26 @@ import {
   Minus,
   AlertCircle,
   Flame,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause,
+  Calendar,
 } from 'lucide-react';
+
+const shiftMonth = (ym: string, delta: number): string => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+const monthToDateRange = (ym: string, maxDate?: string): { desde: string; hasta: string } => {
+  const [y, m] = ym.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const monthEnd = `${ym}-${String(lastDay).padStart(2, '0')}`;
+  const hasta = maxDate && maxDate.startsWith(ym) && maxDate < monthEnd ? maxDate : monthEnd;
+  return { desde: `${ym}-01`, hasta };
+};
 
 // Estilo cartográfico oscuro oficial del Instituto Geográfico Nacional (IGN Argentina), sin API key
 const DEFAULT_GLOBE_STYLE: maplibregl.StyleSpecification = {
@@ -64,6 +83,7 @@ interface GloboTerraqueoProps {
   onMapReady?: (map: maplibregl.Map) => void;
   center?: [number, number];
   zoom?: number;
+  bbox?: [number, number, number, number];
   capa?: 'armonizado' | 'modis' | 'viirs';
 }
 
@@ -72,16 +92,21 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   onMapReady,
   center = [-64, -36], // Centrado en Argentina
   zoom = 2.0,
+  bbox = [-73.6, -55.1, -53.6, -21.8],
   capa = 'armonizado',
 }) => {
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
+  const { data: metadata } = useMetadata();
+  const minMonth = metadata?.fecha_min?.slice(0, 7) || '2000-11';
+  const maxMonth = metadata?.fecha_max?.slice(0, 7) || '2026-11';
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const spinIntervalRef = useRef<number | null>(null);
   const idleTimeoutRef = useRef<number | null>(null);
+  const userPickedMonthRef = useRef(false);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -103,7 +128,26 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
+  const [selectedMonth, setSelectedMonth] = useState<string>(maxMonth);
+  const [isPlayingTimeline, setIsPlayingTimeline] = useState(false);
+  const [isLoadingCells, setIsLoadingCells] = useState(false);
+  const [totalCellsCount, setTotalCellsCount] = useState<number | null>(null);
   const [realHotspots, setRealHotspots] = useState<typeof SAMPLE_HOTSPOTS | null>(null);
+
+  useEffect(() => {
+    if (metadata?.fecha_max && !userPickedMonthRef.current) {
+      setSelectedMonth(metadata.fecha_max.slice(0, 7));
+    }
+  }, [metadata?.fecha_max]);
+
+  useEffect(() => {
+    if (!isPlayingTimeline) return;
+    const timer = window.setInterval(() => {
+      userPickedMonthRef.current = true;
+      setSelectedMonth((prev) => (prev >= maxMonth ? minMonth : shiftMonth(prev, 1)));
+    }, 1200);
+    return () => window.clearInterval(timer);
+  }, [isPlayingTimeline, minMonth, maxMonth]);
 
   // Sincronizar con prop externa
   useEffect(() => {
@@ -192,19 +236,31 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     });
   }, [realHotspots, isEn]);
 
-  // Consulta de celdas activas a FireHistoryInterfaceAPI (sin bucles en deps)
+  const bboxParam = bbox.join(',');
+
+  // Consulta de celdas activas a FireHistoryInterfaceAPI para el mes y zona seleccionados
   useEffect(() => {
     let isCancelled = false;
+    const { desde, hasta } = monthToDateRange(selectedMonth, metadata?.fecha_max);
+    setIsLoadingCells(true);
+
     getMapaCeldas({
-      bbox: '-73.6,-55.1,-53.6,-21.8',
-      desde: '2024-09-01',
-      hasta: '2024-09-30',
+      bbox: bboxParam,
+      desde,
+      hasta,
       capa: activeSensorFilter,
-      min_focos: 10,
+      min_focos: 5,
     })
       .then((fc) => {
-        if (isCancelled || !fc?.features || fc.features.length === 0) return;
-        const mapped = fc.features.slice(0, 30).map((f: any, idx: number) => {
+        if (isCancelled) return;
+        const features = fc?.features || [];
+        setTotalCellsCount(features.length);
+
+        const topFeatures = [...features]
+          .sort((a: any, b: any) => (b.properties?.valor ?? 0) - (a.properties?.valor ?? 0))
+          .slice(0, 60);
+
+        const mapped = topFeatures.map((f: any, idx: number) => {
           const coords = f.geometry?.coordinates?.[0] || [];
           let sumLng = 0;
           let sumLat = 0;
@@ -227,18 +283,22 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           };
         });
 
-        if (mapped.length > 0) {
-          setRealHotspots(mapped);
-        }
+        setRealHotspots(mapped);
       })
       .catch(() => {
-        // Fallback silencioso a SAMPLE_HOTSPOTS
+        if (!isCancelled) {
+          setTotalCellsCount(null);
+          setRealHotspots(null);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingCells(false);
       });
 
     return () => {
       isCancelled = true;
     };
-  }, [activeSensorFilter]);
+  }, [activeSensorFilter, selectedMonth, bboxParam, metadata?.fecha_max]);
 
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {
@@ -408,6 +468,77 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
+        </div>
+      </div>
+
+      {/* Barra de navegación temporal histórica */}
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#07100F] border-b border-[#21312D] text-xs font-mono">
+        <div className="flex items-center gap-1.5 text-[#93A39C]">
+          <Calendar className="h-3.5 w-3.5 text-[#B8EE68]" />
+          <span className="hidden sm:inline">{isEn ? 'Period:' : 'Período:'}</span>
+          <button
+            type="button"
+            disabled={selectedMonth <= minMonth}
+            onClick={() => {
+              userPickedMonthRef.current = true;
+              setIsPlayingTimeline(false);
+              setSelectedMonth((prev) => shiftMonth(prev, -1));
+            }}
+            aria-label={isEn ? 'Previous month' : 'Mes anterior'}
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <input
+            type="month"
+            min={minMonth}
+            max={maxMonth}
+            value={selectedMonth}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              userPickedMonthRef.current = true;
+              setIsPlayingTimeline(false);
+              setSelectedMonth(e.target.value);
+            }}
+            aria-label={isEn ? 'Select historical month' : 'Seleccionar mes histórico'}
+            className="h-7 rounded border border-[#21312D] bg-[#111E1B] px-2 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none [color-scheme:dark]"
+          />
+          <button
+            type="button"
+            disabled={selectedMonth >= maxMonth}
+            onClick={() => {
+              userPickedMonthRef.current = true;
+              setIsPlayingTimeline(false);
+              setSelectedMonth((prev) => shiftMonth(prev, 1));
+            }}
+            aria-label={isEn ? 'Next month' : 'Mes siguiente'}
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPlayingTimeline((p) => !p)}
+            aria-pressed={isPlayingTimeline}
+            className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-medium transition-colors ${
+              isPlayingTimeline
+                ? 'border-[#B8EE68]/50 bg-[#B8EE68]/20 text-[#B8EE68]'
+                : 'border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/40'
+            }`}
+          >
+            {isPlayingTimeline ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            <span>{isPlayingTimeline ? (isEn ? 'Pause' : 'Pausar') : (isEn ? 'Timelapse' : 'Recorrer')}</span>
+          </button>
+          <span className="rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 text-xs text-[#B8EE68]">
+            {isLoadingCells
+              ? '...'
+              : totalCellsCount !== null
+              ? `${totalCellsCount} ${isEn ? 'cells' : 'celdas'} · ${selectedMonth}`
+              : `${selectedMonth} · DEMO`}
+          </span>
         </div>
       </div>
 

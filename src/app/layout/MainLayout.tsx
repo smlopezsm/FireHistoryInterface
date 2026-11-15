@@ -159,6 +159,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <GloboTerraqueo
               center={selectedZone.center}
               zoom={selectedZone.zoom}
+              bbox={selectedZone.bbox}
               capa={capa}
               className="w-full h-[560px] xl:h-[620px] rounded-none border-0"
             />
@@ -221,6 +222,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <GloboTerraqueo
               center={selectedZone.center}
               zoom={selectedZone.zoom}
+              bbox={selectedZone.bbox}
               capa={capa}
               className="w-full h-[420px] rounded-none border-0"
             />
