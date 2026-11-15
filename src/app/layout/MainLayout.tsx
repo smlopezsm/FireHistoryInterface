@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import {
@@ -13,13 +13,14 @@ import { GloboTerraqueo } from '../../features/globe';
 import {
   useAnomalia,
   useMetadata,
+  useProvincias,
+  esZonaRegion,
   pedidoDeZona,
-  zonaDePoligono,
+  zoomParaBbox,
   aMes,
   mesAnterior,
   ZONA_ARGENTINA,
   type Capa,
-  type GeoJSON,
   type ZonaSeleccionada,
 } from '../../api';
 
@@ -47,16 +48,15 @@ function useIsDesktop() {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = () => {
-  const { t, i18n } = useTranslation();
-  const isEn = !Boolean(i18n?.language?.startsWith('es'));
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
 
   const [zona, setZona] = useState<ZonaSeleccionada>(ZONA_ARGENTINA);
   const [capa, setCapa] = useState<Capa>('armonizado');
   const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(null);
-  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(null);
 
   const { data: metadata } = useMetadata();
+  const { data: apiProvincias } = useProvincias();
   const mesMin = metadata ? aMes(metadata.fecha_min) : undefined;
   const mesMax = metadata ? aMes(metadata.fecha_max) : undefined;
 
@@ -65,7 +65,7 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
   const periodoParams = periodoUsuario ?? {};
 
   // El mapa muestra un mes; por defecto el último mes completo.
-  const mesMapa = mesMapaUsuario ?? (mesMax ? mesAnterior(mesMax) : null);
+  const mesMapa = mesMax ? mesAnterior(mesMax) : null;
 
   const pedido = useMemo(() => pedidoDeZona(zona), [zona]);
   const anomalia = useAnomalia(pedido);
@@ -74,8 +74,36 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
     metadata && anomalia.data && anomalia.data.mes > aMes(metadata.fecha_ultimo_sp),
   );
 
-  const handlePoligono = (poligono: GeoJSON.Polygon) =>
-    setZona(zonaDePoligono(poligono, isEn ? 'Drawn area' : 'Zona dibujada', isEn ? 'Polygon' : 'Polígono'));
+  const handleSelectProvinciaFromMap = useCallback(
+    (provinciaId: string | null) => {
+      if (!provinciaId) {
+        setZona(ZONA_ARGENTINA);
+        return;
+      }
+      const match = apiProvincias?.find((p) => p.provincia_id === provinciaId);
+      if (match) {
+        setZona({
+          id: match.provincia_id,
+          provincia_id: match.provincia_id,
+          nombre: match.nombre,
+          region: match.region,
+          center: [(match.bbox[0] + match.bbox[2]) / 2, (match.bbox[1] + match.bbox[3]) / 2],
+          zoom: zoomParaBbox(match.bbox),
+          bbox: match.bbox,
+        });
+      } else {
+        setZona({
+          id: provinciaId,
+          provincia_id: provinciaId,
+          nombre: `Provincia ${provinciaId}`,
+          region: 'Argentina',
+          center: zona.center,
+          zoom: 5.5,
+        });
+      }
+    },
+    [apiProvincias, zona.center]
+  );
 
   const zonaNombre =
     zona.id === ZONA_ARGENTINA.id ? t('zone.allCountry') : zona.nombre;
@@ -94,19 +122,27 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
     />
   );
 
+  const selectedProvinciaIds = useMemo(() => {
+    if (zona.provincia_id) return [zona.provincia_id];
+    if (esZonaRegion(zona) && apiProvincias) {
+      return apiProvincias
+        .filter((p) => p.region === zona.region)
+        .map((p) => p.provincia_id);
+    }
+    return [];
+  }, [zona, apiProvincias]);
+
   const globo = (heightClass: string) => (
     <GloboTerraqueo
       center={zona.center}
       zoom={zona.zoom}
+      bbox={zona.bbox}
       capa={capa}
-      mesMapa={mesMapa}
-      onChangeMesMapa={setMesMapaUsuario}
-      mesMin={mesMin}
-      mesMax={mesMax}
-      fechaMin={metadata?.fecha_min}
-      fechaMax={metadata?.fecha_max}
+      externalMonth={mesMapa ?? undefined}
       geometriaZona={zona.geometria}
-      onPoligonoDibujado={handlePoligono}
+      selectedProvinciaId={zona.provincia_id}
+      selectedProvinciaIds={selectedProvinciaIds}
+      onSelectProvincia={handleSelectProvinciaFromMap}
       className={`w-full ${heightClass} rounded-none border-0`}
     />
   );

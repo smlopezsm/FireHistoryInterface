@@ -48,10 +48,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
               </h1>
               <span className="rounded border border-[#21312D] bg-[#111E1B] px-2 py-0.5 font-mono text-xs text-[#93A39C]">
                 {metadata?.factores_version ? (
-                  <>
-                    <span className="hidden sm:inline">NASA FIRMS · v{metadata.factores_version}</span>
-                    <span className="inline sm:hidden">v{metadata.factores_version}</span>
-                  </>
+                  <span>v{metadata.factores_version}</span>
                 ) : (
                   <>
                     <span className="hidden sm:inline">{t('header.badge')}</span>

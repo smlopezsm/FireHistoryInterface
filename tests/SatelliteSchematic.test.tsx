@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import '../src/i18n';
 import { SatelliteSchematic } from '../src/features/satellite-schematic';
 
@@ -80,5 +80,25 @@ describe('SatelliteSchematic Component (English Default)', () => {
 
     fireEvent.click(inspectBtn);
     expect(handleOpen3D).toHaveBeenCalledTimes(1);
+  });
+
+  it('automatically animates subsystem disassembly without user click', () => {
+    vi.useFakeTimers();
+    try {
+      render(<SatelliteSchematic />);
+      expect(
+        screen.getByRole('button', { name: /Disassemble Subsystems|Desarmar Subsistemas/i })
+      ).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(650);
+      });
+
+      expect(
+        screen.getByRole('button', { name: /Assemble Spacecraft|Rearmar Nave/i })
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

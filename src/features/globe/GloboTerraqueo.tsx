@@ -1,122 +1,212 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import * as maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { getMapaCeldas, useMetadata, useProvincias, type GeoJSON } from '../../api';
 import {
-  getMapaCeldas,
-  getMapaIndustriales,
-  rangoDelMes,
-  BBOX_ARGENTINA,
-  type BBox,
-  type Capa,
-  type GeoJSON,
-} from '../../api';
+  attachProvinciasLayer,
+  PROVINCIAS_GEOJSON_URL,
+  type ProvinciaFeatureProperties,
+  type ProvinciasLayerController,
+} from './provinciasLayer';
 import {
   RotateCw,
   RefreshCw,
   Maximize2,
   Minimize2,
-  Key,
   Globe as GlobeIcon,
   Plus,
   Minus,
   AlertCircle,
-  ExternalLink,
   Flame,
-  Loader2,
-  Pentagon,
-  Check,
-  X,
-  Factory,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause,
+  Calendar,
+  Layers,
 } from 'lucide-react';
+
+const shiftMonth = (ym: string, delta: number): string => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+};
+
+const monthToDateRange = (ym: string, maxDate?: string): { desde: string; hasta: string } => {
+  const [y, m] = ym.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const monthEnd = `${ym}-${String(lastDay).padStart(2, '0')}`;
+  const hasta = maxDate && maxDate.startsWith(ym) && maxDate < monthEnd ? maxDate : monthEnd;
+  return { desde: `${ym}-01`, hasta };
+};
+
+const monthDiff = (fromYm: string, toYm: string): number => {
+  const [fy, fm] = fromYm.split('-').map(Number);
+  const [ty, tm] = toYm.split('-').map(Number);
+  return Math.max(0, (ty - fy) * 12 + (tm - fm));
+};
+
+const isPointInRing = (lng: number, lat: number, ring: number[][]): boolean => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+};
+
+const isPointInPolygonCoords = (lng: number, lat: number, rings: number[][][]): boolean => {
+  if (!rings.length || !isPointInRing(lng, lat, rings[0])) return false;
+  for (let i = 1; i < rings.length; i++) {
+    if (isPointInRing(lng, lat, rings[i])) return false;
+  }
+  return true;
+};
+
+const isPointInGeometry = (
+  lng: number,
+  lat: number,
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
+): boolean => {
+  if (geometry.type === 'Polygon') {
+    return isPointInPolygonCoords(lng, lat, geometry.coordinates);
+  }
+  return geometry.coordinates.some((poly) => isPointInPolygonCoords(lng, lat, poly));
+};
+
+// Estilo cartográfico oscuro científico (IGN Argentina Argenmap Oscuro), perspectiva 3D inclinada sobre Argentina
+const DEFAULT_GLOBE_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  projection: { type: 'mercator' },
+  sky: {
+    'sky-color': '#030807',
+    'horizon-color': '#2B7A73',
+    'fog-color': '#07100F',
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 6, 0.25],
+  },
+  sources: {
+    'ign-argenmap-oscuro': {
+      type: 'raster',
+      tiles: [
+        'https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/argenmap_oscuro@EPSG%3A3857@png/{z}/{x}/{y}.png',
+      ],
+      scheme: 'tms',
+      tileSize: 256,
+      maxzoom: 16,
+    },
+  },
+  layers: [
+    {
+      id: 'ign-argenmap-base',
+      type: 'raster',
+      source: 'ign-argenmap-oscuro',
+      paint: {
+        'raster-brightness-min': 0.0,
+        'raster-brightness-max': 0.82,
+        'raster-contrast': 0.35,
+        'raster-saturation': -0.35,
+        'raster-hue-rotate': -15,
+      },
+    },
+  ],
+};
+
+// Vista satelital global (Esri World Imagery), cobertura planetaria sin API key
+const SATELLITE_GLOBE_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  projection: { type: 'globe' },
+  sky: {
+    'sky-color': '#030807',
+    'horizon-color': '#2B7A73',
+    'fog-color': '#07100F',
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.95, 5, 0.2],
+  },
+  sources: {
+    'esri-world-imagery': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      maxzoom: 18,
+    },
+  },
+  layers: [
+    {
+      id: 'esri-satellite-base',
+      type: 'raster',
+      source: 'esri-world-imagery',
+    },
+  ],
+};
+
+// Puntos calientes representativos en Argentina (Córdoba, Delta del Paraná, Corrientes, San Luis, Salta, Chubut)
+const SAMPLE_HOTSPOTS = [
+  { id: 'f1', lng: -64.42, lat: -31.35, sensor: 'viirs', brightness: 345, province: 'Córdoba (Punilla)' },
+  { id: 'f2', lng: -64.55, lat: -31.60, sensor: 'viirs', brightness: 370, province: 'Córdoba (Calamuchita)' },
+  { id: 'f3', lng: -60.40, lat: -32.85, sensor: 'modis', brightness: 320, province: 'Entre Ríos (Delta)' },
+  { id: 'f4', lng: -60.25, lat: -33.10, sensor: 'modis', brightness: 315, province: 'Entre Ríos (Islas)' },
+  { id: 'f5', lng: -57.85, lat: -28.20, sensor: 'viirs', brightness: 360, province: 'Corrientes (Iberá)' },
+  { id: 'f6', lng: -58.20, lat: -28.75, sensor: 'modis', brightness: 330, province: 'Corrientes' },
+  { id: 'f7', lng: -66.15, lat: -33.15, sensor: 'viirs', brightness: 380, province: 'San Luis (Sierras)' },
+  { id: 'f8', lng: -64.80, lat: -24.20, sensor: 'viirs', brightness: 355, province: 'Salta (Orán)' },
+  { id: 'f9', lng: -71.30, lat: -42.80, sensor: 'modis', brightness: 310, province: 'Chubut (Cordillera)' },
+  { id: 'f10', lng: -65.20, lat: -37.10, sensor: 'viirs', brightness: 335, province: 'La Pampa' },
+];
 
 interface GloboTerraqueoProps {
   className?: string;
-  onMapReady?: (map: mapboxgl.Map) => void;
+  onMapReady?: (map: maplibregl.Map) => void;
   center?: [number, number];
   zoom?: number;
-  capa?: Capa;
-  /** Mes que pinta la capa de celdas (YYYY-MM). */
-  mesMapa?: string | null;
-  onChangeMesMapa?: (mes: string) => void;
-  mesMin?: string;
-  mesMax?: string;
-  fechaMin?: string;
-  fechaMax?: string;
-  /** Polígono de la zona elegida (se dibuja su contorno). */
+  bbox?: [number, number, number, number];
+  capa?: 'armonizado' | 'modis' | 'viirs';
+  externalMonth?: string;
   geometriaZona?: GeoJSON.Polygon | GeoJSON.MultiPolygon;
-  /** Se llama al terminar de dibujar un polígono en el mapa. */
-  onPoligonoDibujado?: (poligono: GeoJSON.Polygon) => void;
+  selectedProvinciaId?: string;
+  selectedProvinciaIds?: string[];
+  onSelectProvincia?: (provinciaId: string | null) => void;
 }
-
-const VACIO: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
-const DEBOUNCE_MS = 300;
-/** Debajo de este zoom se pide todo el país (1 mes entra en el límite de 20.000 celdas). */
-const ZOOM_PAIS = 4;
-const MAX_VERTICES = 2000;
-
-// Rampa para `valor` (focos por celda de 5 × 5 km en el período)
-const RAMPA: [number, string][] = [
-  [1, '#FFE08A'],
-  [3, '#FF9C55'],
-  [10, '#FF6759'],
-  [30, '#D7263D'],
-];
-
-type EstadoMapa =
-  | { tipo: 'inactivo' }
-  | { tipo: 'cargando' }
-  | { tipo: 'ok'; celdas: number }
-  | { tipo: 'error'; mensaje: string };
-
-/** Vista actual recortada a Argentina y redondeada hacia afuera (evita pedidos por cambios mínimos). */
-function bboxDeVista(map: mapboxgl.Map): BBox {
-  if (map.getZoom() < ZOOM_PAIS) return BBOX_ARGENTINA;
-  const b = map.getBounds();
-  if (!b) return BBOX_ARGENTINA;
-  const paso = 0.25;
-  const oeste = Math.max(BBOX_ARGENTINA[0], Math.floor(b.getWest() / paso) * paso);
-  const sur = Math.max(BBOX_ARGENTINA[1], Math.floor(b.getSouth() / paso) * paso);
-  const este = Math.min(BBOX_ARGENTINA[2], Math.ceil(b.getEast() / paso) * paso);
-  const norte = Math.min(BBOX_ARGENTINA[3], Math.ceil(b.getNorth() / paso) * paso);
-  if (oeste >= este || sur >= norte) return BBOX_ARGENTINA;
-  return [oeste, sur, este, norte];
-}
-
-const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   className = '',
   onMapReady,
-  center = [-64, -36],
+  center = [-64, -36], // Centrado en Argentina
   zoom = 2.0,
+  bbox = [-73.6, -55.1, -53.6, -21.8],
   capa = 'armonizado',
-  mesMapa = null,
-  onChangeMesMapa,
-  mesMin,
-  mesMax,
-  fechaMin,
-  fechaMax,
+  externalMonth,
   geometriaZona,
-  onPoligonoDibujado,
+  selectedProvinciaId,
+  selectedProvinciaIds,
+  onSelectProvincia,
 }) => {
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
+  const { data: metadata } = useMetadata();
+  const { data: apiProvincias } = useProvincias(true);
+  const minMonth = metadata?.fecha_min?.slice(0, 7) || '2000-11';
+  const maxMonth = metadata?.fecha_max?.slice(0, 7) || '2026-11';
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const provinciasControllerRef = useRef<ProvinciasLayerController | null>(null);
+  const provinciasGeoJSONRef = useRef<GeoJSON.FeatureCollection<
+    GeoJSON.Geometry,
+    ProvinciaFeatureProperties
+  > | null>(null);
+  const activeSelectedIds = selectedProvinciaIds ?? (selectedProvinciaId ? [selectedProvinciaId] : []);
+  const selectedProvinciaIdsRef = useRef<string[]>(activeSelectedIds);
+  selectedProvinciaIdsRef.current = activeSelectedIds;
+  const onSelectProvinciaRef = useRef(onSelectProvincia);
+  onSelectProvinciaRef.current = onSelectProvincia;
   const idleTimeoutRef = useRef<number | null>(null);
-  const debounceRef = useRef<number | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const ultimoPedidoRef = useRef<string>('');
-
-  const envToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
-  const isEnvTokenValid = Boolean(envToken && !envToken.includes('tu_mapbox_access_token'));
-
-  const [activeToken, setActiveToken] = useState<string>(isEnvTokenValid ? envToken! : '');
-  const [manualTokenInput, setManualTokenInput] = useState('');
-  const [showTokenPrompt, setShowTokenPrompt] = useState(!isEnvTokenValid);
+  const userPickedMonthRef = useRef(false);
+  const prevViewRef = useRef({ lng: center[0], lat: center[1], zoom });
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -127,224 +217,355 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const [isSpinning, setIsSpinning] = useState(!prefersReducedMotion);
   const [isUserInteracting, setIsUserInteracting] = useState(false);
+  const isSpinningRef = useRef(isSpinning);
+  const isUserInteractingRef = useRef(isUserInteracting);
+  useEffect(() => {
+    isSpinningRef.current = isSpinning;
+  }, [isSpinning]);
+  useEffect(() => {
+    isUserInteractingRef.current = isUserInteracting;
+  }, [isUserInteracting]);
+
+  const rootRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [estadoMapa, setEstadoMapa] = useState<EstadoMapa>({ tipo: 'inactivo' });
-  const [mostrarIndustriales, setMostrarIndustriales] = useState(false);
-  const [dibujando, setDibujando] = useState(false);
-  const [vertices, setVertices] = useState<[number, number][]>([]);
+  const handleToggleFullscreen = useCallback(() => {
+    const el = rootRef.current;
+    if (typeof document !== 'undefined') {
+      if (document.fullscreenElement === el) {
+        document.exitFullscreen?.().catch(() => {});
+        setIsFullscreen(false);
+        return;
+      }
+      if (!isFullscreen && el && typeof el.requestFullscreen === 'function') {
+        el.requestFullscreen()
+          .then(() => setIsFullscreen(true))
+          .catch(() => setIsFullscreen((prev) => !prev));
+        return;
+      }
+    }
+    setIsFullscreen((prev) => !prev);
+  }, [isFullscreen]);
 
-  // Refs para leer el estado actual desde los listeners de Mapbox (registrados una sola vez)
-  const spinStateRef = useRef({ isSpinning, isUserInteracting, dibujando });
-  spinStateRef.current = { isSpinning, isUserInteracting, dibujando };
-  const consultaRef = useRef({ capa, mesMapa, fechaMin, fechaMax });
-  consultaRef.current = { capa, mesMapa, fechaMin, fechaMax };
-  const dibujandoRef = useRef(false);
-  dibujandoRef.current = dibujando;
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === rootRef.current);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
 
-  // ── Rotación orbital ────────────────────────────────────────────────
-  const secondsPerRevolution = 180;
+  useEffect(() => {
+    if (!isFullscreen || typeof window === 'undefined') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && document.fullscreenElement !== rootRef.current) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const raf = window.requestAnimationFrame(() => map.resize?.());
+    const timer = window.setTimeout(() => map.resize?.(), 80);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+    };
+  }, [isFullscreen]);
+  const [mapStyleMode, setMapStyleMode] = useState<'ign' | 'satellite'>('ign');
+  const [revealSeed, setRevealSeed] = useState(0);
+  const mapStyleModeRef = useRef<'ign' | 'satellite'>(mapStyleMode);
+  useEffect(() => {
+    mapStyleModeRef.current = mapStyleMode;
+  }, [mapStyleMode]);
+
+  const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
+  const [selectedMonth, setSelectedMonth] = useState<string>(maxMonth);
+  const [isPlayingTimeline, setIsPlayingTimeline] = useState(!prefersReducedMotion);
+  const [isLoadingCells, setIsLoadingCells] = useState(false);
+  const [totalCellsCount, setTotalCellsCount] = useState<number | null>(null);
+  const [realHotspots, setRealHotspots] = useState<typeof SAMPLE_HOTSPOTS | null>(null);
+
+  const totalMonths = Math.max(1, monthDiff(minMonth, maxMonth));
+  const currentMonthIdx = Math.min(totalMonths, monthDiff(minMonth, selectedMonth));
+
+  useEffect(() => {
+    if (metadata?.fecha_max && !userPickedMonthRef.current && !externalMonth) {
+      setSelectedMonth(metadata.fecha_max.slice(0, 7));
+    }
+  }, [metadata?.fecha_max, externalMonth]);
+
+  useEffect(() => {
+    if (externalMonth) {
+      userPickedMonthRef.current = true;
+      setIsPlayingTimeline(false);
+      setSelectedMonth(externalMonth);
+    }
+  }, [externalMonth]);
+
+  useEffect(() => {
+    if (!isPlayingTimeline) return;
+    const timer = window.setInterval(() => {
+      userPickedMonthRef.current = true;
+      setSelectedMonth((prev) => (prev >= maxMonth ? minMonth : shiftMonth(prev, 1)));
+    }, 2200);
+    return () => window.clearInterval(timer);
+  }, [isPlayingTimeline, minMonth, maxMonth]);
+
+  // Sincronizar con prop externa
+  useEffect(() => {
+    setActiveSensorFilter(capa);
+  }, [capa]);
+
+  // Rotación orbital (grados/segundo efectivos en ciclos de 1000 ms encadenados con moveend)
+  const secondsPerRevolution = 150;
   const maxSpinZoom = 4;
   const slowSpinZoom = 2.5;
 
   const spinGlobe = useCallback(() => {
     const map = mapRef.current;
-    const s = spinStateRef.current;
-    if (!map || !s.isSpinning || s.isUserInteracting || s.dibujando) return;
+    if (!map || !isSpinningRef.current || isUserInteractingRef.current) return;
+    if (mapStyleModeRef.current !== 'satellite') return;
+
     const currentZoom = map.getZoom();
     if (currentZoom < maxSpinZoom) {
       let distancePerSecond = 360 / secondsPerRevolution;
       if (currentZoom > slowSpinZoom) {
-        distancePerSecond *= (maxSpinZoom - currentZoom) / (maxSpinZoom - slowSpinZoom);
+        const zoomDif = (maxSpinZoom - currentZoom) / (maxSpinZoom - slowSpinZoom);
+        distancePerSecond *= zoomDif;
       }
       const mapCenter = map.getCenter();
-      mapCenter.lng -= distancePerSecond / 60;
-      map.easeTo({ center: mapCenter, duration: 1000, easing: (n) => n });
+      mapCenter.lng -= distancePerSecond;
+      map.easeTo({ center: mapCenter, duration: 1000, easing: (n: number) => n });
     }
-  }, []);
+  }, [maxSpinZoom, slowSpinZoom, secondsPerRevolution]);
 
   const handleInteractionStart = useCallback(() => {
     setIsUserInteracting(true);
-    if (idleTimeoutRef.current) window.clearTimeout(idleTimeoutRef.current);
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current);
+    }
   }, []);
 
   const handleInteractionEnd = useCallback(() => {
-    if (idleTimeoutRef.current) window.clearTimeout(idleTimeoutRef.current);
-    idleTimeoutRef.current = window.setTimeout(() => setIsUserInteracting(false), 3500);
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current);
+    }
+    idleTimeoutRef.current = window.setTimeout(() => {
+      setIsUserInteracting(false);
+    }, 3500);
   }, []);
 
-  // ── Capa de celdas: pedido con debounce y cancelación ────────────────
-  const pedirCeldas = useCallback((forzar = false) => {
-    const map = mapRef.current;
-    const { capa: c, mesMapa: mes, fechaMin: fmin, fechaMax: fmax } = consultaRef.current;
-    if (!map || !mes || !map.getSource('celdas')) return;
-    const bbox = bboxDeVista(map).join(',');
-    const { desde, hasta } = rangoDelMes(mes, fmin, fmax);
-    const clave = `${bbox}|${desde}|${hasta}|${c}`;
-    if (!forzar && clave === ultimoPedidoRef.current) return;
-    ultimoPedidoRef.current = clave;
+  // Actualizar marcadores de focos de calor según filtro
+  const renderHotspotMarkers = useCallback((map: maplibregl.Map, filter: 'armonizado' | 'modis' | 'viirs', customSpots?: typeof SAMPLE_HOTSPOTS) => {
+    // Limpiar marcadores anteriores
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
 
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setEstadoMapa({ tipo: 'cargando' });
+    const spotsSource = customSpots || realHotspots || SAMPLE_HOTSPOTS;
+    const visibleHotspots = spotsSource.filter((h) => {
+      if (filter === 'armonizado') return true;
+      return h.sensor === filter;
+    });
 
-    getMapaCeldas({ bbox, desde, hasta, capa: c }, controller.signal)
-      .then((fc) => {
-        if (controller.signal.aborted) return;
-        (map.getSource('celdas') as mapboxgl.GeoJSONSource | undefined)?.setData(fc as never);
-        setEstadoMapa({ tipo: 'ok', celdas: fc.features.length });
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
-        ultimoPedidoRef.current = ''; // permitir reintento
-        (map.getSource('celdas') as mapboxgl.GeoJSONSource | undefined)?.setData(VACIO as never);
-        // 413 RESULTADO_DEMASIADO_GRANDE: la API ya dice "acercá el mapa o acortá el período"
-        setEstadoMapa({ tipo: 'error', mensaje: err instanceof Error ? err.message : String(err) });
+    visibleHotspots.forEach((h, idx) => {
+      const el = document.createElement('div');
+      el.className = 'hotspot-marker';
+
+      const isViirs = h.sensor === 'viirs';
+      const isExtreme = h.brightness > 360;
+      const color = isExtreme ? '#FF6759' : isViirs ? '#FF9C55' : '#68D9D0';
+      const delayMs = Math.min(idx * 35, 1100);
+
+      el.innerHTML = `
+        <div class="hotspot-appear relative flex items-center justify-center cursor-pointer" style="animation-delay: ${delayMs}ms;">
+          <div class="hotspot-halo absolute w-4 h-4 rounded-full" style="background: ${color}; animation-delay: ${delayMs}ms;"></div>
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; border: 1.5px solid #EFF5ED; box-shadow: 0 0 8px ${color};"></div>
+        </div>
+      `;
+
+      const coordsLabel = `${h.lat.toFixed(4)}, ${h.lng.toFixed(4)}`;
+      const gmapsUrl = `https://www.google.com/maps?q=${h.lat.toFixed(4)},${h.lng.toFixed(4)}`;
+      const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(`
+        <div style="font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px; color: #EFF5ED; background: #0D1816; border: 1px solid #21312D; border-radius: 4px;">
+          <strong style="color: ${color};">${h.sensor.toUpperCase()} · ${h.province}</strong><br/>
+          <span>${isEn ? 'Brightness Temp:' : 'T. Brillo:'} <b>${h.brightness} K</b></span><br/>
+          <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 3px; color: #B8EE68; text-decoration: underline; font-size: 11px;">
+            ${coordsLabel} · Google Maps ↗
+          </a><br/>
+          <span style="color: #93A39C; font-size: 11px;">${isEn ? 'S-NPP Calibrated' : 'S-NPP Calibrado'}</span>
+        </div>
+      `);
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([h.lng, h.lat])
+        .setPopup(popup)
+        .addTo(map);
+
+      let closeTimer: number | null = null;
+      const cancelClose = () => {
+        if (closeTimer !== null) {
+          window.clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+      };
+      const scheduleClose = () => {
+        cancelClose();
+        closeTimer = window.setTimeout(() => {
+          popup.remove?.();
+        }, 140);
+      };
+
+      el.addEventListener('mouseenter', () => {
+        cancelClose();
+        popup.setLngLat([h.lng, h.lat]).addTo(map);
+        const popupEl = popup.getElement?.();
+        if (popupEl && !popupEl.dataset.hoverBound) {
+          popupEl.dataset.hoverBound = '1';
+          popupEl.addEventListener('mouseenter', cancelClose);
+          popupEl.addEventListener('mouseleave', scheduleClose);
+        }
       });
-  }, []);
 
-  const pedirCeldasDebounced = useCallback(() => {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(() => pedirCeldas(), DEBOUNCE_MS);
-  }, [pedirCeldas]);
+      el.addEventListener('mouseleave', scheduleClose);
 
-  // ── Inicializar Mapbox GL JS (una vez por token) ─────────────────────
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        cancelClose();
+      });
+
+      markersRef.current.push(marker);
+    });
+  }, [realHotspots, isEn]);
+
+  const bboxParam = bbox.join(',');
+
+  // Consulta de celdas activas a FireHistoryInterfaceAPI para el mes y zona seleccionados
   useEffect(() => {
-    if (!mapContainerRef.current || !activeToken) return;
+    let isCancelled = false;
+    const { desde, hasta } = monthToDateRange(selectedMonth, metadata?.fecha_max);
+    setIsLoadingCells(true);
+
+    getMapaCeldas({
+      bbox: bboxParam,
+      desde,
+      hasta,
+      capa: activeSensorFilter,
+      min_focos: 5,
+    })
+      .then((fc) => {
+        if (isCancelled) return;
+        const features = fc?.features || [];
+
+        const mappedAll = features.map((f: any, idx: number) => {
+          const coords = f.geometry?.coordinates?.[0] || [];
+          let sumLng = 0;
+          let sumLat = 0;
+          coords.forEach(([clng, clat]: [number, number]) => {
+            sumLng += clng;
+            sumLat += clat;
+          });
+          const count = coords.length || 1;
+          const valor = f.properties?.valor ?? f.properties?.armonizado ?? 30;
+          const sensor = f.properties?.viirs ? 'viirs' : 'modis';
+          const provId = f.properties?.provincia_id;
+
+          return {
+            id: `real-${f.properties?.cell_id ?? idx}`,
+            lng: Number((sumLng / count).toFixed(4)),
+            lat: Number((sumLat / count).toFixed(4)),
+            sensor: sensor as 'viirs' | 'modis',
+            brightness: Math.min(420, Math.round(310 + valor * 1.5)),
+            valor,
+            province: provId ? `Prov. ${provId} (${Math.round(valor)} focos)` : `Celda ${f.properties?.cell_id ?? idx}`,
+          };
+        });
+
+        const scoped = geometriaZona
+          ? mappedAll.filter((spot) => isPointInGeometry(spot.lng, spot.lat, geometriaZona))
+          : mappedAll;
+
+        setTotalCellsCount(scoped.length);
+
+        const topSpots = [...scoped]
+          .sort((a, b) => b.valor - a.valor)
+          .slice(0, 60)
+          .map(({ valor: _v, ...spot }) => spot);
+
+        setRealHotspots(topSpots);
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setTotalCellsCount(null);
+          setRealHotspots(null);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingCells(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeSensorFilter, selectedMonth, bboxParam, metadata?.fecha_max, geometriaZona]);
+
+  // Inicializar MapLibre GL JS (sin token)
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
 
     try {
-      mapboxgl.accessToken = activeToken;
-      const map = new mapboxgl.Map({
+      const style = import.meta.env.VITE_MAP_STYLE_URL || DEFAULT_GLOBE_STYLE;
+      const initialZoom = zoom === 2.0 ? 3.5 : zoom;
+      const map = new maplibregl.Map({
         container: mapContainerRef.current,
-        style: 'mapbox://styles/mapbox/standard-satellite',
-        projection: { name: 'globe' },
+        style,
         center,
-        zoom,
+        zoom: initialZoom,
+        pitch: 42,
+        bearing: -10,
         minZoom: 1,
         maxZoom: 14,
-        antialias: true,
-        cooperativeGestures: true,
+        cooperativeGestures: false,
+        dragPan: true,
+        dragRotate: true,
+        scrollZoom: true,
+        touchZoomRotate: true,
+        attributionControl: false,
       });
+
       mapRef.current = map;
 
       map.on('style.load', () => {
         try {
-          map.setFog({
-            color: 'rgb(7, 16, 15)',
-            'high-color': 'rgb(104, 217, 208)',
-            'horizon-blend': 0.08,
-            'space-color': 'rgb(4, 8, 8)',
-            'star-intensity': 0.7,
-          });
+          const projectionType = mapStyleModeRef.current === 'satellite' ? 'globe' : 'mercator';
+          map.setProjection?.({ type: projectionType });
         } catch {
-          // Ignorar si el estilo difiere
+          // Ignorar si el entorno de test/estilo difiere
         }
 
-        map.addSource('celdas', { type: 'geojson', data: VACIO as never });
-        map.addLayer({
-          id: 'celdas-fill',
-          type: 'fill',
-          source: 'celdas',
-          paint: {
-            'fill-color': ['interpolate', ['linear'], ['get', 'valor'], ...RAMPA.flat()] as never,
-            'fill-opacity': ['case', ['==', ['get', 'estado'], 'observado'], 0.8, 0.6] as never,
-            'fill-outline-color': 'rgba(7,16,15,0.35)',
-          },
-        });
+        if (!provinciasControllerRef.current) {
+          provinciasControllerRef.current = attachProvinciasLayer(map, {
+            onSelectProvincia: (pid) => onSelectProvinciaRef.current?.(pid),
+          });
+        } else {
+          provinciasControllerRef.current.ensureLayers();
+        }
 
-        map.addSource('industriales', { type: 'geojson', data: VACIO as never });
-        map.addLayer({
-          id: 'industriales-circle',
-          type: 'circle',
-          source: 'industriales',
-          layout: { visibility: 'none' },
-          paint: {
-            'circle-radius': 4,
-            'circle-color': '#68D9D0',
-            'circle-stroke-color': '#07100F',
-            'circle-stroke-width': 1,
-          },
-        });
-
-        map.addSource('zona', { type: 'geojson', data: VACIO as never });
-        map.addLayer({
-          id: 'zona-line',
-          type: 'line',
-          source: 'zona',
-          paint: { 'line-color': '#B8EE68', 'line-width': 2 },
-        });
-
-        map.addSource('dibujo', { type: 'geojson', data: VACIO as never });
-        map.addLayer({
-          id: 'dibujo-fill',
-          type: 'fill',
-          source: 'dibujo',
-          filter: ['==', ['geometry-type'], 'Polygon'],
-          paint: { 'fill-color': '#B8EE68', 'fill-opacity': 0.15 },
-        });
-        map.addLayer({
-          id: 'dibujo-line',
-          type: 'line',
-          source: 'dibujo',
-          paint: { 'line-color': '#B8EE68', 'line-width': 2, 'line-dasharray': [2, 1] },
-        });
-        map.addLayer({
-          id: 'dibujo-vertices',
-          type: 'circle',
-          source: 'dibujo',
-          filter: ['==', ['geometry-type'], 'Point'],
-          paint: { 'circle-radius': 4, 'circle-color': '#B8EE68', 'circle-stroke-color': '#07100F', 'circle-stroke-width': 1 },
-        });
+        if (provinciasGeoJSONRef.current) {
+          provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
+          provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
+        }
 
         setIsLoaded(true);
-        pedirCeldas(true);
         if (onMapReady) onMapReady(map);
       });
 
-      // Detalle de una celda al hacer clic
-      map.on('click', 'celdas-fill', (e) => {
-        if (dibujandoRef.current) return;
-        const f = e.features?.[0];
-        if (!f) return;
-        const p = f.properties as Record<string, unknown>;
-        const viirs = p.viirs === null || p.viirs === undefined || p.viirs === 'null' ? (isEn ? 'no data' : 'sin dato') : String(p.viirs);
-        new mapboxgl.Popup({ offset: 8, closeButton: false })
-          .setLngLat(e.lngLat)
-          .setHTML(
-            `<div style="font-family:'DM Mono',monospace;font-size:12px;padding:6px;color:#EFF5ED;background:#0D1816;border:1px solid #21312D;border-radius:4px">
-              <strong style="color:#FF9C55">${isEn ? 'Cell' : 'Celda'} ${escapeHtml(String(p.cell_id))}</strong><br/>
-              ${isEn ? 'Value' : 'Valor'}: <b>${escapeHtml(String(p.valor))}</b> ${isEn ? 'spots' : 'focos'} (${escapeHtml(String(p.estado))})<br/>
-              MODIS: ${escapeHtml(String(p.modis))} · VIIRS: ${escapeHtml(viirs)}
-            </div>`,
-          )
-          .addTo(map);
-      });
-
-      map.on('click', 'industriales-circle', (e) => {
-        if (dibujandoRef.current) return;
-        const p = (e.features?.[0]?.properties ?? {}) as Record<string, unknown>;
-        new mapboxgl.Popup({ offset: 8, closeButton: false })
-          .setLngLat(e.lngLat)
-          .setHTML(
-            `<div style="font-family:'DM Mono',monospace;font-size:12px;padding:6px;color:#EFF5ED;background:#0D1816;border:1px solid #21312D;border-radius:4px">
-              <strong style="color:#68D9D0">${isEn ? 'Fixed source (excluded)' : 'Fuente fija (excluida)'}</strong><br/>
-              ${escapeHtml(String(p.motivo))} · ${escapeHtml(String(p.n_focos))} ${isEn ? 'spots' : 'focos'}
-            </div>`,
-          )
-          .addTo(map);
-      });
-
-      // Dibujo de polígono: cada clic agrega un vértice
-      map.on('click', (e) => {
-        if (!dibujandoRef.current) return;
-        setVertices((prev) => (prev.length >= MAX_VERTICES ? prev : [...prev, [e.lngLat.lng, e.lngLat.lat]]));
-      });
-
-      map.on('error', (e) => {
-        if (e.error?.message?.includes('Forbidden') || e.error?.message?.includes('Unauthorized')) {
-          setHasError(true);
-          setErrorMessage(isEn ? 'Invalid Mapbox token or no access to standard-satellite.' : 'Token de Mapbox no válido o sin acceso a standard-satellite.');
-        }
+      map.on('error', () => {
+        // Evitar bloquear la UI por fallos transitorios de teselas externas
       });
 
       map.on('mousedown', handleInteractionStart);
@@ -352,129 +573,175 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       map.on('dragstart', handleInteractionStart);
       map.on('mouseup', handleInteractionEnd);
       map.on('touchend', handleInteractionEnd);
-      map.on('moveend', () => {
-        spinGlobe();
-        pedirCeldasDebounced();
+      map.on('moveend', spinGlobe);
+      map.on('click', (e: maplibregl.MapMouseEvent) => {
+        const target = e.originalEvent?.target as HTMLElement | null;
+        if (target?.closest?.('.hotspot-marker')) return;
+
+        isSpinningRef.current = false;
+        setIsSpinning(false);
+        map.stop?.();
+
+        const currentPitch = map.getPitch?.() ?? 0;
+        const currentBearing = map.getBearing?.() ?? 0;
+        if (currentPitch > 1 || Math.abs(currentBearing) > 1) {
+          map.easeTo({
+            center: e.lngLat ? [e.lngLat.lng, e.lngLat.lat] : map.getCenter(),
+            zoom: Math.max(map.getZoom(), 4.2),
+            pitch: 0,
+            bearing: 0,
+            duration: 600,
+            essential: true,
+          });
+        }
       });
 
       return () => {
         if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        abortRef.current?.abort();
-        ultimoPedidoRef.current = '';
+        provinciasControllerRef.current?.destroy();
+        provinciasControllerRef.current = null;
+        markersRef.current.forEach((m) => m.remove());
         map.remove();
         mapRef.current = null;
-        setIsLoaded(false);
       };
     } catch (err: unknown) {
       setHasError(true);
-      setErrorMessage(err instanceof Error ? err.message : 'Error al inicializar Mapbox');
+      setErrorMessage(err instanceof Error ? err.message : 'Error al inicializar MapLibre');
     }
-    // El mapa se crea una sola vez por token; el resto se sincroniza en otros efectos.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeToken]);
+  }, [handleInteractionStart, handleInteractionEnd, spinGlobe, onMapReady]);
 
-  // Volver a pedir celdas al cambiar capa o mes
+  // Cargar geometrías de provincias desde el backend local (con fallback al GeoJSON estático)
   useEffect(() => {
-    if (isLoaded) pedirCeldas();
-  }, [capa, mesMapa, fechaMin, fechaMax, isLoaded, pedirCeldas]);
+    if (!isLoaded || !provinciasControllerRef.current) return;
 
-  // Capa informativa de fuentes fijas (se pide una vez, todo el país)
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !isLoaded) return;
-    map.setLayoutProperty('industriales-circle', 'visibility', mostrarIndustriales ? 'visible' : 'none');
-    if (!mostrarIndustriales) return;
+    const apiFeatures = (apiProvincias ?? [])
+      .filter((p) => Boolean(p.geometria && p.geometria.type))
+      .map((p) => ({
+        type: 'Feature' as const,
+        geometry: p.geometria as GeoJSON.Geometry,
+        properties: {
+          provincia_id: p.provincia_id,
+          nombre: p.nombre,
+        },
+      }));
+
+    if (apiFeatures.length > 0) {
+      const fc: GeoJSON.FeatureCollection<GeoJSON.Geometry, ProvinciaFeatureProperties> = {
+        type: 'FeatureCollection',
+        features: apiFeatures,
+      };
+      provinciasGeoJSONRef.current = fc;
+      provinciasControllerRef.current.setGeoJSON(fc);
+      provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
+      return;
+    }
+
+    if (provinciasGeoJSONRef.current) {
+      provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
+      provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
+      return;
+    }
+
     const controller = new AbortController();
-    getMapaIndustriales(undefined, controller.signal)
-      .then((fc) => (map.getSource('industriales') as mapboxgl.GeoJSONSource | undefined)?.setData(fc as never))
-      .catch(() => undefined);
+    fetch(PROVINCIAS_GEOJSON_URL, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || data.type !== 'FeatureCollection' || !provinciasControllerRef.current) return;
+        provinciasGeoJSONRef.current = data;
+        provinciasControllerRef.current.setGeoJSON(data);
+        provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
+      })
+      .catch(() => {
+        // Silencioso en entornos sin red o tests jsdom
+      });
+
     return () => controller.abort();
-  }, [mostrarIndustriales, isLoaded]);
+  }, [isLoaded, apiProvincias]);
 
-  // Contorno de la zona elegida (polígono dibujado)
+  // Sincronizar selección externa (provincia o región) con el estado GPU del mapa
+  const selectedIdsKey = activeSelectedIds.join(',');
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !isLoaded) return;
-    const data: GeoJSON.FeatureCollection = geometriaZona
-      ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: geometriaZona, properties: {} }] }
-      : VACIO;
-    (map.getSource('zona') as mapboxgl.GeoJSONSource | undefined)?.setData(data as never);
-  }, [geometriaZona, isLoaded]);
+    if (!isLoaded || !provinciasControllerRef.current) return;
+    provinciasControllerRef.current.setSelectedProvincias(activeSelectedIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdsKey, isLoaded]);
 
-  // Polígono en construcción
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !isLoaded) return;
-    const features: GeoJSON.Feature[] = vertices.map((v) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: v } as GeoJSON.Point, properties: {} }));
-    if (vertices.length >= 3) {
-      features.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...vertices, vertices[0]]] } as GeoJSON.Polygon, properties: {} });
-    } else if (vertices.length === 2) {
-      features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: vertices }, properties: {} });
-    }
-    (map.getSource('dibujo') as mapboxgl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features } as never);
-  }, [vertices, isLoaded]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !isLoaded) return;
-    if (dibujando) {
-      map.doubleClickZoom.disable();
-      map.getCanvas().style.cursor = 'crosshair';
-    } else {
-      map.doubleClickZoom.enable();
-      map.getCanvas().style.cursor = '';
-    }
-  }, [dibujando, isLoaded]);
-
-  const empezarDibujo = () => {
-    setVertices([]);
-    setDibujando(true);
-    setIsSpinning(false);
-  };
-  const cancelarDibujo = () => {
-    setDibujando(false);
-    setVertices([]);
-  };
-  const terminarDibujo = () => {
-    if (vertices.length < 3) return;
-    onPoligonoDibujado?.({ type: 'Polygon', coordinates: [[...vertices, vertices[0]]] });
-    setDibujando(false);
-    setVertices([]);
-  };
-
-  // Vuelo suave cuando cambia la zona
+  // Actualizar marcadores al cambiar filtro de sensor o reiniciar animación
   useEffect(() => {
     if (mapRef.current && isLoaded) {
-      mapRef.current.flyTo({ center, zoom, duration: 1800, essential: true });
+      renderHotspotMarkers(mapRef.current, activeSensorFilter);
     }
+  }, [activeSensorFilter, isLoaded, revealSeed, renderHotspotMarkers]);
+
+  // Vuelo suave cuando cambian las coordenadas de selección externa
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return;
+    const prev = prevViewRef.current;
+    if (prev.lng === center[0] && prev.lat === center[1] && prev.zoom === zoom) return;
+    prevViewRef.current = { lng: center[0], lat: center[1], zoom };
+    const isSat = mapStyleModeRef.current === 'satellite';
+    mapRef.current.flyTo({
+      center,
+      zoom: !isSat && zoom === 2.0 ? 3.5 : zoom,
+      pitch: isSat ? 0 : 42,
+      duration: 1500,
+      essential: true,
+    });
   }, [center, zoom, isLoaded]);
 
-  // Loop de auto-rotación
+  // Loop de auto-rotación encadenado con moveend (sin setInterval duplicado)
   useEffect(() => {
-    if (!isLoaded || !isSpinning || isUserInteracting || dibujando) return;
+    if (!isLoaded || !isSpinning || isUserInteracting) {
+      mapRef.current?.stop?.();
+      return;
+    }
     spinGlobe();
-    const interval = window.setInterval(spinGlobe, 1000);
-    return () => clearInterval(interval);
-  }, [isLoaded, isSpinning, isUserInteracting, dibujando, spinGlobe]);
+  }, [isLoaded, isSpinning, isUserInteracting, spinGlobe]);
 
-  const handleResetView = () => {
-    mapRef.current?.flyTo({ center: [-64, -36], zoom: 2.0, duration: 1800, essential: true });
+  const handleToggleStyle = () => {
+    const nextMode = mapStyleMode === 'ign' ? 'satellite' : 'ign';
+    setMapStyleMode(nextMode);
+    mapStyleModeRef.current = nextMode;
+    const map = mapRef.current;
+    if (!map) return;
+
+    const nextStyle = nextMode === 'satellite' ? SATELLITE_GLOBE_STYLE : DEFAULT_GLOBE_STYLE;
+    map.setStyle?.(nextStyle);
+    if (nextMode === 'satellite') {
+      const shouldSpin = !prefersReducedMotion;
+      isSpinningRef.current = shouldSpin;
+      setIsSpinning(shouldSpin);
+      map.setProjection?.({ type: 'globe' });
+      map.flyTo({ center: [-64, -36], zoom: 2.2, pitch: 0, bearing: 0, duration: 1200, essential: true });
+    } else {
+      isSpinningRef.current = false;
+      setIsSpinning(false);
+      map.stop?.();
+      setRevealSeed((s) => s + 1);
+      map.setProjection?.({ type: 'mercator' });
+      map.flyTo({ center: [-64, -36], zoom: 3.5, pitch: 42, bearing: -10, duration: 1200, essential: true });
+    }
   };
 
-  const handleApplyManualToken = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (manualTokenInput.trim()) {
-      setActiveToken(manualTokenInput.trim());
-      setShowTokenPrompt(false);
-      setHasError(false);
-    }
+  const handleResetView = () => {
+    const isSat = mapStyleModeRef.current === 'satellite';
+    mapRef.current?.flyTo({
+      center: [-64, -36],
+      zoom: isSat ? 2.2 : 3.5,
+      pitch: isSat ? 0 : 42,
+      bearing: isSat ? 0 : -10,
+      duration: 1800,
+      essential: true,
+    });
   };
 
   return (
     <div
+      ref={rootRef}
       className={`relative flex flex-col rounded-xl overflow-hidden border border-[#21312D] bg-[#07100F] ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : `w-full h-[520px] lg:h-[580px] ${className}`
+        isFullscreen
+          ? 'fixed inset-0 z-[100] rounded-none w-screen h-screen'
+          : `w-full h-[520px] lg:h-[580px] ${className}`
       }`}
     >
       {/* Barra de cabecera del globo */}
@@ -483,37 +750,86 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#B8EE68]/20 text-[#B8EE68]">
             <GlobeIcon className="h-3.5 w-3.5" />
           </div>
-          <span className="font-title font-bold text-[#EFF5ED]">{t('globe.title')}</span>
-          <span className="hidden xl:inline rounded bg-[#B8EE68]/15 px-2 py-0.5 font-mono text-xs font-bold text-[#B8EE68]">{t('globe.badge')}</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-title font-bold text-[#EFF5ED]">{t('globe.title')}</span>
+              <span className="rounded bg-[#B8EE68]/15 px-2 py-0.5 font-mono text-xs font-bold text-[#B8EE68]">
+                {t('globe.badge')}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Mes que pinta el mapa */}
-        <label className="flex items-center gap-1.5 font-sans text-xs text-[#93A39C]">
-          <span>{isEn ? 'Map month' : 'Mes del mapa'}</span>
-          <input
-            type="month"
-            value={mesMapa ?? ''}
-            min={mesMin}
-            max={mesMax}
-            disabled={!mesMapa}
-            onChange={(e) => e.target.value && onChangeMesMapa?.(e.target.value)}
-            className="rounded-md border border-[#21312D] bg-[#07100F] px-2 py-1 font-mono text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none [color-scheme:dark]"
+        {/* Indicador de canal de sensor activo (sincronizado con selector maestro) */}
+        <div className="hidden sm:flex items-center gap-2 rounded-md border border-[#21312D] bg-[#07100F] px-2.5 py-1 font-mono text-xs text-[#EFF5ED]">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              activeSensorFilter === 'armonizado'
+                ? 'bg-[#B8EE68]'
+                : activeSensorFilter === 'modis'
+                ? 'bg-[#68D9D0]'
+                : 'bg-[#FF9C55]'
+            }`}
           />
-        </label>
+          <span className="font-semibold">
+            {activeSensorFilter === 'armonizado'
+              ? (isEn ? 'HARMONIZED · VIIRS EQUIV' : 'ARMONIZADO · ESCALA VIIRS')
+              : activeSensorFilter === 'modis'
+              ? 'MODIS · 1 km'
+              : 'VIIRS · 375 m'}
+          </span>
+        </div>
 
+        {/* Acciones de control */}
         <div className="flex items-center gap-1.5 font-sans text-xs">
           <button
             type="button"
-            onClick={() => setIsSpinning((prev) => !prev)}
-            aria-pressed={isSpinning}
-            title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
+            onClick={handleToggleStyle}
+            aria-pressed={mapStyleMode === 'satellite'}
+            title={mapStyleMode === 'satellite' ? (isEn ? 'Switch to dark IGN map' : 'Cambiar a mapa oscuro IGN') : (isEn ? 'Switch to satellite view' : 'Cambiar a vista satelital')}
             className={`inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-              isSpinning ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40' : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
+              mapStyleMode === 'satellite'
+                ? 'bg-[#68D9D0]/20 text-[#68D9D0] border border-[#68D9D0]/40'
+                : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
             }`}
           >
-            <RotateCw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t('globe.spin')}</span>
+            <Layers className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{mapStyleMode === 'satellite' ? (isEn ? 'IGN Dark' : 'IGN Oscuro') : (isEn ? 'Satellite' : 'Satélite')}</span>
           </button>
+
+          {mapStyleMode === 'satellite' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsSpinning((prev) => {
+                  const next = !prev;
+                  isSpinningRef.current = next;
+                  if (!next) mapRef.current?.stop?.();
+                  return next;
+                });
+              }}
+              aria-pressed={isSpinning}
+              title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
+              className={`inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                isSpinning
+                  ? 'bg-[#B8EE68]/20 text-[#B8EE68] border border-[#B8EE68]/40'
+                  : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
+              }`}
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t('globe.spin')}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRevealSeed((s) => s + 1)}
+              title={isEn ? 'Replay gradual hotspot reveal' : 'Reproducir aparición gradual de focos'}
+              className="inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md border border-[#B8EE68]/40 bg-[#B8EE68]/15 px-2.5 py-1 text-xs font-medium text-[#B8EE68] transition-colors hover:bg-[#B8EE68]/25"
+            >
+              <Flame className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{isEn ? 'Reveal' : 'Animar'}</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -526,8 +842,10 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
           <button
             type="button"
-            onClick={() => setIsFullscreen((prev) => !prev)}
-            title={isFullscreen ? (isEn ? 'Exit fullscreen' : 'Salir de pantalla completa') : isEn ? 'Fullscreen' : 'Pantalla completa'}
+            onClick={handleToggleFullscreen}
+            aria-pressed={isFullscreen}
+            aria-label={isFullscreen ? (isEn ? 'Exit fullscreen' : 'Salir de pantalla completa') : (isEn ? 'Fullscreen' : 'Pantalla completa')}
+            title={isFullscreen ? (isEn ? 'Exit fullscreen' : 'Salir de pantalla completa') : (isEn ? 'Fullscreen' : 'Pantalla completa')}
             className="flex min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] items-center justify-center rounded-md border border-[#21312D] bg-[#111E1B] p-2 sm:p-1.5 text-[#93A39C] hover:text-[#EFF5ED] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -535,136 +853,140 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         </div>
       </div>
 
-      {/* Viewport del mapa */}
-      <div className="relative flex-1 w-full h-full min-h-[380px] bg-[#050C0B]">
+      {/* Barra de navegación temporal histórica */}
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#07100F] border-b border-[#21312D] text-xs font-mono">
+        <div className="flex items-center gap-1.5 text-[#93A39C]">
+          <Calendar className="h-3.5 w-3.5 text-[#B8EE68]" />
+          <span className="hidden sm:inline">{isEn ? 'Period:' : 'Período:'}</span>
+          <button
+            type="button"
+            disabled={selectedMonth <= minMonth}
+            onClick={() => {
+              userPickedMonthRef.current = true;
+              setIsPlayingTimeline(false);
+              setSelectedMonth((prev) => shiftMonth(prev, -1));
+            }}
+            aria-label={isEn ? 'Previous month' : 'Mes anterior'}
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <input
+            type="month"
+            min={minMonth}
+            max={maxMonth}
+            value={selectedMonth}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              userPickedMonthRef.current = true;
+              setIsPlayingTimeline(false);
+              setSelectedMonth(e.target.value);
+            }}
+            aria-label={isEn ? 'Select historical month' : 'Seleccionar mes histórico'}
+            className="h-7 rounded border border-[#21312D] bg-[#111E1B] px-2 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none [color-scheme:dark]"
+          />
+          <button
+            type="button"
+            disabled={selectedMonth >= maxMonth}
+            onClick={() => {
+              userPickedMonthRef.current = true;
+              setIsPlayingTimeline(false);
+              setSelectedMonth((prev) => shiftMonth(prev, 1));
+            }}
+            aria-label={isEn ? 'Next month' : 'Mes siguiente'}
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <input
+          type="range"
+          min={0}
+          max={totalMonths}
+          value={currentMonthIdx}
+          onChange={(e) => {
+            userPickedMonthRef.current = true;
+            setIsPlayingTimeline(false);
+            setSelectedMonth(shiftMonth(minMonth, Number(e.target.value)));
+          }}
+          aria-label={isEn ? 'Timeline slider' : 'Deslizador temporal'}
+          className="h-1.5 flex-1 min-w-[110px] cursor-pointer accent-[#B8EE68]"
+        />
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPlayingTimeline((p) => !p)}
+            aria-pressed={isPlayingTimeline}
+            className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-medium transition-colors ${
+              isPlayingTimeline
+                ? 'border-[#B8EE68]/50 bg-[#B8EE68]/20 text-[#B8EE68]'
+                : 'border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/40'
+            }`}
+          >
+            {isPlayingTimeline ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            <span>{isPlayingTimeline ? (isEn ? 'Pause' : 'Pausar') : (isEn ? 'Timelapse' : 'Recorrer')}</span>
+          </button>
+          <span
+            className={`min-w-[148px] text-center tabular-nums rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 text-xs text-[#B8EE68] transition-opacity duration-200 ${
+              isLoadingCells ? 'opacity-60' : 'opacity-100'
+            }`}
+          >
+            {totalCellsCount !== null
+              ? `${totalCellsCount} ${isEn ? 'cells' : 'celdas'} · ${selectedMonth}`
+              : `${selectedMonth} · DEMO`}
+          </span>
+        </div>
+      </div>
+
+      {/* Viewport del Mapa 3D */}
+      <div
+        className="relative flex-1 w-full h-full min-h-[380px]"
+        style={{ background: 'radial-gradient(circle at 50% 45%, #0c221f 0%, #050c0b 65%, #020505 100%)' }}
+      >
         <div ref={mapContainerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
 
-        {(!activeToken || showTokenPrompt || hasError) && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-[#07100F]/95 backdrop-blur-md text-[#EFF5ED]">
-            <div className="w-full max-w-md rounded-xl border border-[#21312D] bg-[#0D1816] p-6 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#B8EE68]/20 text-[#B8EE68] mb-3">
-                <Key className="h-6 w-6" />
-              </div>
-              <h3 className="font-title text-base font-bold text-[#EFF5ED]">{t('globe.tokenTitle')}</h3>
-              <p className="mt-2 text-xs text-[#93A39C] leading-relaxed">{t('globe.tokenDesc')}</p>
-              {hasError && (
-                <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#FF6759]/40 bg-[#FF6759]/10 p-2.5 text-left text-xs text-[#FF6759]">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-              <form onSubmit={handleApplyManualToken} className="mt-4 flex flex-col gap-2.5">
-                <input
-                  type="text"
-                  value={manualTokenInput}
-                  onChange={(e) => setManualTokenInput(e.target.value)}
-                  placeholder="pk.eyJ1Ijoi..."
-                  className="w-full rounded-lg border border-[#21312D] bg-[#07100F] px-3 py-2 font-mono text-xs text-[#EFF5ED] placeholder-[#93A39C]/60 focus:border-[#B8EE68] focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!manualTokenInput.trim()}
-                  className="rounded-lg bg-[#B8EE68] px-4 py-2 font-sans text-xs font-bold text-[#07100F] transition-colors hover:bg-[#cbf58c] disabled:opacity-50"
-                >
-                  {t('globe.initBtn')}
-                </button>
-              </form>
-              <div className="mt-4 border-t border-[#21312D] pt-3 text-xs text-[#93A39C] flex items-center justify-between">
-                <span>{t('globe.noToken')}</span>
-                <a href="https://account.mapbox.com/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#B8EE68] hover:underline">
-                  <span>{t('globe.freeAccount')}</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+        {hasError && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-[#07100F]/90 backdrop-blur-md text-[#EFF5ED]">
+            <div className="flex items-center gap-2 rounded-lg border border-[#FF6759]/40 bg-[#FF6759]/10 p-3 text-xs text-[#FF6759]">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
           </div>
         )}
 
-        {/* Leyenda y estado de la capa de celdas */}
-        {activeToken && isLoaded && (
-          <div className="absolute top-3 left-3 z-10 flex max-w-[260px] flex-col gap-1.5 rounded-md border border-[#21312D] bg-[#07100F]/90 p-2.5 backdrop-blur-md text-xs">
+        {/* Leyenda científica de puntos calientes en la esquina del globo */}
+        {isLoaded && (
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 rounded-md border border-[#21312D] bg-[#07100F]/90 p-2.5 backdrop-blur-md text-xs">
             <div className="flex items-center gap-1.5 font-sans text-xs font-semibold text-[#EFF5ED] border-b border-[#21312D] pb-1">
               <Flame className="h-3.5 w-3.5 text-[#FF6759]" />
-              <span>{isEn ? 'Spots per 5 km cell' : 'Focos por celda de 5 km'}</span>
+              <span>{isEn ? 'Thermal Detections' : 'Detecciones Térmicas'}</span>
             </div>
-            <div className="flex items-center gap-1 font-mono text-xs text-[#93A39C]">
-              {RAMPA.map(([v, c]) => (
-                <span key={v} className="flex items-center gap-0.5">
-                  <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: c }} />
-                  <span>{v === 30 ? '30+' : v}</span>
-                </span>
-              ))}
-            </div>
-            <div className="font-mono text-xs" role="status" aria-live="polite">
-              {estadoMapa.tipo === 'cargando' && (
-                <span className="flex items-center gap-1 text-[#93A39C]">
-                  <Loader2 className="h-3 w-3 animate-spin text-[#B8EE68]" />
-                  {isEn ? 'Loading cells…' : 'Cargando celdas…'}
-                </span>
-              )}
-              {estadoMapa.tipo === 'ok' && (
-                <span className="text-[#B8EE68]">
-                  {estadoMapa.celdas.toLocaleString(isEn ? 'en-US' : 'es-AR')} {isEn ? 'cells' : 'celdas'} · {mesMapa} · {capa}
-                </span>
-              )}
-              {estadoMapa.tipo === 'error' && (
-                <span className="flex items-start gap-1 text-[#FF6759]">
-                  <AlertCircle className="h-3 w-3 shrink-0 mt-px" />
-                  {estadoMapa.mensaje}
-                </span>
-              )}
-            </div>
-            <label className="flex items-center gap-1.5 border-t border-[#21312D] pt-1 font-sans text-xs text-[#93A39C] cursor-pointer">
-              <input type="checkbox" checked={mostrarIndustriales} onChange={(e) => setMostrarIndustriales(e.target.checked)} className="accent-[#68D9D0]" />
-              <Factory className="h-3 w-3 text-[#68D9D0]" />
-              <span>{isEn ? 'Fixed sources (excluded)' : 'Fuentes fijas (excluidas)'}</span>
-            </label>
-          </div>
-        )}
-
-        {/* Dibujo de zona */}
-        {activeToken && isLoaded && onPoligonoDibujado && (
-          <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-1.5">
-            {!dibujando ? (
-              <button
-                type="button"
-                onClick={empezarDibujo}
-                className="inline-flex min-h-[32px] items-center gap-1.5 rounded-md border border-[#21312D] bg-[#07100F]/90 px-2.5 py-1 font-sans text-xs font-medium text-[#EFF5ED] backdrop-blur-md hover:border-[#B8EE68]/50"
-              >
-                <Pentagon className="h-3.5 w-3.5 text-[#B8EE68]" />
-                {isEn ? 'Draw area' : 'Dibujar zona'}
-              </button>
-            ) : (
-              <div className="flex flex-col items-end gap-1.5 rounded-md border border-[#B8EE68]/40 bg-[#07100F]/95 p-2 backdrop-blur-md">
-                <span className="font-sans text-xs text-[#93A39C]">
-                  {isEn ? `Click to add points (${vertices.length})` : `Hacé clic para agregar puntos (${vertices.length})`}
-                </span>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={terminarDibujo}
-                    disabled={vertices.length < 3}
-                    className="inline-flex items-center gap-1 rounded-md bg-[#B8EE68] px-2.5 py-1 font-sans text-xs font-bold text-[#07100F] disabled:opacity-50"
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    {isEn ? 'Finish' : 'Terminar'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelarDibujo}
-                    className="inline-flex items-center gap-1 rounded-md border border-[#21312D] bg-[#111E1B] px-2.5 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED]"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    {isEn ? 'Cancel' : 'Cancelar'}
-                  </button>
-                </div>
+            <div className="mt-1 flex flex-col gap-1 font-mono text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#68D9D0]" />
+                <span className="text-[#EFF5ED]">MODIS (1 km)</span>
               </div>
-            )}
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#FF9C55]" />
+                <span className="text-[#EFF5ED]">VIIRS (375 m)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#FF6759]" />
+                <span className="text-[#EFF5ED]">{isEn ? 'High Intensity (>360K)' : 'Alta Intensidad (>360K)'}</span>
+              </div>
+            </div>
+            <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
+              {realHotspots
+                ? (isEn ? 'LIVE API' : 'API EN VIVO')
+                : (isEn ? 'SAMPLE DATA' : 'DATOS DE MUESTRA')}
+            </div>
           </div>
         )}
 
-        {/* Controles de zoom */}
-        {activeToken && isLoaded && (
+        {/* Controles de Zoom */}
+        {isLoaded && (
           <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1 rounded-md border border-[#21312D] bg-[#07100F]/85 p-1 backdrop-blur-md">
             <button
               type="button"
@@ -686,6 +1008,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           </div>
         )}
 
+        {/* Atribución oficial NASA Blue Marble */}
         <div className="absolute bottom-2 left-3 z-10 rounded border border-[#21312D] bg-[#07100F]/85 px-2 py-0.5 font-mono text-xs text-[#93A39C] backdrop-blur-md">
           {t('globe.attribution')}
         </div>

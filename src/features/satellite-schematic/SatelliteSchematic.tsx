@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Layers,
@@ -83,8 +83,27 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
 
   const [isExploded, setIsExploded] = useState(false);
+  const [autoCyclePaused, setAutoCyclePaused] = useState(false);
   const [instrument, setInstrument] = useState<InstrumentMode>('modis');
   const [activeCallout, setActiveCallout] = useState<string | null>(null);
+
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Secuencia automática de desarmado y rearmado de subsistemas (se pausa al interactuar)
+  useEffect(() => {
+    if (prefersReducedMotion || autoCyclePaused || activeCallout !== null) return;
+    const initialTimer = window.setTimeout(() => setIsExploded(true), 600);
+    const cycleTimer = window.setInterval(() => {
+      setIsExploded((prev) => !prev);
+    }, 2400);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(cycleTimer);
+    };
+  }, [prefersReducedMotion, autoCyclePaused, activeCallout]);
 
   const isModis = instrument === 'modis';
 
@@ -169,10 +188,13 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
             </button>
           </div>
 
-          {/* Conmutador Desarmar / Rearmar */}
+          {/* Conmutador Desarmar / Rearmar (pausa la secuencia automática al interactuar) */}
           <button
             type="button"
-            onClick={() => setIsExploded((prev) => !prev)}
+            onClick={() => {
+              setAutoCyclePaused(true);
+              setIsExploded((prev) => !prev);
+            }}
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 text-xs font-mono font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#B8EE68] ${
               isExploded
                 ? 'border-[#B8EE68] bg-[#B8EE68]/20 text-[#B8EE68]'
@@ -227,8 +249,41 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
         </div>
       </div>
 
-      {/* Escena Vectorial Principal: Espacio profundo, horizonte terrestre y satélite en perspectiva */}
-      <div className="relative mt-6 h-[440px] md:h-[520px] w-full rounded-xl border border-[#21312D] bg-gradient-to-b from-[#030706] via-[#050C0B] to-[#0A1614] overflow-hidden select-none">
+      {/* Composición central: tarjetas de subsistemas rodeando el bloque decorativo compacto del satélite */}
+      <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+        {/* Columna izquierda: primeros 3 subsistemas */}
+        <div className="lg:col-span-3 flex flex-col gap-3">
+          {SUBSYSTEMS.slice(0, 3).map((sub) => {
+            const isActive = activeCallout === sub.id;
+            const subName = t(`schematic.subsystems.${sub.id}.name`, { defaultValue: sub.name });
+            const subSpecs = t(`schematic.subsystems.${sub.id}.specs`, { defaultValue: sub.specs });
+            const subDesc = t(`schematic.subsystems.${sub.id}.desc`, { defaultValue: sub.description });
+
+            return (
+              <div
+                key={sub.id}
+                onClick={() => setActiveCallout(isActive ? null : sub.id)}
+                className={`flex-1 flex flex-col justify-between rounded-xl border p-3.5 transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? 'border-[#B8EE68] bg-[#111E1B]'
+                    : 'border-[#21312D] bg-[#0D1816] hover:border-[#2A3F3A] hover:bg-[#111E1B]/70'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    {sub.icon}
+                    <h3 className="text-xs font-bold text-[#EFF5ED]">{subName}</h3>
+                  </div>
+                  <div className="mt-1 font-mono text-[11px] text-[#93A39C]">{subSpecs}</div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-[#93A39C]">{subDesc}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bloque central decorativo compacto del satélite */}
+        <div className="lg:col-span-6 relative h-[280px] sm:h-[320px] lg:h-auto lg:min-h-[340px] w-full rounded-xl border border-[#21312D] bg-gradient-to-b from-[#030706] via-[#050C0B] to-[#0A1614] overflow-hidden select-none">
         {/* Atmósfera curvada y horizonte de la Tierra al fondo */}
         <div className="pointer-events-none absolute -bottom-[420px] left-1/2 h-[600px] w-[1100px] -translate-x-1/2 rounded-[50%] bg-gradient-to-t from-[#0e2722] via-[#08302b] to-[#124d45] opacity-50 blur-[2px]" />
         <div className="pointer-events-none absolute -bottom-[422px] left-1/2 h-[600px] w-[1100px] -translate-x-1/2 rounded-[50%] ring-1 ring-[#68D9D0]/30 shadow-[0_-8px_30px_rgba(104,217,208,0.25)]" />
@@ -606,9 +661,39 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
         </div>
       </div>
 
-      {/* Fila limpia de subsistemas explicados (7 subsistemas de misión) */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {SUBSYSTEMS.map((sub) => {
+        {/* Columna derecha: siguientes 3 subsistemas */}
+        <div className="lg:col-span-3 flex flex-col gap-3">
+          {SUBSYSTEMS.slice(3, 6).map((sub) => {
+            const isActive = activeCallout === sub.id;
+            const subName = t(`schematic.subsystems.${sub.id}.name`, { defaultValue: sub.name });
+            const subSpecs = t(`schematic.subsystems.${sub.id}.specs`, { defaultValue: sub.specs });
+            const subDesc = t(`schematic.subsystems.${sub.id}.desc`, { defaultValue: sub.description });
+
+            return (
+              <div
+                key={sub.id}
+                onClick={() => setActiveCallout(isActive ? null : sub.id)}
+                className={`flex-1 flex flex-col justify-between rounded-xl border p-3.5 transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? 'border-[#B8EE68] bg-[#111E1B]'
+                    : 'border-[#21312D] bg-[#0D1816] hover:border-[#2A3F3A] hover:bg-[#111E1B]/70'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    {sub.icon}
+                    <h3 className="text-xs font-bold text-[#EFF5ED]">{subName}</h3>
+                  </div>
+                  <div className="mt-1 font-mono text-[11px] text-[#93A39C]">{subSpecs}</div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-[#93A39C]">{subDesc}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Fila inferior: 7mo subsistema completando el marco */}
+        {SUBSYSTEMS.slice(6).map((sub) => {
           const isActive = activeCallout === sub.id;
           const subName = t(`schematic.subsystems.${sub.id}.name`, { defaultValue: sub.name });
           const subSpecs = t(`schematic.subsystems.${sub.id}.specs`, { defaultValue: sub.specs });
@@ -618,21 +703,19 @@ export const SatelliteSchematic: React.FC<SatelliteSchematicProps> = ({ onOpen3D
             <div
               key={sub.id}
               onClick={() => setActiveCallout(isActive ? null : sub.id)}
-              className={`flex flex-col justify-between rounded-xl border p-4 transition-all duration-200 cursor-pointer ${
+              className={`lg:col-span-12 flex flex-col justify-between rounded-xl border p-3.5 transition-all duration-200 cursor-pointer ${
                 isActive
                   ? 'border-[#B8EE68] bg-[#111E1B]'
                   : 'border-[#21312D] bg-[#0D1816] hover:border-[#2A3F3A] hover:bg-[#111E1B]/70'
               }`}
             >
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {sub.icon}
-                    <h3 className="text-xs font-bold text-[#EFF5ED]">{subName}</h3>
-                  </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {sub.icon}
+                  <h3 className="text-xs font-bold text-[#EFF5ED]">{subName}</h3>
+                  <span className="font-mono text-[11px] text-[#93A39C]">· {subSpecs}</span>
                 </div>
-                <div className="mt-1 font-mono text-xs text-[#93A39C]">{subSpecs}</div>
-                <p className="mt-2 text-xs leading-relaxed text-[#93A39C]">{subDesc}</p>
+                <p className="text-xs leading-relaxed text-[#93A39C]">{subDesc}</p>
               </div>
             </div>
           );

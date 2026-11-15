@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Table, Loader2, Hash, AlertCircle } from 'lucide-react';
+import { Table, Loader2, Hash, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCalendario, type Capa, type PedidoZona, type PeriodoParams, type Punto } from '../../api';
 
 interface CalendarHeatmapWidgetProps {
@@ -68,6 +68,7 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
   const [hovered, setHovered] = useState<Punto | null>(null);
   const [showTableView, setShowTableView] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [showNumbers, setShowNumbers] = useState(true);
 
   const fmt = (v: number | null) => (v === null ? sinDato : Math.round(v).toLocaleString(locale));
@@ -123,14 +124,14 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
   return (
     <div role="region" aria-label={t('calendar.title')} aria-busy={isLoading} className={`bg-[#0D1816] p-4 text-[#EFF5ED] ${className}`}>
       {/* Encabezado */}
-      <div className="flex flex-col gap-2 border-b border-[#21312D] pb-3">
+      <div className={`flex flex-col gap-2 ${isExpanded ? 'border-b border-[#21312D] pb-3' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <h3 className="font-title text-sm md:text-base font-bold text-[#EFF5ED]">{t('calendar.title')}</h3>
             {isFetching && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#B8EE68]" />}
           </div>
           <div className="flex items-center gap-1.5">
-            {!showTableView && (
+            {isExpanded && !showTableView && (
               <button
                 type="button"
                 onClick={() => setShowNumbers((prev) => !prev)}
@@ -141,13 +142,25 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
                 <span>{showNumbers ? (isEn ? 'Hide values' : 'Ocultar valores') : (isEn ? 'Show values' : 'Mostrar valores')}</span>
               </button>
             )}
+            {isExpanded && (
+              <button
+                type="button"
+                onClick={() => setShowTableView((prev) => !prev)}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
+              >
+                <Table className="h-3.5 w-3.5" />
+                <span>{showTableView ? t('calendar.viewMatrix') : t('calendar.viewTable')}</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setShowTableView((prev) => !prev)}
+              onClick={() => setIsExpanded((prev) => !prev)}
+              aria-expanded={isExpanded}
+              aria-controls="calendar-heatmap-content"
               className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-sans text-xs text-[#93A39C] hover:text-[#EFF5ED] hover:border-[#2A3F3A] transition-colors"
             >
-              <Table className="h-3.5 w-3.5" />
-              <span>{showTableView ? t('calendar.viewMatrix') : t('calendar.viewTable')}</span>
+              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              <span>{isExpanded ? (isEn ? 'Collapse' : 'Ocultar') : (isEn ? 'Expand' : 'Desplegar')}</span>
             </button>
           </div>
         </div>
@@ -165,6 +178,9 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
           )}
         </p>
       </div>
+
+      {isExpanded && (
+        <div id="calendar-heatmap-content">
 
       {error && (
         <p role="alert" className="mt-3 flex items-start gap-1.5 rounded-md border border-[#FF6759]/40 bg-[#FF6759]/10 px-2.5 py-1.5 text-xs text-[#FF6759]">
@@ -202,20 +218,20 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
 
           {!showTableView ? (
             <div className="overflow-x-auto pb-1">
-              <div className="min-w-[580px]">
-                <div className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 mb-1 font-mono text-xs text-[#93A39C] text-center items-center">
-                  <span className="text-left pl-1">{isEn ? 'Year' : 'Año'}</span>
+              <div className="w-full min-w-[360px]">
+                <div className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 mb-1 font-mono text-[10px] sm:text-xs text-[#93A39C] text-center items-center">
+                  <span className="text-left pl-0.5">{isEn ? 'Year' : 'Año'}</span>
                   {months.map((m) => (
-                    <span key={m}>{m}</span>
+                    <span key={m} className="truncate">{m}</span>
                   ))}
-                  <span className="text-right pr-1 font-semibold text-[#EFF5ED]">Total</span>
+                  <span className="text-right pr-0.5 font-semibold text-[#EFF5ED]">Total</span>
                 </div>
 
-                <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-1" role="grid">
+                <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto pr-0.5" role="grid">
                   {years.map((year) => {
                     const yearTotal = getYearTotal(year);
                     return (
-                      <div key={year} role="row" className="grid grid-cols-[44px_repeat(12,1fr)_56px] gap-1 items-center">
+                      <div key={year} role="row" className="grid grid-cols-[38px_repeat(12,minmax(0,1fr))_46px] gap-0.5 sm:gap-1 items-center">
                         <span className="font-mono text-xs font-semibold text-[#93A39C]">{year}</span>
 
                         {Array.from({ length: 12 }, (_, monthIdx) => {
@@ -397,6 +413,8 @@ export const CalendarHeatmapWidget: React.FC<CalendarHeatmapWidgetProps> = ({
           <span className="text-[#687771]">{isEn ? 'Fainter = lower confidence' : 'Más tenue = menor confianza'}</span>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 };

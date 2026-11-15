@@ -76,16 +76,17 @@ export const BackendHealthIndicator: React.FC = () => {
       onFocus={handleMouseEnter}
       onBlur={handleMouseLeave}
     >
-      {/* Botón / Badge activador */}
+      {/* Botón / Indicador compacto de estado */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-label={`${isSpanish ? 'Estado del backend' : 'Backend status'}: ${statusLabel}`}
-        className="group inline-flex items-center gap-2 rounded-md border border-[#21312D] bg-[#0D1816] px-2.5 py-1 font-mono text-xs text-[#EFF5ED] transition-all hover:border-[#2A3F3A] hover:bg-[#111E1B] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
+        title={`${statusLabel}${metadata?.factores_version && isOnline ? ` · v${metadata.factores_version}` : ''}`}
+        className="group inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#21312D] bg-[#0D1816] transition-all hover:border-[#2A3F3A] hover:bg-[#111E1B] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
       >
         {/* Indicador LED con animación de pulso cuando está online */}
-        <span className="relative flex h-2 w-2 items-center justify-center">
+        <span className="relative flex h-2.5 w-2.5 items-center justify-center">
           {isOnline && (
             <span
               className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
@@ -93,18 +94,10 @@ export const BackendHealthIndicator: React.FC = () => {
             />
           )}
           <span
-            className="relative inline-flex h-2 w-2 rounded-full"
+            className="relative inline-flex h-2.5 w-2.5 rounded-full"
             style={{ backgroundColor: statusColor }}
           />
         </span>
-
-        <span className="font-semibold">{statusLabel}</span>
-
-        {metadata?.factores_version && isOnline && (
-          <span className="hidden sm:inline text-[#93A39C] text-[11px]">
-            v{metadata.factores_version}
-          </span>
-        )}
       </button>
 
       {/* Tooltip / Tarjeta flotante al pasar el mouse */}
