@@ -41,7 +41,8 @@ vi.mock('maplibre-gl', () => {
   const Popup = vi.fn().mockImplementation(() => ({
     setHTML: vi.fn().mockReturnThis(),
   }));
-  return { Map, Marker, Popup, default: { Map, Marker, Popup } };
+  const setWorkerUrl = vi.fn();
+  return { Map, Marker, Popup, setWorkerUrl, default: { Map, Marker, Popup, setWorkerUrl } };
 });
 
 describe('GloboTerraqueo 3D Component', () => {
@@ -272,5 +273,16 @@ describe('GloboTerraqueo 3D Component', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(fsBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('registers the bundled MapLibre worker URL on initialization', async () => {
+    vi.resetModules();
+    const maplibregl = await import('maplibre-gl');
+    await import('../src/features/globe/GloboTerraqueo');
+
+    expect(maplibregl.setWorkerUrl).toHaveBeenCalledTimes(1);
+    const [workerUrl] = vi.mocked(maplibregl.setWorkerUrl).mock.calls[0];
+    expect(typeof workerUrl).toBe('string');
+    expect(workerUrl.length).toBeGreaterThan(0);
   });
 });
