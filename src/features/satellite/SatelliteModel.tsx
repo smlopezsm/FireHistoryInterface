@@ -9,13 +9,20 @@ interface SatelliteModelProps {
   rotationSpeed?: number;
 }
 
+const FALLBACK_TGA_TEXTURE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
 export const SatelliteModel: React.FC<SatelliteModelProps> = ({
   modelPath,
   autoRotate = true,
   rotationSpeed = 0.2,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF(modelPath);
+  const { scene } = useGLTF(modelPath, undefined, undefined, (loader) => {
+    loader.manager.setURLModifier((url) =>
+      url.toLowerCase().endsWith('.tga') ? FALLBACK_TGA_TEXTURE : url
+    );
+  });
 
   // Clonar la escena para evitar efectos secundarios al intercambiar modelos
   const clonedScene = useMemo(() => {

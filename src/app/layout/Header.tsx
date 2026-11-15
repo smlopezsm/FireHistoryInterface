@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites, 
         </div>
 
         <nav
-          aria-label="Secciones principales"
+          aria-label={t('header.nav.ariaLabel')}
           className="col-span-2 row-start-2 flex items-stretch gap-2 font-sans text-xs lg:col-span-1 lg:col-start-2 lg:row-start-1"
         >
           <button

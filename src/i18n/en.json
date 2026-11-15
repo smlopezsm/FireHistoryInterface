@@ -16,6 +16,7 @@
     "title": "Fire History Interface",
     "subtitle": "MODIS & VIIRS hot spots · Argentina, 2000 → now",
     "nav": {
+      "ariaLabel": "Main sections",
       "calendar": "Calendar",
       "mission": "The mission"
     },
@@ -29,6 +30,7 @@
     "methodCta": "How is harmonization calculated?",
     "satelliteCta": "Explore 3D Satellites (NASA GLB)",
     "scientificNote": "Scientific note:",
+    "scientificNoteAriaLabel": "Thermal observation technical note",
     "disclaimer": "A hot spot is a satellite-detected thermal anomaly in an observation cell, not necessarily an individual fire or its active perimeter. Prior to 2012, calibrated estimates harmonize the scale from MODIS to VIIRS."
   },
   "methodDialog": {

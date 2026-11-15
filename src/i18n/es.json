@@ -16,6 +16,7 @@
     "title": "Fire History Interface",
     "subtitle": "Focos MODIS y VIIRS · Argentina, 2000 → hoy",
     "nav": {
+      "ariaLabel": "Secciones principales",
       "calendar": "Calendario",
       "mission": "La misión"
     },
@@ -29,6 +30,7 @@
     "methodCta": "¿Cómo se calcula la armonización?",
     "satelliteCta": "Explorar Satélites en 3D (NASA GLB)",
     "scientificNote": "Nota científica:",
+    "scientificNoteAriaLabel": "Nota técnica de observación térmica",
     "disclaimer": "Un punto caliente (hot spot) es una anomalía térmica detectada por satélite en una celda de observación, no necesariamente un incendio individual o su perímetro activo. Antes de 2012, las estimaciones calibradas armonizan la escala de MODIS a VIIRS."
   },
   "methodDialog": {
