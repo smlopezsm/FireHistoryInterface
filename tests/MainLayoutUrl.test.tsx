@@ -13,6 +13,7 @@ vi.mock('../src/features/globe', () => ({
 }));
 
 const provincias = [
+  { provincia_id: '14', nombre: 'Córdoba', region: 'Pampeana', bbox: [-65.77, -35.02, -61.77, -29.5], geometria: null },
   { provincia_id: '74', nombre: 'San Luis', region: 'Cuyo', bbox: [-67.4, -36, -64.9, -31.8], geometria: null },
   { provincia_id: '70', nombre: 'San Juan', region: 'Cuyo', bbox: [-70.6, -32.6, -66.7, -28.4], geometria: null },
 ];
@@ -107,8 +108,11 @@ describe('MainLayout · estado en la URL', () => {
     await waitFor(() => expect(screen.getByTestId('globo')).toHaveAttribute('data-mes', '2024-08'));
     await waitFor(() => expect(new URLSearchParams(window.location.search).has('mes')).toBe(false));
 
-    fireEvent.click(screen.getByText('Download CSV'));
-    fireEvent.click(screen.getByRole('button', { name: /Calendar.*MODIS, VIIRS and harmonized/ }));
+    const descargarCalendario = screen.getByRole('button', { name: /Calendar.*MODIS, VIIRS and harmonized/ });
+    expect(descargarCalendario).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Layer' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Calendar color scale' })).toBeVisible();
+    fireEvent.click(descargarCalendario);
     await waitFor(() => expect(api.descargarCsv).toHaveBeenLastCalledWith(
       { provincia_id: '74' },
       { tipo: 'calendario', desde: '2024-07', hasta: '2024-08' },
@@ -132,6 +136,26 @@ describe('MainLayout · estado en la URL', () => {
     await waitFor(() => expect(api.getAnomalia).toHaveBeenLastCalledWith(
       expect.anything(), { mes: '2026-11' }, expect.anything(),
     ));
+  });
+
+  it('restaura el caso con la provincia del catálogo y sale sin perder la selección', async () => {
+    irA('?caso=sierras-cordoba&paso=armonizacion&desde=2008-08&hasta=2008-10&mes=2008-09');
+    render(<Providers><MainLayout /></Providers>);
+
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('zona')).toBe('prov:14'));
+    await waitFor(() => expect(screen.getByTestId('globo')).toHaveAttribute('data-mes', '2008-09'));
+    expect(api.getCalendario).toHaveBeenLastCalledWith(
+      { provincia_id: '14' },
+      { desde: '2008-08', hasta: '2008-10', capa: 'armonizado' },
+      expect.anything(),
+    );
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('caso')).toBeNull());
+    expect(new URLSearchParams(window.location.search).get('zona')).toBe('prov:14');
+    expect(new URLSearchParams(window.location.search).get('mes')).toBe('2008-09');
+    expect(screen.getByRole('button', { name: 'Learn with the Córdoba case' })).toHaveFocus();
+    localStorage.removeItem('fuegocontinuo-invitacion-cordoba');
   });
 
 });

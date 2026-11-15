@@ -19,7 +19,6 @@ interface DownloadsWidgetProps {
   mesMapa: string | null;
   fechaMin?: string;
   fechaMax?: string;
-  className?: string;
 }
 
 type Tipo = "calendario" | "focos";
@@ -31,9 +30,8 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
   mesMapa,
   fechaMin,
   fechaMax,
-  className = "",
 }) => {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith("es"));
   const [downloading, setDownloading] = useState<Tipo | null>(null);
   const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -64,6 +62,8 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
   };
 
   const disabled = downloading !== null || !pedido;
+  const titulo = isEn ? "Download CSV" : "Descargar CSV";
+  const botonDescarga = "flex min-w-0 items-start gap-2 rounded-md border border-[#2A3F3A] bg-[#111E1B] px-3 py-2 text-left hover:border-[#B8EE68]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B8EE68] disabled:opacity-50";
 
   const mesInicial = periodo.desde ?? fechaMin?.slice(0, 7);
   const mesFinal = periodo.hasta ?? fechaMax?.slice(0, 7);
@@ -72,16 +72,14 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
     : (isEn ? "Full record" : "Todo el registro");
 
   return (
-    <details aria-label={t("downloads.title")} className={`text-[#EFF5ED] ${className}`}>
-      <summary className="min-h-10 cursor-pointer rounded-md px-2 py-2 text-sm text-[#C8D3CE] hover:text-[#EFF5ED]">
-        {isEn ? "Download CSV" : "Descargar CSV"}
-      </summary>
-      <div className="grid gap-2">
+    <section aria-labelledby="titulo-descargas" className="grid gap-2 border-t border-[#21312D] pt-3 text-[#EFF5ED] sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-x-4">
+      <h2 id="titulo-descargas" className="text-sm font-medium sm:pt-2.5">{titulo}</h2>
+      <div className="grid gap-2 sm:grid-cols-2">
         <button
           type="button"
           onClick={() => handleDownload("calendario")}
           disabled={disabled}
-          className="flex items-start gap-2 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 text-left hover:border-[#B8EE68]/40 disabled:opacity-50"
+          className={botonDescarga}
         >
           {downloading === "calendario" ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" /> : <Download className="mt-0.5 h-4 w-4 shrink-0" />}
           <span className="text-sm">
@@ -93,7 +91,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
           type="button"
           onClick={() => handleDownload("focos")}
           disabled={disabled || !rangoFocos}
-          className="flex items-start gap-2 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 text-left hover:border-[#B8EE68]/40 disabled:opacity-50"
+          className={botonDescarga}
         >
           {downloading === "focos" ? <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" /> : <Download className="mt-0.5 h-4 w-4 shrink-0" />}
           <span className="text-sm">
@@ -110,12 +108,12 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
       {mensaje && (
         <p
           role={mensaje.ok ? "status" : "alert"}
-          className={`flex items-start gap-1.5 text-xs ${mensaje.ok ? "text-[#B8EE68]" : "text-[#FF6759]"}`}
+          className={`flex items-start gap-1.5 text-xs sm:col-start-2 ${mensaje.ok ? "text-[#B8EE68]" : "text-[#FF6759]"}`}
         >
           {mensaje.ok ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-px" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-px" />}
           <span>{mensaje.texto}</span>
         </p>
       )}
-    </details>
+    </section>
   );
 };

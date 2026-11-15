@@ -7,9 +7,10 @@ import { App } from '../src/app/App';
 describe('App Shell Layout & i18n (English Default)', () => {
   beforeEach(() => {
     i18n.changeLanguage('en');
+    localStorage.setItem('fuegocontinuo-invitacion-cordoba', '1');
   });
 
-  it('renders header, main layout and footer in English by default', async () => {
+  it('renders header, main layout and footer in English by default', () => {
     render(
       <Providers>
         <App />
@@ -17,17 +18,34 @@ describe('App Shell Layout & i18n (English Default)', () => {
     );
 
     // Header title
-    expect(screen.getByRole('heading', { name: /FuegoContinuo/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'FuegoContinuo' })).toBeInTheDocument();
 
     // Check key widgets in main layout in English
     expect(screen.getByRole('combobox', { name: 'Area' })).toBeInTheDocument();
-    // El globo se carga de forma diferida (React.lazy).
-    expect((await screen.findAllByText(/3D Earth Globe/i))[0]).toBeInTheDocument();
+    // La región del mapa está disponible durante la carga diferida del globo.
+    expect(screen.getByRole('region', { name: /3D Earth Globe/i })).toBeInTheDocument();
     expect(screen.getAllByText(/Monthly Anomaly/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Monthly calendar/i)[0]).toBeInTheDocument();
 
     // Footer sources
     expect(screen.getByText(/NASA FIRMS/i)).toBeInTheDocument();
+  });
+
+  it('offers the Córdoba guide once and keeps its entry in the header', () => {
+    localStorage.removeItem('fuegocontinuo-invitacion-cordoba');
+    const app = () => render(<Providers><App /></Providers>);
+    const firstVisit = app();
+
+    expect(screen.getByRole('dialog', { name: 'Would you like a guided tour?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start guided experience' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Explore on my own' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Learn with the Córdoba case' })).toHaveFocus();
+
+    firstVisit.unmount();
+    app();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Learn with the Córdoba case' })).toBeInTheDocument();
   });
 
   it('toggles language between English and Spanish when clicking language button', () => {

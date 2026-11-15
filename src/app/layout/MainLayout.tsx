@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import {
@@ -11,12 +11,19 @@ import {
 } from '../../features/dashboard';
 import { claveDeZona, escribirEstado, leerEstado, zonaDeClave } from '../estadoUrl';
 import { CargarAlVer } from '../CargarAlVer';
+import { Header } from './Header';
+import { ExperienciaCordoba } from '../../features/cordoba/ExperienciaCordoba';
+import {
+  CLAVE_PROVINCIA_CORDOBA, EXTENSION_CONAE, MES_ESTIMADO, PERIODO_ESTIMADO, PERIODO_EPISODIO, PRODUCTO_CONAE,
+  TESELAS_CONAE, seleccionDelPaso, type PasoCordoba,
+} from '../../features/cordoba/caso';
 
 // El globo trae MapLibre (~300 kB gzip): se descarga recién cuando el mapa se acerca a la
 // pantalla, así no compite con la anomalía y el calendario en la carga inicial.
 const GloboTerraqueo = lazy(() => import('../../features/globe').then((m) => ({ default: m.GloboTerraqueo })));
 import {
   useAnomalia,
+  useCalendario,
   useMetadata,
   useProvincias,
   esZonaRegion,
@@ -35,26 +42,33 @@ interface MainLayoutProps {
   onOpenSatellites?: () => void;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
+export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSatellites }) => {
   const { t } = useTranslation();
 
   // Estado inicial desde la URL (docs/02 §6): se puede compartir y sobrevive a recargar.
   const [inicial] = useState(() => (typeof window !== 'undefined' ? leerEstado(window.location.search) : {}));
+  const [pasoCordoba, setPasoCordoba] = useState<PasoCordoba | null>(inicial.pasoCordoba ?? null);
+  const guiaRef = useRef<HTMLButtonElement>(null);
+  const [celdaAbierta, setCeldaAbierta] = useState(false);
+  const [conaeVisible, setConaeVisible] = useState(false);
+  const [errorCaso, setErrorCaso] = useState(false);
   const [zona, setZona] = useState<ZonaSeleccionada>(() => zonaDeClave(inicial.zona ?? 'arg', []) ?? ZONA_ARGENTINA);
   // Las provincias y regiones de la URL requieren el catálogo.
   const [zonaPendiente, setZonaPendiente] = useState(() => {
-    const clave = inicial.zona;
+    const clave = inicial.pasoCordoba ? CLAVE_PROVINCIA_CORDOBA : inicial.zona;
     return clave?.startsWith('prov:') || clave?.startsWith('region:') ? clave : null;
   });
   const [escalaFija, setEscalaFija] = useState(false);
-  const [capa, setCapa] = useState<Capa>(inicial.capa ?? 'armonizado');
-  const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(
-    inicial.desde && inicial.hasta ? { desde: inicial.desde, hasta: inicial.hasta } : null
+  const [capa, setCapa] = useState<Capa>(inicial.capa ??
+    (inicial.pasoCordoba && !inicial.zona ? seleccionDelPaso(inicial.pasoCordoba).capa : 'armonizado'),
   );
-  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(inicial.mes ?? null);
+  const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(
+    inicial.desde && inicial.hasta ? { desde: inicial.desde, hasta: inicial.hasta } : inicial.pasoCordoba ? PERIODO_EPISODIO : null
+  );
+  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(inicial.mes ?? (inicial.pasoCordoba ? seleccionDelPaso(inicial.pasoCordoba).mes : null));
 
   const { data: metadata, isError: metadataError } = useMetadata();
-  const { data: apiProvincias } = useProvincias();
+  const { data: apiProvincias, isError: provinciasError } = useProvincias();
   const mesMin = metadata ? aMes(metadata.fecha_min) : undefined;
   const mesMax = metadata ? aMes(metadata.fecha_max) : undefined;
 
@@ -75,11 +89,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
   const mesMapa = metadata ? (mesEnRango ?? mesSugerido) : null;
 
   useEffect(() => {
-    if (!zonaPendiente || !apiProvincias) return;
-    const resuelta = zonaDeClave(zonaPendiente, apiProvincias);
+    if (!zonaPendiente || (!apiProvincias && !provinciasError)) return;
+    const resuelta = zonaDeClave(zonaPendiente, apiProvincias ?? []);
     if (resuelta) setZona(resuelta);
+    else if (pasoCordoba && zonaPendiente === CLAVE_PROVINCIA_CORDOBA) {
+      setPasoCordoba(null);
+      setErrorCaso(true);
+    }
     setZonaPendiente(null);
-  }, [zonaPendiente, apiProvincias]);
+  }, [zonaPendiente, apiProvincias, provinciasError, pasoCordoba]);
 
   useEffect(() => {
     if (!metadata) return;
@@ -87,12 +105,39 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
     if (mesMapaUsuario && !mesEnRango) setMesMapaUsuario(null);
   }, [metadata, fueraDeDatos, mesMapaUsuario, mesEnRango]);
 
+  const cambiarPasoCordoba = (paso: PasoCordoba | null) => {
+    setPasoCordoba(paso);
+    setConaeVisible(false);
+    setCeldaAbierta(false);
+    if (!paso) return;
+    const seleccion = seleccionDelPaso(paso);
+    const provincia = zonaDeClave(CLAVE_PROVINCIA_CORDOBA, apiProvincias ?? []);
+    if (provincia) {
+      setZonaPendiente(null);
+      setZona(provincia);
+    } else {
+      setZonaPendiente(CLAVE_PROVINCIA_CORDOBA);
+    }
+    setErrorCaso(false);
+    setPeriodoUsuario(PERIODO_EPISODIO);
+    setCapa(seleccion.capa);
+    setMesMapaUsuario(seleccion.mes);
+  };
+
+  const verEstimacionCordoba = () => {
+    setCapa('armonizado');
+    setPeriodoUsuario(PERIODO_ESTIMADO);
+    setMesMapaUsuario(MES_ESTIMADO);
+  };
+
   const cambiarPeriodo = (siguiente: Periodo) => {
+    if (pasoCordoba) cambiarPasoCordoba(null);
     setPeriodoUsuario(siguiente);
     setMesMapaUsuario((mes) => mes && mes >= siguiente.desde && mes <= siguiente.hasta ? mes : null);
   };
 
   const cambiarZona = (siguiente: ZonaSeleccionada) => {
+    if (pasoCordoba) cambiarPasoCordoba(null);
     setZonaPendiente(null);
     setZona(siguiente);
   };
@@ -106,14 +151,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
       hasta: periodoElegido?.hasta,
       capa,
       mes: (metadata ? mesEnRango : mesMapaUsuario) ?? undefined,
+      pasoCordoba: pasoCordoba ?? undefined,
     });
     if (query !== window.location.search) {
       window.history.replaceState(window.history.state, '', `${window.location.pathname}${query}${window.location.hash}`);
     }
-  }, [zona, zonaPendiente, periodoElegido, capa, mesMapaUsuario, mesEnRango, metadata]);
+  }, [zona, zonaPendiente, periodoElegido, capa, mesMapaUsuario, mesEnRango, metadata, pasoCordoba]);
 
   const pedido = useMemo(() => (zonaPendiente ? null : pedidoDeZona(zona)), [zona, zonaPendiente]);
   const anomalia = useAnomalia(mesMapa ? pedido : null, mesMapa ?? undefined);
+  const detalleCordoba = useCalendario(pasoCordoba && mesMapa ? pedido : null, { ...periodoParams, capa });
+  const mesCordoba = detalleCordoba.data?.meses.find((punto) => punto.periodo === mesMapa);
+  const abrirCeldaCordoba = useCallback(() => setCeldaAbierta(true), []);
 
   const preliminar = Boolean(
     metadata && anomalia.data && anomalia.data.mes > aMes(metadata.fecha_ultimo_sp),
@@ -191,6 +240,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
             zoom={zona.zoom}
             bbox={zona.bbox}
             mostrarLimites={zonaPorCoordenadas}
+            onInspectCell={pasoCordoba === 'mapa' ? abrirCeldaCordoba : undefined}
+            historicalRasterTiles={conaeVisible ? TESELAS_CONAE : undefined}
+            historicalRasterSource={PRODUCTO_CONAE}
+            historicalRasterBounds={EXTENSION_CONAE}
             capa={capa}
             month={mesMapa ?? undefined}
             mesDesde={periodo.desde || undefined}
@@ -199,7 +252,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
             geometriaZona={zona.geometria}
             selectedProvinciaId={zona.provincia_id}
             selectedProvinciaIds={selectedProvinciaIds}
-            onSelectProvincia={handleSelectProvinciaFromMap}
+            onSelectProvincia={pasoCordoba ? undefined : handleSelectProvinciaFromMap}
             className="flex-1 rounded-none border-0"
           />
         </Suspense>
@@ -207,7 +260,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
     </CargarAlVer>
   );
 
-  const descargas = (className: string) => (
+  const descargas = (
     <DownloadsWidget
       zonaNombre={zonaNombre}
       pedido={pedido}
@@ -215,7 +268,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
       mesMapa={mesMapa}
       fechaMin={metadata?.fecha_min}
       fechaMax={metadata?.fecha_max}
-      className={className}
     />
   );
 
@@ -249,53 +301,82 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
           className="rounded-none border-0 bg-transparent"
         />
       </div>
-      <AnomalyWidget
-        zonaNombre={zonaNombre}
-        data={anomalia.data}
-        isLoading={anomalia.isLoading}
-        error={anomalia.error}
-        preliminar={preliminar}
-        className="rounded-none border-0 bg-transparent"
-      />
+      <div id="comparacion-historica" className="scroll-mt-24">
+        <AnomalyWidget
+          zonaNombre={zonaNombre}
+          data={anomalia.data}
+          isLoading={anomalia.isLoading}
+          error={anomalia.error}
+          preliminar={preliminar}
+          className="rounded-none border-0 bg-transparent"
+        />
+      </div>
     </>
   );
 
   return (
-    <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 md:px-8 space-y-6">
-      <div id="explorar" className="scroll-mt-20 space-y-4">
-        <div className="flex flex-col gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 lg:flex-row lg:items-start">
-          {selector}
-          {descargas('lg:max-w-64 lg:pt-6')}
+    <>
+      <Header
+        onOpenMethod={onOpenMethod}
+        onOpenSatellites={onOpenSatellites}
+        onStartGuide={() => cambiarPasoCordoba('calendario')}
+        guideButtonRef={guiaRef}
+      />
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 md:px-8 space-y-6">
+        <div id="explorar" className="scroll-mt-20 space-y-4">
+          {errorCaso && <p role="alert" className="text-sm text-[#FF9C55]">{t('cordoba.provinceUnavailable')}</p>}
+          <ExperienciaCordoba
+            paso={pasoCordoba}
+            guideButtonRef={guiaRef}
+            onPaso={cambiarPasoCordoba}
+            mes={mesMapa}
+            capa={capa}
+            celdaAbierta={celdaAbierta}
+            datoMes={mesCordoba}
+            anomalia={anomalia.data}
+            mostrarConae={conaeVisible}
+            onVerEstimacion={verEstimacionCordoba}
+          />
+          <div id="filtros-explorador" className="scroll-mt-24 space-y-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4">
+            {selector}
+            {descargas}
+          </div>
+          <div className="grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5">
+            <section
+              aria-label={t('zone.calendarAndComparison')}
+              className="min-w-0 overflow-hidden rounded-xl border border-[#21312D] bg-[#0D1816] divide-y divide-[#21312D] lg:col-span-5 lg:col-start-8 lg:row-start-1"
+            >
+              {diagnostico}
+            </section>
+            <section
+              id="mapa"
+              aria-label={t('globe.title')}
+              className="flex h-[420px] min-w-0 flex-col scroll-mt-20 overflow-hidden rounded-xl border border-[#21312D] bg-[#07100F] lg:col-span-7 lg:col-start-1 lg:row-start-1 lg:h-auto lg:min-h-[560px] lg:self-stretch xl:min-h-[620px]"
+            >
+              {pasoCordoba === 'recurrencia' && (
+                <label className="flex min-h-10 items-center gap-2 border-b border-[#21312D] px-4 py-2 text-sm">
+                  <input type="checkbox" className="h-4 w-4 accent-[#B8EE68]" checked={conaeVisible} onChange={(e) => setConaeVisible(e.target.checked)} />
+                  {t('cordoba.historicalLayer')}
+                </label>
+              )}
+              {globo}
+            </section>
+            {serie('min-w-0 overflow-hidden rounded-xl border border-[#21312D] bg-[#0D1816] lg:col-span-12')}
+          </div>
         </div>
-        <div className="grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5">
-          <section
-            aria-label={t('zone.calendarAndComparison')}
-            className="min-w-0 overflow-hidden rounded-xl border border-[#21312D] bg-[#0D1816] divide-y divide-[#21312D] lg:col-span-5 lg:col-start-8 lg:row-start-1"
-          >
-            {diagnostico}
-          </section>
-          <section
-            id="mapa"
-            aria-label={t('globe.title')}
-            className="flex h-[420px] min-w-0 flex-col scroll-mt-20 overflow-hidden rounded-xl border border-[#21312D] bg-[#07100F] lg:col-span-7 lg:col-start-1 lg:row-start-1 lg:h-auto lg:min-h-[560px] lg:self-stretch xl:min-h-[620px]"
-          >
-            {globo}
-          </section>
-          {serie('min-w-0 overflow-hidden rounded-xl border border-[#21312D] bg-[#0D1816] lg:col-span-12')}
-        </div>
-      </div>
 
-      <aside
-        aria-label="Nota técnica de observación térmica"
-        className="flex items-start gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 text-xs text-[#93A39C]"
-      >
-        <Info className="h-4 w-4 shrink-0 text-[#68D9D0] mt-0.5" aria-hidden="true" />
-        <p className="leading-relaxed">
-          <strong className="font-semibold text-[#EFF5ED]">{t('hero.scientificNote')} </strong>
-          {t('hero.disclaimer')}
-        </p>
-      </aside>
+        <aside
+          aria-label="Nota técnica de observación térmica"
+          className="flex items-start gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 text-xs text-[#93A39C]"
+        >
+          <Info className="h-4 w-4 shrink-0 text-[#68D9D0] mt-0.5" aria-hidden="true" />
+          <p className="leading-relaxed">
+            <strong className="font-semibold text-[#EFF5ED]">{t('hero.scientificNote')} </strong>
+            {t('hero.disclaimer')}
+          </p>
+        </aside>
 
-    </main>
+      </main>
+    </>
   );
 };

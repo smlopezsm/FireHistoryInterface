@@ -1,5 +1,4 @@
 import React, { useState, Suspense } from 'react';
-import { Header } from './layout/Header';
 import { MainLayout } from './layout/MainLayout';
 import { Footer } from './layout/Footer';
 import { MethodDialog } from './MethodDialog';
@@ -17,10 +16,6 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#07100F] text-[#EFF5ED] selection:bg-[#B8EE68] selection:text-[#07100F]">
-      <Header
-        onOpenMethod={() => setIsMethodOpen(true)}
-        onOpenSatellites={() => setIsSatellitesOpen(true)}
-      />
       <MainLayout
         onOpenMethod={() => setIsMethodOpen(true)}
         onOpenSatellites={() => setIsSatellitesOpen(true)}

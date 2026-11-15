@@ -1,9 +1,17 @@
 {
+  "cordoba": {
+    "guideLink": "Learn with the Córdoba case",
+    "invitationTitle": "Would you like a guided tour?",
+    "invitationDetail": "Use the calendar and map to explore a real case: the September 2020 fires in Córdoba.",
+    "startGuide": "Start guided experience",
+    "exploreAlone": "Explore on my own",
+    "historicalLayer": "Historical burned area · CONAE",
+    "provinceUnavailable": "Córdoba is unavailable in the API province catalog."
+  },
   "header": {
     "title": "FuegoContinuo",
     "subtitle": "Harmonization of MODIS and VIIRS hot spots in Argentina (2000 → today).",
     "nav": {
-      "explore": "Explore",
       "calendar": "Calendar",
       "mission": "The mission"
     },

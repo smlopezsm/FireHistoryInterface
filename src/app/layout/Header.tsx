@@ -1,15 +1,17 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Flame, Globe, HelpCircle, Orbit } from 'lucide-react';
+import { Compass, Flame, Globe, HelpCircle, Orbit } from 'lucide-react';
 import { useMetadata } from '../../api';
 import { BackendHealthIndicator } from './BackendHealthIndicator';
 
 interface HeaderProps {
   onOpenMethod?: () => void;
   onOpenSatellites?: () => void;
+  onStartGuide: () => void;
+  guideButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites, onStartGuide, guideButtonRef }) => {
   const { t, i18n } = useTranslation();
   const { data: metadata } = useMetadata();
   const isSpanish = Boolean(i18n?.language?.startsWith('es'));
@@ -58,22 +60,23 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
           </div>
         </div>
 
-        {/* Navegación central: Explorar / Calendario / La misión */}
         <nav
           aria-label="Secciones principales"
-          className="hidden md:flex items-center gap-1 font-sans text-xs text-[#93A39C] rounded-md border border-[#21312D] bg-[#0D1816] p-1"
+          className="order-last flex w-full items-center gap-2 font-sans text-xs md:order-none md:w-auto"
         >
           <button
             type="button"
-            onClick={() => scrollToSection('explorar')}
-            className="rounded px-2.5 py-1 hover:text-[#EFF5ED] hover:bg-[#111E1B] transition-colors focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
+            ref={guideButtonRef}
+            onClick={onStartGuide}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md bg-[#B8EE68] px-3 py-1.5 font-semibold text-[#07100F] transition-colors hover:bg-[#CBF58C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B8EE68] md:flex-initial"
           >
-            {t('header.nav.explore')}
+            <Compass className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {t('cordoba.guideLink')}
           </button>
           <button
             type="button"
             onClick={() => scrollToSection('calendario')}
-            className="rounded px-2.5 py-1 hover:text-[#EFF5ED] hover:bg-[#111E1B] transition-colors focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
+            className="hidden min-h-10 items-center rounded-md border border-[#21312D] bg-[#0D1816] px-3 text-[#C8D3CE] transition-colors hover:text-[#EFF5ED] hover:bg-[#111E1B] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B8EE68] md:inline-flex"
           >
             {t('header.nav.calendar')}
           </button>

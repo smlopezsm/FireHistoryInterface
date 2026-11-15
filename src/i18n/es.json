@@ -1,9 +1,17 @@
 {
+  "cordoba": {
+    "guideLink": "Aprendé con el caso de Córdoba",
+    "invitationTitle": "¿Querés explorar con una guía?",
+    "invitationDetail": "Usá el calendario y el mapa con un caso real: los incendios de Córdoba de septiembre de 2020.",
+    "startGuide": "Empezar experiencia asistida",
+    "exploreAlone": "Explorar por mi cuenta",
+    "historicalLayer": "Área quemada histórica · CONAE",
+    "provinceUnavailable": "Córdoba no figura en el catálogo de provincias de la API."
+  },
   "header": {
     "title": "FuegoContinuo",
     "subtitle": "Armonización de puntos calientes MODIS y VIIRS en Argentina (2000 → hoy).",
     "nav": {
-      "explore": "Explorar",
       "calendar": "Calendario",
       "mission": "La misión"
     },

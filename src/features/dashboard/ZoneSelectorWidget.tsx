@@ -75,8 +75,8 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
   };
 
   return (
-    <div role="region" aria-label={t("zone.title")} className="min-w-0 flex-1 text-[#EFF5ED]">
-      <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1fr)_minmax(14rem,1fr)_auto]">
+    <div role="region" aria-label={t("zone.title")} className="min-w-0 text-[#EFF5ED]">
+      <div className="grid items-start gap-3 min-[420px]:grid-cols-2 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.85fr)_minmax(0,1fr)]">
         <div className="space-y-1.5">
           <label htmlFor="zone-select" className="block text-sm font-medium">{isEn ? "Area" : "Zona"}</label>
           <select
@@ -103,28 +103,21 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
           {error && <p role="alert" className="text-xs text-[#FF9C55]">{error.message}</p>}
         </div>
         <PeriodRangePicker periodo={periodo} onChangePeriodo={onChangePeriodo} mesMin={mesMin} mesMax={mesMax} metadataError={metadataError} isEn={isEn} />
-        <details className="sm:col-span-2 lg:col-span-1 lg:pt-6">
-          <summary className="min-h-10 cursor-pointer rounded-md px-2 py-2 text-sm text-[#C8D3CE] hover:text-[#EFF5ED]">
-            {isEn ? "Data options" : "Opciones de datos"}
-          </summary>
-          <div className="grid gap-3 px-2 pb-2 pt-1 sm:grid-cols-2 lg:grid-cols-1">
-            <label className="space-y-1">
-              <span className="text-xs text-[#C8D3CE]">{isEn ? "Layer" : "Capa"}</span>
-              <select className={selectClass} value={capa} onChange={(e) => onChangeCapa(e.target.value as Capa)}>
-                <option value="armonizado">{t("zone.harmonized")}</option>
-                <option value="modis">MODIS</option>
-                <option value="viirs">VIIRS</option>
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs text-[#C8D3CE]">{isEn ? "Calendar color scale" : "Escala de color del calendario"}</span>
-              <select className={selectClass} value={escalaFija ? "fija" : "relativa"} onChange={(e) => onChangeEscala(e.target.value === "fija")}>
-                <option value="relativa">{isEn ? "For this area and period" : "Para esta zona y período"}</option>
-                <option value="fija">{isEn ? "Fixed to compare areas" : "Fija para comparar zonas"}</option>
-              </select>
-            </label>
-          </div>
-        </details>
+        <div className="min-w-0 space-y-1.5">
+          <label htmlFor="capa-datos" className="block text-sm font-medium">{isEn ? "Layer" : "Capa"}</label>
+          <select id="capa-datos" className={selectClass} value={capa} onChange={(e) => onChangeCapa(e.target.value as Capa)}>
+            <option value="armonizado">{t("zone.harmonized")}</option>
+            <option value="modis">MODIS</option>
+            <option value="viirs">VIIRS</option>
+          </select>
+        </div>
+        <div className="min-w-0 space-y-1.5">
+          <label htmlFor="escala-calendario" className="block text-sm font-medium">{isEn ? "Calendar color scale" : "Escala de color del calendario"}</label>
+          <select id="escala-calendario" className={selectClass} value={escalaFija ? "fija" : "relativa"} onChange={(e) => onChangeEscala(e.target.value === "fija")}>
+            <option value="relativa">{isEn ? "For this area and period" : "Para esta zona y período"}</option>
+            <option value="fija">{isEn ? "Fixed to compare areas" : "Fija para comparar zonas"}</option>
+          </select>
+        </div>
       </div>
       {showCoordinates && (
         <div className="mt-3">

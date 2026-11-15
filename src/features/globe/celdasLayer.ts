@@ -1,7 +1,7 @@
 import type * as maplibregl from 'maplibre-gl';
 import type { CeldaMapa } from './celdasMapa';
 
-const ID_CELDAS = 'focos-celdas';
+export const ID_CELDAS = 'focos-celdas';
 const ID_ESTIMADAS = 'focos-celdas-estimadas';
 
 export function dibujarCeldas(map: maplibregl.Map, features: CeldaMapa[]) {
