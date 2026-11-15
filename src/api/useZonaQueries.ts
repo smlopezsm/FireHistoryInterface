@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ApiRequestError, getAnomalia, getCalendario, getSerie, type PeriodoParams } from './client';
 import type { AnomaliaResponse, CalendarioResponse, Granularidad, PedidoZona, SerieResponse } from './types';
 
@@ -20,14 +20,36 @@ export function useCalendario(zona: PedidoZona | null, params: PeriodoParams = {
   });
 }
 
-export function useSerie(zona: PedidoZona | null, params: PeriodoParams & { granularidad?: Granularidad } = {}) {
+type ParamsSerie = PeriodoParams & { granularidad?: Granularidad };
+
+/**
+ * La curva anterior solo se conserva mientras carga la nueva si cambió **únicamente** la
+ * granularidad: con otra zona, período o capa, mostrarla sería mostrar datos que no
+ * corresponden al encabezado.
+ */
+export const soloCambiaGranularidad = (
+  previa: readonly unknown[] | undefined,
+  zona: PedidoZona | null,
+  params: ParamsSerie,
+): boolean => {
+  if (!previa) return false;
+  const [, zonaPrevia, paramsPrevios] = previa as [string, PedidoZona | null, ParamsSerie | undefined];
+  const sinGranularidad = ({ granularidad: _g, ...resto }: ParamsSerie = {}) => resto;
+  return (
+    JSON.stringify(zonaPrevia) === JSON.stringify(zona) &&
+    JSON.stringify(sinGranularidad(paramsPrevios)) === JSON.stringify(sinGranularidad(params))
+  );
+};
+
+export function useSerie(zona: PedidoZona | null, params: ParamsSerie = {}) {
   return useQuery<SerieResponse, Error>({
     queryKey: ['serie', zona, params],
     queryFn: ({ signal }) => getSerie(zona!, params, signal),
     enabled: zona !== null,
     staleTime: HORA,
     retry: retryServidor,
-    placeholderData: keepPreviousData,
+    placeholderData: (previo, consultaPrevia) =>
+      soloCambiaGranularidad(consultaPrevia?.queryKey, zona, params) ? previo : undefined,
   });
 }
 
