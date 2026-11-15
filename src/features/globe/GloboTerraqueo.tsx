@@ -18,6 +18,7 @@ import {
   Play,
   Pause,
   Calendar,
+  Layers,
 } from 'lucide-react';
 
 const shiftMonth = (ym: string, delta: number): string => {
@@ -34,15 +35,21 @@ const monthToDateRange = (ym: string, maxDate?: string): { desde: string; hasta:
   return { desde: `${ym}-01`, hasta };
 };
 
-// Estilo cartográfico oscuro oficial del Instituto Geográfico Nacional (IGN Argentina), sin API key
+const monthDiff = (fromYm: string, toYm: string): number => {
+  const [fy, fm] = fromYm.split('-').map(Number);
+  const [ty, tm] = toYm.split('-').map(Number);
+  return Math.max(0, (ty - fy) * 12 + (tm - fm));
+};
+
+// Estilo cartográfico oscuro científico (IGN Argentina Argenmap Oscuro), perspectiva 3D inclinada sobre Argentina
 const DEFAULT_GLOBE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
-  projection: { type: 'globe' },
+  projection: { type: 'mercator' },
   sky: {
-    'sky-color': '#040808',
-    'horizon-color': '#183c38',
+    'sky-color': '#030807',
+    'horizon-color': '#2B7A73',
     'fog-color': '#07100F',
-    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 6, 0.1],
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 6, 0.25],
   },
   sources: {
     'ign-argenmap-oscuro': {
@@ -60,6 +67,42 @@ const DEFAULT_GLOBE_STYLE: maplibregl.StyleSpecification = {
       id: 'ign-argenmap-base',
       type: 'raster',
       source: 'ign-argenmap-oscuro',
+      paint: {
+        'raster-brightness-min': 0.0,
+        'raster-brightness-max': 0.82,
+        'raster-contrast': 0.35,
+        'raster-saturation': -0.35,
+        'raster-hue-rotate': -15,
+      },
+    },
+  ],
+};
+
+// Vista satelital global (Esri World Imagery), cobertura planetaria sin API key
+const SATELLITE_GLOBE_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  projection: { type: 'globe' },
+  sky: {
+    'sky-color': '#030807',
+    'horizon-color': '#2B7A73',
+    'fog-color': '#07100F',
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.95, 5, 0.2],
+  },
+  sources: {
+    'esri-world-imagery': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      maxzoom: 18,
+    },
+  },
+  layers: [
+    {
+      id: 'esri-satellite-base',
+      type: 'raster',
+      source: 'esri-world-imagery',
     },
   ],
 };
@@ -104,9 +147,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
-  const spinIntervalRef = useRef<number | null>(null);
   const idleTimeoutRef = useRef<number | null>(null);
   const userPickedMonthRef = useRef(false);
+  const prevViewRef = useRef({ lng: center[0], lat: center[1], zoom });
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -127,12 +170,21 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   }, [isUserInteracting]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mapStyleMode, setMapStyleMode] = useState<'ign' | 'satellite'>('ign');
+  const mapStyleModeRef = useRef<'ign' | 'satellite'>(mapStyleMode);
+  useEffect(() => {
+    mapStyleModeRef.current = mapStyleMode;
+  }, [mapStyleMode]);
+
   const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
   const [selectedMonth, setSelectedMonth] = useState<string>(maxMonth);
   const [isPlayingTimeline, setIsPlayingTimeline] = useState(false);
   const [isLoadingCells, setIsLoadingCells] = useState(false);
   const [totalCellsCount, setTotalCellsCount] = useState<number | null>(null);
   const [realHotspots, setRealHotspots] = useState<typeof SAMPLE_HOTSPOTS | null>(null);
+
+  const totalMonths = Math.max(1, monthDiff(minMonth, maxMonth));
+  const currentMonthIdx = Math.min(totalMonths, monthDiff(minMonth, selectedMonth));
 
   useEffect(() => {
     if (metadata?.fecha_max && !userPickedMonthRef.current) {
@@ -145,7 +197,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     const timer = window.setInterval(() => {
       userPickedMonthRef.current = true;
       setSelectedMonth((prev) => (prev >= maxMonth ? minMonth : shiftMonth(prev, 1)));
-    }, 1200);
+    }, 1600);
     return () => window.clearInterval(timer);
   }, [isPlayingTimeline, minMonth, maxMonth]);
 
@@ -154,14 +206,20 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     setActiveSensorFilter(capa);
   }, [capa]);
 
-  // Rotación orbital
-  const secondsPerRevolution = 180;
+  // Rotación orbital (grados/segundo efectivos en ciclos de 1000 ms encadenados con moveend)
+  const secondsPerRevolution = 150;
   const maxSpinZoom = 4;
   const slowSpinZoom = 2.5;
 
   const spinGlobe = useCallback(() => {
     const map = mapRef.current;
     if (!map || !isSpinningRef.current || isUserInteractingRef.current) return;
+
+    if (mapStyleModeRef.current === 'ign') {
+      const nextBearing = ((map.getBearing?.() ?? 0) + 4) % 360;
+      map.easeTo({ bearing: nextBearing, duration: 1000, easing: (n: number) => n });
+      return;
+    }
 
     const currentZoom = map.getZoom();
     if (currentZoom < maxSpinZoom) {
@@ -171,7 +229,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         distancePerSecond *= zoomDif;
       }
       const mapCenter = map.getCenter();
-      mapCenter.lng -= distancePerSecond / 60;
+      mapCenter.lng -= distancePerSecond;
       map.easeTo({ center: mapCenter, duration: 1000, easing: (n: number) => n });
     }
   }, [maxSpinZoom, slowSpinZoom, secondsPerRevolution]);
@@ -214,16 +272,21 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       el.innerHTML = `
         <div class="relative flex items-center justify-center cursor-pointer">
-          <div class="animate-ping absolute w-4 h-4 rounded-full opacity-45" style="background: ${color};"></div>
+          <div class="hotspot-halo absolute w-4 h-4 rounded-full" style="background: ${color};"></div>
           <div style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; border: 1.5px solid #EFF5ED; box-shadow: 0 0 8px ${color};"></div>
         </div>
       `;
 
+      const coordsLabel = `${h.lat.toFixed(4)}, ${h.lng.toFixed(4)}`;
+      const gmapsUrl = `https://www.google.com/maps?q=${h.lat.toFixed(4)},${h.lng.toFixed(4)}`;
       const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(`
         <div style="font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px; color: #EFF5ED; background: #0D1816; border: 1px solid #21312D; border-radius: 4px;">
           <strong style="color: ${color};">${h.sensor.toUpperCase()} · ${h.province}</strong><br/>
           <span>${isEn ? 'Brightness Temp:' : 'T. Brillo:'} <b>${h.brightness} K</b></span><br/>
-          <span style="color: #93A39C; font-size: 12px;">${isEn ? 'NASA FIRMS S-NPP Calibrated' : 'NASA FIRMS S-NPP Calibrado'}</span>
+          <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 3px; color: #B8EE68; text-decoration: underline; font-size: 11px;">
+            ${coordsLabel} · Google Maps ↗
+          </a><br/>
+          <span style="color: #93A39C; font-size: 11px;">${isEn ? 'NASA FIRMS S-NPP Calibrated' : 'NASA FIRMS S-NPP Calibrado'}</span>
         </div>
       `);
 
@@ -306,11 +369,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
     try {
       const style = import.meta.env.VITE_MAP_STYLE_URL || DEFAULT_GLOBE_STYLE;
+      const initialZoom = zoom === 2.0 ? 3.5 : zoom;
       const map = new maplibregl.Map({
         container: mapContainerRef.current,
         style,
         center,
-        zoom,
+        zoom: initialZoom,
+        pitch: 42,
+        bearing: -10,
         minZoom: 1,
         maxZoom: 14,
         cooperativeGestures: true,
@@ -321,7 +387,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       map.on('style.load', () => {
         try {
-          map.setProjection?.({ type: 'globe' });
+          const projectionType = mapStyleModeRef.current === 'satellite' ? 'globe' : 'mercator';
+          map.setProjection?.({ type: projectionType });
         } catch {
           // Ignorar si el entorno de test/estilo difiere
         }
@@ -341,7 +408,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       map.on('moveend', spinGlobe);
 
       return () => {
-        if (spinIntervalRef.current) clearInterval(spinIntervalRef.current);
         if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
         markersRef.current.forEach((m) => m.remove());
         map.remove();
@@ -360,31 +426,56 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     }
   }, [activeSensorFilter, isLoaded, renderHotspotMarkers]);
 
-  // Vuelo suave cuando cambian las coordenadas de selección
+  // Vuelo suave cuando cambian las coordenadas de selección externa
   useEffect(() => {
-    if (mapRef.current && isLoaded) {
-      mapRef.current.flyTo({
-        center: center,
-        zoom: zoom,
-        duration: 1800,
-        essential: true,
-      });
-    }
+    if (!mapRef.current || !isLoaded) return;
+    const prev = prevViewRef.current;
+    if (prev.lng === center[0] && prev.lat === center[1] && prev.zoom === zoom) return;
+    prevViewRef.current = { lng: center[0], lat: center[1], zoom };
+    const isSat = mapStyleModeRef.current === 'satellite';
+    mapRef.current.flyTo({
+      center,
+      zoom: !isSat && zoom === 2.0 ? 3.5 : zoom,
+      pitch: isSat ? 0 : 42,
+      duration: 1500,
+      essential: true,
+    });
   }, [center, zoom, isLoaded]);
 
-  // Loop de auto-rotación
+  // Loop de auto-rotación encadenado con moveend (sin setInterval duplicado)
   useEffect(() => {
-    if (!isLoaded || !isSpinning || isUserInteracting) return;
+    if (!isLoaded || !isSpinning || isUserInteracting) {
+      mapRef.current?.stop?.();
+      return;
+    }
     spinGlobe();
-    const interval = window.setInterval(spinGlobe, 1000);
-    spinIntervalRef.current = interval;
-    return () => clearInterval(interval);
   }, [isLoaded, isSpinning, isUserInteracting, spinGlobe]);
 
+  const handleToggleStyle = () => {
+    const nextMode = mapStyleMode === 'ign' ? 'satellite' : 'ign';
+    setMapStyleMode(nextMode);
+    mapStyleModeRef.current = nextMode;
+    const map = mapRef.current;
+    if (!map) return;
+
+    const nextStyle = nextMode === 'satellite' ? SATELLITE_GLOBE_STYLE : DEFAULT_GLOBE_STYLE;
+    map.setStyle?.(nextStyle);
+    if (nextMode === 'satellite') {
+      map.setProjection?.({ type: 'globe' });
+      map.flyTo({ center: [-64, -36], zoom: 2.2, pitch: 0, bearing: 0, duration: 1200, essential: true });
+    } else {
+      map.setProjection?.({ type: 'mercator' });
+      map.flyTo({ center: [-64, -36], zoom: 3.5, pitch: 42, bearing: -10, duration: 1200, essential: true });
+    }
+  };
+
   const handleResetView = () => {
+    const isSat = mapStyleModeRef.current === 'satellite';
     mapRef.current?.flyTo({
       center: [-64, -36],
-      zoom: 2.0,
+      zoom: isSat ? 2.2 : 3.5,
+      pitch: isSat ? 0 : 42,
+      bearing: isSat ? 0 : -10,
       duration: 1800,
       essential: true,
     });
@@ -438,7 +529,29 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         <div className="flex items-center gap-1.5 font-sans text-xs">
           <button
             type="button"
-            onClick={() => setIsSpinning((prev) => !prev)}
+            onClick={handleToggleStyle}
+            aria-pressed={mapStyleMode === 'satellite'}
+            title={mapStyleMode === 'satellite' ? (isEn ? 'Switch to dark IGN map' : 'Cambiar a mapa oscuro IGN') : (isEn ? 'Switch to satellite view' : 'Cambiar a vista satelital')}
+            className={`inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              mapStyleMode === 'satellite'
+                ? 'bg-[#68D9D0]/20 text-[#68D9D0] border border-[#68D9D0]/40'
+                : 'bg-[#111E1B] text-[#93A39C] hover:text-[#EFF5ED] border border-[#21312D]'
+            }`}
+          >
+            <Layers className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{mapStyleMode === 'satellite' ? (isEn ? 'IGN Dark' : 'IGN Oscuro') : (isEn ? 'Satellite' : 'Satélite')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsSpinning((prev) => {
+                const next = !prev;
+                isSpinningRef.current = next;
+                if (!next) mapRef.current?.stop?.();
+                return next;
+              });
+            }}
             aria-pressed={isSpinning}
             title={isSpinning ? t('globe.pauseSpin') : t('globe.resumeSpin')}
             className={`inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -518,6 +631,20 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           </button>
         </div>
 
+        <input
+          type="range"
+          min={0}
+          max={totalMonths}
+          value={currentMonthIdx}
+          onChange={(e) => {
+            userPickedMonthRef.current = true;
+            setIsPlayingTimeline(false);
+            setSelectedMonth(shiftMonth(minMonth, Number(e.target.value)));
+          }}
+          aria-label={isEn ? 'Timeline slider' : 'Deslizador temporal'}
+          className="h-1.5 flex-1 min-w-[110px] cursor-pointer accent-[#B8EE68]"
+        />
+
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -532,10 +659,12 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             {isPlayingTimeline ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
             <span>{isPlayingTimeline ? (isEn ? 'Pause' : 'Pausar') : (isEn ? 'Timelapse' : 'Recorrer')}</span>
           </button>
-          <span className="rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 text-xs text-[#B8EE68]">
-            {isLoadingCells
-              ? '...'
-              : totalCellsCount !== null
+          <span
+            className={`min-w-[148px] text-center tabular-nums rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 text-xs text-[#B8EE68] transition-opacity duration-200 ${
+              isLoadingCells ? 'opacity-60' : 'opacity-100'
+            }`}
+          >
+            {totalCellsCount !== null
               ? `${totalCellsCount} ${isEn ? 'cells' : 'celdas'} · ${selectedMonth}`
               : `${selectedMonth} · DEMO`}
           </span>

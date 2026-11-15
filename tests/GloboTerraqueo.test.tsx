@@ -8,10 +8,15 @@ import { GloboTerraqueo } from '../src/features/globe/GloboTerraqueo';
 // Mock maplibre-gl para entorno jsdom
 vi.mock('maplibre-gl', () => {
   const Map = vi.fn().mockImplementation(() => ({
-    on: vi.fn(),
+    on: vi.fn((event: string, cb: () => void) => {
+      if (event === 'style.load') Promise.resolve().then(cb);
+    }),
     remove: vi.fn(),
     setProjection: vi.fn(),
-    getZoom: vi.fn().mockReturnValue(2),
+    setStyle: vi.fn(),
+    stop: vi.fn(),
+    getBearing: vi.fn().mockReturnValue(0),
+    getZoom: vi.fn().mockReturnValue(3.5),
     getCenter: vi.fn().mockReturnValue({ lng: -64, lat: -36 }),
     easeTo: vi.fn(),
     flyTo: vi.fn(),
@@ -39,7 +44,7 @@ describe('GloboTerraqueo 3D Component', () => {
     );
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
     vi.spyOn(api, 'getMetadata').mockResolvedValue({
       schema_version: '1.1.0',
       data_version: '2026-11-14T17:49:45-03:00',
@@ -104,7 +109,8 @@ describe('GloboTerraqueo 3D Component', () => {
     });
   });
 
-  it('allows user to toggle auto-rotation button', () => {
+  it('allows user to toggle auto-rotation button and stops map animation when paused', async () => {
+    const maplibregl = await import('maplibre-gl');
     renderGlobe();
 
     const rotateBtn = screen.getByTitle(/Pause auto-rotation|Pausar rotación automática/i);
@@ -112,6 +118,75 @@ describe('GloboTerraqueo 3D Component', () => {
 
     fireEvent.click(rotateBtn);
     expect(rotateBtn).toHaveAttribute('aria-pressed', 'false');
+
+    const mapInstance = vi.mocked(maplibregl.Map).mock.results.at(-1)?.value;
+    expect(mapInstance.stop).toHaveBeenCalled();
+  });
+
+  it('toggles between IGN dark 3D map and Esri satellite view', async () => {
+    const maplibregl = await import('maplibre-gl');
+    renderGlobe();
+
+    const styleBtn = screen.getByTitle(/Switch to satellite|Cambiar a vista satelital/i);
+    expect(styleBtn).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(styleBtn);
+    expect(styleBtn).toHaveAttribute('aria-pressed', 'true');
+
+    const mapInstance = vi.mocked(maplibregl.Map).mock.results.at(-1)?.value;
+    expect(mapInstance.setStyle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projection: { type: 'globe' },
+      })
+    );
+  });
+
+  it('includes clickable Google Maps coordinates link in hotspot popup HTML', async () => {
+    vi.spyOn(api, 'getMapaCeldas').mockResolvedValue({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[-64.42, -31.35], [-64.42, -31.35], [-64.42, -31.35], [-64.42, -31.35]]],
+          },
+          properties: { cell_id: 1, valor: 25, viirs: 25, provincia_id: 6 },
+        },
+      ],
+    } as any);
+
+    const maplibregl = await import('maplibre-gl');
+    renderGlobe();
+
+    await waitFor(() => {
+      expect(vi.mocked(maplibregl.Popup)).toHaveBeenCalled();
+    });
+
+    const firstPopup = vi.mocked(maplibregl.Popup).mock.results[0]?.value;
+    const htmlArg = vi.mocked(firstPopup.setHTML).mock.calls[0]?.[0] as string;
+    expect(htmlArg).toContain('https://www.google.com/maps?q=-31.3500,-64.4200');
+    expect(htmlArg).toContain('Google Maps');
+  });
+
+  it('scrubs timeline via horizontal range slider without collapsing readout', async () => {
+    renderGlobe();
+
+    await waitFor(() => {
+      expect(api.getMapaCeldas).toHaveBeenCalledTimes(1);
+    });
+
+    const slider = screen.getByLabelText(/Timeline slider|Deslizador temporal/i);
+    fireEvent.change(slider, { target: { value: '0' } });
+
+    await waitFor(() => {
+      expect(api.getMapaCeldas).toHaveBeenCalledWith(
+        expect.objectContaining({
+          desde: '2000-11-01',
+          hasta: '2000-11-30',
+        })
+      );
+    });
   });
 
   it('respects prefers-reduced-motion and initializes auto-rotation paused', () => {
