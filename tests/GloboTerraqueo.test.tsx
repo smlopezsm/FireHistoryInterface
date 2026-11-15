@@ -11,7 +11,8 @@ vi.mock('maplibre-gl', () => {
   const Map = vi.fn().mockImplementation(() => {
     const handlers: Record<string, ((e?: any) => void)[]> = {};
     return {
-      on: vi.fn((event: string, cb: (e?: any) => void) => {
+      on: vi.fn((event: string, cb: string | ((e?: any) => void)) => {
+        if (typeof cb !== 'function') return;
         handlers[event] = handlers[event] || [];
         handlers[event].push(cb);
         if (event === 'style.load') Promise.resolve().then(() => cb());
@@ -20,6 +21,8 @@ vi.mock('maplibre-gl', () => {
         (handlers[event] || []).forEach((fn) => fn(payload));
       },
       getSource: vi.fn(),
+      getLayer: vi.fn(),
+      queryRenderedFeatures: vi.fn().mockReturnValue([]),
       addSource: vi.fn(),
       addLayer: vi.fn(),
       remove: vi.fn(),
@@ -36,17 +39,14 @@ vi.mock('maplibre-gl', () => {
       zoomOut: vi.fn(),
     };
   });
-  const Marker = vi.fn().mockImplementation(() => ({
+  const Popup = vi.fn().mockImplementation(() => ({
     setLngLat: vi.fn().mockReturnThis(),
-    setPopup: vi.fn().mockReturnThis(),
+    setHTML: vi.fn().mockReturnThis(),
     addTo: vi.fn().mockReturnThis(),
     remove: vi.fn(),
   }));
-  const Popup = vi.fn().mockImplementation(() => ({
-    setHTML: vi.fn().mockReturnThis(),
-  }));
   const setWorkerUrl = vi.fn();
-  return { Map, Marker, Popup, setWorkerUrl, default: { Map, Marker, Popup, setWorkerUrl } };
+  return { Map, Popup, setWorkerUrl, default: { Map, Popup, setWorkerUrl } };
 });
 
 describe('GloboTerraqueo 3D Component', () => {
@@ -82,9 +82,8 @@ describe('GloboTerraqueo 3D Component', () => {
 
     expect(screen.getAllByText(/3D Earth Globe|Globo Terráqueo 3D/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/MapLibre 3D/i)[0]).toBeInTheDocument();
-    expect(screen.getAllByTitle(/Replay gradual hotspot reveal|Reproducir aparición gradual/i)[0]).toBeInTheDocument();
     expect(screen.getAllByTitle(/Recenter on Argentina|Centrar en Argentina/i)[0]).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Pause|Pausar/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Play months|Reproducir meses/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('initializes MapLibre 3D globe immediately without requiring an access token', async () => {
@@ -157,7 +156,9 @@ describe('GloboTerraqueo 3D Component', () => {
     const styleBtn = screen.getByTitle(/Switch to satellite|Cambiar a vista satelital/i);
     fireEvent.click(styleBtn);
 
-    const rotateBtn = screen.getByTitle(/Pause auto-rotation|Pausar rotación automática/i);
+    const rotateBtn = screen.getByTitle(/Start auto-rotation|Resume auto-rotation|Reanudar rotación/i);
+    expect(rotateBtn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(rotateBtn);
     expect(rotateBtn).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(rotateBtn);
@@ -224,9 +225,12 @@ describe('GloboTerraqueo 3D Component', () => {
     const maplibregl = await import('maplibre-gl');
     renderGlobe();
 
-    await waitFor(() => {
-      expect(vi.mocked(maplibregl.Popup)).toHaveBeenCalled();
-    });
+    const map = vi.mocked(maplibregl.Map).mock.results.at(-1)?.value;
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1 (cell|celda)/));
+    map.getLayer.mockReturnValueOnce(true);
+    map.queryRenderedFeatures.mockReturnValueOnce([{ id: 1 }]);
+    act(() => map.__emit('click', { point: { x: 10, y: 10 }, lngLat: [-64.42, -31.35] }));
+    expect(vi.mocked(maplibregl.Popup)).toHaveBeenCalled();
 
     const firstPopup = vi.mocked(maplibregl.Popup).mock.results[0]?.value;
     const htmlArg = vi.mocked(firstPopup.setHTML).mock.calls[0]?.[0] as string;
@@ -258,6 +262,28 @@ describe('GloboTerraqueo 3D Component', () => {
       );
     });
   });
+
+  it('waits for the current month before playing the next one and stops at the end', async () => {
+    const vacio = { type: 'FeatureCollection' as const, features: [] };
+    let resolverAgosto!: () => void;
+    const agosto = new Promise<typeof vacio>((resolve) => { resolverAgosto = () => resolve(vacio); });
+    vi.mocked(api.getMapaCeldas).mockImplementation(({ desde }) => desde === '2024-08-01' ? agosto : Promise.resolve(vacio));
+
+    renderGlobe({ mesDesde: '2024-07', mesHasta: '2024-09' });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/0 (cells|celdas)/));
+
+    fireEvent.click(screen.getByRole('button', { name: /Play months|Reproducir meses/i }));
+    await waitFor(() => expect(api.getMapaCeldas).toHaveBeenCalledWith(
+      expect.objectContaining({ desde: '2024-08-01' }), expect.anything(),
+    ), { timeout: 4000 });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1450)); });
+    const fechas = () => vi.mocked(api.getMapaCeldas).mock.calls.map(([p]) => p.desde);
+    expect(fechas()).toEqual(['2024-09-01', '2024-07-01', '2024-08-01']);
+    await act(async () => { resolverAgosto(); });
+    await waitFor(() => expect(screen.getByRole('button', { name: /Play months|Reproducir meses/i })).toHaveAttribute('aria-pressed', 'false'), { timeout: 3500 });
+    expect(fechas()).toHaveLength(3);
+    expect(screen.getByRole('time')).toHaveAttribute('datetime', '2024-09');
+  }, 8000);
 
   it('draws the applied rectangle again when the base map changes', async () => {
     const maplibregl = await import('maplibre-gl');
@@ -302,11 +328,11 @@ describe('GloboTerraqueo 3D Component', () => {
   it('ensures control buttons meet minimum touch target size classes', () => {
     renderGlobe();
 
-    const revealBtn = screen.getByTitle(/Replay gradual hotspot reveal|Reproducir aparición gradual/i);
+    const playBtn = screen.getByRole('button', { name: /Play months|Reproducir meses/i });
     const recenterBtn = screen.getByTitle(/Recenter on Argentina|Centrar en Argentina/i);
     const fullscreenBtn = screen.getByTitle(/Fullscreen|Pantalla completa/i);
 
-    expect(revealBtn.className).toContain('min-h-[36px]');
+    expect(playBtn.className).toContain('min-h-9');
     expect(recenterBtn.className).toContain('min-h-[36px]');
     expect(fullscreenBtn.className).toContain('min-h-[36px]');
   });
@@ -334,29 +360,25 @@ describe('GloboTerraqueo 3D Component', () => {
     expect(typeof workerUrl).toBe('string');
     expect(workerUrl.length).toBeGreaterThan(0);
   });
-  it('draws honest markers: count-based legend, no brightness, and "N of total" counter', async () => {
-    vi.mocked(api.getMapaCeldas).mockResolvedValueOnce({
-      type: 'FeatureCollection',
-      features: Array.from({ length: 70 }, (_, i) => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Polygon' as const, coordinates: [[[-66, -33], [-65, -33], [-65, -34], [-66, -33]]] },
-        properties: { cell_id: i, provincia_id: '74', modis: 3, viirs: null, estado: 'estimado' as const, valor: 5 + i },
-      })),
-    });
+  it('draws returned polygons with a fill layer and restores them after a style change', async () => {
+    const features = Array.from({ length: 70 }, (_, i) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Polygon' as const, coordinates: [[[-66, -33], [-65, -33], [-65, -34], [-66, -33]]] },
+      properties: { cell_id: i, provincia_id: '74', modis: 3, viirs: null, estado: 'estimado' as const, valor: 5 + i },
+    }));
+    vi.mocked(api.getMapaCeldas).mockResolvedValueOnce({ type: 'FeatureCollection', features });
     const maplibregl = await import('maplibre-gl');
-    vi.mocked(maplibregl.Marker).mockClear();
-    vi.mocked(maplibregl.Popup).mockClear();
     renderGlobe();
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/60 (of|de) 70 (cells|celdas)/));
-    await waitFor(() => expect(vi.mocked(maplibregl.Marker)).toHaveBeenCalledTimes(60));
-
-    expect(screen.getByText(/Hot spots per cell|Focos por celda/)).toBeInTheDocument();
-    expect(screen.queryByText(/360K|Thermal Detections|Detecciones Térmicas/)).not.toBeInTheDocument();
-    const html = vi.mocked(maplibregl.Popup).mock.results
-      .map((r) => vi.mocked(r.value.setHTML).mock.calls[0]?.[0] as string)
-      .join(' ');
-    expect(html).not.toMatch(/Brightness|Brillo| K<|Calibrat|Calibrad/);
-    expect(html).toMatch(/74 (hot spots|focos)/);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/70 (cells|celdas)/));
+    const map = vi.mocked(maplibregl.Map).mock.results.at(-1)?.value;
+    expect(map.addLayer).toHaveBeenCalledWith(expect.objectContaining({ type: 'fill', id: 'focos-celdas' }));
+    const ultimaFuente = () => map.addSource.mock.calls
+      .filter(([id]: [string]) => id === 'focos-celdas').at(-1)?.[1].data.features;
+    expect(ultimaFuente()).toHaveLength(70);
+    expect(ultimaFuente()[0].geometry).toEqual(features[0].geometry);
+    fireEvent.click(screen.getByRole('button', { name: /Satellite|Satélite/i }));
+    act(() => map.__emit('style.load'));
+    expect(ultimaFuente()).toHaveLength(70);
   });
 });

@@ -4,17 +4,16 @@ import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { formatMes } from '../../i18n/formatMes';
-import { rangoDelMes, useMapaCeldas, useMetadata, useProvincias, type GeoJSON, type BBox } from '../../api';
+import { ApiRequestError, rangoDelMes, useMapaCeldas, useMetadata, useProvincias, type GeoJSON, type BBox } from '../../api';
 import {
   MIN_FOCOS_MAPA,
   TRAMOS_FOCOS,
-  celdasAMarcadores,
-  colorDeConteo,
+  celdasParaMapa,
   etiquetaTramo,
   popupCeldaHtml,
   textoContador,
-  type MarcadorCelda,
 } from './celdasMapa';
+import { celdaEnPunto, dibujarCeldas } from './celdasLayer';
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(maplibreWorkerUrl);
@@ -191,7 +190,7 @@ interface GloboTerraqueoProps {
 }
 
 export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
-  className = '',
+  className = 'h-[520px] lg:h-[580px]',
   onMapReady,
   center = [-64, -36], // Centrado en Argentina
   zoom = 2.0,
@@ -224,7 +223,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   limitesRef.current = limites;
   const estiloListoRef = useRef(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
   const provinciasControllerRef = useRef<ProvinciasLayerController | null>(null);
   const provinciasGeoJSONRef = useRef<GeoJSON.FeatureCollection<
     GeoJSON.Geometry,
@@ -241,11 +240,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const [isSpinning, setIsSpinning] = useState(!prefersReducedMotion);
+  const [isSpinning, setIsSpinning] = useState(false);
   const [isUserInteracting, setIsUserInteracting] = useState(false);
   const isSpinningRef = useRef(isSpinning);
   const isUserInteractingRef = useRef(isUserInteracting);
@@ -307,7 +302,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     };
   }, [isFullscreen]);
   const [mapStyleMode, setMapStyleMode] = useState<'ign' | 'satellite'>('ign');
-  const [revealSeed, setRevealSeed] = useState(0);
   const mapStyleModeRef = useRef<'ign' | 'satellite'>(mapStyleMode);
   useEffect(() => {
     mapStyleModeRef.current = mapStyleMode;
@@ -318,7 +312,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const selectedMonth = requestedMonth && minMonth && maxMonth &&
     requestedMonth >= minMonth && requestedMonth <= maxMonth ? requestedMonth : maxMonth;
   const updateMonth = onMonthChange ?? setLocalMonth;
-  const [isPlayingTimeline, setIsPlayingTimeline] = useState(!onMonthChange && !prefersReducedMotion);
+  const [isPlayingTimeline, setIsPlayingTimeline] = useState(false);
+  const mesEnReproduccion = useRef<string>();
   // Celdas del mes con TanStack Query: caché por mes/zona/capa y cancelación de lo obsoleto.
   const bboxParam = bbox.join(',');
   const paramsCeldas = useMemo(() => {
@@ -329,22 +324,25 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const celdas = useMapaCeldas(paramsCeldas);
   const isLoadingCells = celdas.isFetching;
   const cellsError = celdas.isError;
-  const { marcadores: realHotspots, total: totalCellsCount } = useMemo((): {
-    marcadores: MarcadorCelda[];
-    total: number | null;
-  } => {
-    if (!celdas.data) return { marcadores: [], total: null };
-    return celdasAMarcadores(celdas.data.features, {
+  const celdasVisibles = useMemo(
+    () => celdasParaMapa(celdas.data?.features ?? [], {
+      capa,
       provinciaId: selectedProvinciaId,
       provinciaIds: selectedProvinciaId ? undefined : selectedProvinciaIds,
       dentro: geometriaZona ? (lng, lat) => isPointInGeometry(lng, lat, geometriaZona) : undefined,
       nombres: nombresProvincias,
-    });
-  }, [celdas.data, selectedProvinciaId, selectedProvinciaIds, geometriaZona, nombresProvincias]);
+    }),
+    [celdas.data, capa, selectedProvinciaId, selectedProvinciaIds, geometriaZona, nombresProvincias],
+  );
+  const opcionesCeldasRef = useRef({ celdasVisibles, capa, isEn });
+  opcionesCeldasRef.current = { celdasVisibles, capa, isEn };
 
-  const cellsStatus = metadataError || cellsError
-    ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
-    : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
+  const demasiadasCeldas = celdas.error instanceof ApiRequestError && celdas.error.status === 413;
+  const cellsStatus = demasiadasCeldas
+    ? (isEn ? 'Choose a smaller area' : 'Elegí una zona más chica')
+    : metadataError || cellsError
+      ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
+      : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
 
   const selectMonth = (nextMonth: string) => {
     if (!minMonth || !maxMonth || nextMonth < minMonth || nextMonth > maxMonth) return;
@@ -352,17 +350,37 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     updateMonth(nextMonth);
   };
 
+  const alternarReproduccion = () => {
+    if (!minMonth || !maxMonth || !selectedMonth || minMonth === maxMonth) return;
+    if (isPlayingTimeline) {
+      setIsPlayingTimeline(false);
+      return;
+    }
+    const inicio = selectedMonth === maxMonth ? minMonth : selectedMonth;
+    mesEnReproduccion.current = inicio;
+    if (inicio !== selectedMonth) updateMonth(inicio);
+    setIsPlayingTimeline(true);
+  };
+
+  const idsZona = activeSelectedIds.join(',');
   useEffect(() => {
-    if (onMonthChange) setIsPlayingTimeline(false);
-  }, [mesDesde, mesHasta, onMonthChange]);
+    setIsPlayingTimeline(false);
+  }, [bboxParam, idsZona, capa, minMonth, maxMonth]);
 
   useEffect(() => {
-    if (!isPlayingTimeline || !selectedMonth || !minMonth || !maxMonth || minMonth === maxMonth) return;
+    if (!isPlayingTimeline || !selectedMonth || !maxMonth) return;
+    if (mesEnReproduccion.current !== selectedMonth || selectedMonth >= maxMonth || cellsError) {
+      setIsPlayingTimeline(false);
+      return;
+    }
+    if (!isLoaded || isLoadingCells || !celdas.data) return;
     const timer = window.setTimeout(() => {
-      updateMonth(selectedMonth >= maxMonth ? minMonth : shiftMonth(selectedMonth, 1));
-    }, 2200);
+      const siguiente = shiftMonth(selectedMonth, 1);
+      mesEnReproduccion.current = siguiente;
+      updateMonth(siguiente);
+    }, 1400);
     return () => window.clearTimeout(timer);
-  }, [isPlayingTimeline, selectedMonth, minMonth, maxMonth, updateMonth]);
+  }, [isPlayingTimeline, isLoaded, isLoadingCells, cellsError, celdas.data, selectedMonth, maxMonth, updateMonth]);
 
   // Rotación orbital (grados/segundo efectivos en ciclos de 1000 ms encadenados con moveend)
   const secondsPerRevolution = 150;
@@ -403,78 +421,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     }, 3500);
   }, []);
 
-  // Actualizar marcadores de focos de calor según filtro
-  const renderHotspotMarkers = useCallback((map: maplibregl.Map) => {
-    // Limpiar marcadores anteriores
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    realHotspots.forEach((h, idx) => {
-      const el = document.createElement('div');
-      el.className = 'hotspot-marker';
-
-      // Color por cantidad de focos de la capa activa; borde punteado = estimado desde MODIS.
-      const color = colorDeConteo(h.valor);
-      const estimado = capa === 'armonizado' && h.estado !== 'observado';
-      const borde = estimado ? '1.5px dashed #EFF5ED' : '1.5px solid #EFF5ED';
-      const delayMs = Math.min(idx * 35, 1100);
-      el.dataset.color = color;
-      el.dataset.estado = h.estado;
-      el.setAttribute('aria-label', popupCeldaHtml(h, { capa, isEn }).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-
-      el.innerHTML = `
-        <div class="hotspot-appear relative flex items-center justify-center cursor-pointer" style="animation-delay: ${delayMs}ms;">
-          <div class="hotspot-halo absolute w-4 h-4 rounded-full" style="background: ${color}; animation-delay: ${delayMs}ms;"></div>
-          <div style="width: 9px; height: 9px; border-radius: 50%; background: ${color}; border: ${borde}; box-shadow: 0 0 8px ${color};"></div>
-        </div>
-      `;
-
-      const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(
-        popupCeldaHtml(h, { capa, isEn })
-      );
-
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([h.lng, h.lat])
-        .setPopup(popup)
-        .addTo(map);
-
-      let closeTimer: number | null = null;
-      const cancelClose = () => {
-        if (closeTimer !== null) {
-          window.clearTimeout(closeTimer);
-          closeTimer = null;
-        }
-      };
-      const scheduleClose = () => {
-        cancelClose();
-        closeTimer = window.setTimeout(() => {
-          popup.remove?.();
-        }, 140);
-      };
-
-      el.addEventListener('mouseenter', () => {
-        cancelClose();
-        popup.setLngLat([h.lng, h.lat]).addTo(map);
-        const popupEl = popup.getElement?.();
-        if (popupEl && !popupEl.dataset.hoverBound) {
-          popupEl.dataset.hoverBound = '1';
-          popupEl.addEventListener('mouseenter', cancelClose);
-          popupEl.addEventListener('mouseleave', scheduleClose);
-        }
-      });
-
-      el.addEventListener('mouseleave', scheduleClose);
-
-      el.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        cancelClose();
-      });
-
-      markersRef.current.push(marker);
-    });
-  }, [realHotspots, isEn, capa]);
-
-
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -497,6 +443,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         scrollZoom: true,
         touchZoomRotate: true,
         attributionControl: false,
+        trackResize: true,
       });
 
       mapRef.current = map;
@@ -513,6 +460,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         if (!provinciasControllerRef.current) {
           provinciasControllerRef.current = attachProvinciasLayer(map, {
             onSelectProvincia: (pid) => onSelectProvinciaRef.current?.(pid),
+            sobreCelda: ({ point }) => celdaEnPunto(map, point) !== undefined,
           });
         } else {
           provinciasControllerRef.current.ensureLayers();
@@ -523,6 +471,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
         }
 
+        dibujarCeldas(map, opcionesCeldasRef.current.celdasVisibles);
         if (limitesRef.current) mostrarRectangulo(map, limitesRef.current);
         setIsLoaded(true);
         if (onMapReady) onMapReady(map);
@@ -539,8 +488,18 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       map.on('touchend', handleInteractionEnd);
       map.on('moveend', spinGlobe);
       map.on('click', (e: maplibregl.MapMouseEvent) => {
-        const target = e.originalEvent?.target as HTMLElement | null;
-        if (target?.closest?.('.hotspot-marker')) return;
+        const celdaId = celdaEnPunto(map, e.point);
+        const { celdasVisibles: visibles, capa: capaActual, isEn: enIngles } = opcionesCeldasRef.current;
+        if (celdaId !== undefined) {
+          const detalle = visibles.find((feature) => feature.id === celdaId)?.properties;
+          if (!detalle) return;
+          popupRef.current?.remove();
+          popupRef.current = new maplibregl.Popup()
+            .setLngLat(e.lngLat)
+            .setHTML(popupCeldaHtml(detalle, { capa: capaActual, isEn: enIngles }))
+            .addTo(map);
+          return;
+        }
 
         isSpinningRef.current = false;
         setIsSpinning(false);
@@ -555,7 +514,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             pitch: 0,
             bearing: 0,
             duration: 600,
-            essential: true,
           });
         }
       });
@@ -564,7 +522,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
         provinciasControllerRef.current?.destroy();
         provinciasControllerRef.current = null;
-        markersRef.current.forEach((m) => m.remove());
+        popupRef.current?.remove();
         estiloListoRef.current = false;
         map.remove();
         mapRef.current = null;
@@ -596,19 +554,16 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   }, [isLoaded, apiProvincias]);
 
   // Sincronizar selección externa (provincia o región) con el estado GPU del mapa
-  const selectedIdsKey = activeSelectedIds.join(',');
   useEffect(() => {
     if (!isLoaded || !provinciasControllerRef.current) return;
     provinciasControllerRef.current.setSelectedProvincias(activeSelectedIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIdsKey, isLoaded]);
+  }, [idsZona, isLoaded]);
 
-  // Actualizar marcadores al cambiar filtro de sensor o reiniciar animación
   useEffect(() => {
-    if (mapRef.current && isLoaded) {
-      renderHotspotMarkers(mapRef.current);
-    }
-  }, [isLoaded, revealSeed, renderHotspotMarkers]);
+    popupRef.current?.remove();
+    if (mapRef.current && estiloListoRef.current) dibujarCeldas(mapRef.current, celdasVisibles);
+  }, [celdasVisibles]);
 
   // Vuelo suave cuando cambian las coordenadas de selección externa
   useEffect(() => {
@@ -622,7 +577,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       zoom: !isSat && zoom === 2.0 ? 3.5 : zoom,
       pitch: isSat ? 0 : 42,
       duration: 1500,
-      essential: true,
     });
   }, [center, zoom, isLoaded]);
 
@@ -643,22 +597,12 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     if (!map) return;
 
     const nextStyle = nextMode === 'satellite' ? SATELLITE_GLOBE_STYLE : DEFAULT_GLOBE_STYLE;
+    isSpinningRef.current = false;
+    setIsSpinning(false);
+    map.stop();
+    popupRef.current?.remove();
     estiloListoRef.current = false;
-    map.setStyle?.(nextStyle, { diff: false });
-    if (nextMode === 'satellite') {
-      const shouldSpin = !prefersReducedMotion;
-      isSpinningRef.current = shouldSpin;
-      setIsSpinning(shouldSpin);
-      map.setProjection?.({ type: 'globe' });
-      map.flyTo({ center: [-64, -36], zoom: 2.2, pitch: 0, bearing: 0, duration: 1200, essential: true });
-    } else {
-      isSpinningRef.current = false;
-      setIsSpinning(false);
-      map.stop?.();
-      setRevealSeed((s) => s + 1);
-      map.setProjection?.({ type: 'mercator' });
-      map.flyTo({ center: [-64, -36], zoom: 3.5, pitch: 42, bearing: -10, duration: 1200, essential: true });
-    }
+    map.setStyle(nextStyle, { diff: false });
   };
 
   const handleResetView = () => {
@@ -669,7 +613,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       pitch: isSat ? 0 : 42,
       bearing: isSat ? 0 : -10,
       duration: 1800,
-      essential: true,
     });
   };
 
@@ -679,7 +622,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       className={`relative flex flex-col rounded-xl overflow-hidden border border-[#21312D] bg-[#07100F] ${
         isFullscreen
           ? 'fixed inset-0 z-[100] rounded-none w-screen h-screen'
-          : `w-full h-[520px] lg:h-[580px] ${className}`
+          : `w-full ${className}`
       }`}
     >
       {/* Barra de cabecera del globo */}
@@ -735,7 +678,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             <span className="hidden sm:inline">{mapStyleMode === 'satellite' ? (isEn ? 'IGN Dark' : 'IGN Oscuro') : (isEn ? 'Satellite' : 'Satélite')}</span>
           </button>
 
-          {mapStyleMode === 'satellite' ? (
+          {mapStyleMode === 'satellite' && (
             <button
               type="button"
               onClick={() => {
@@ -756,16 +699,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             >
               <RotateCw className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{t('globe.spin')}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setRevealSeed((s) => s + 1)}
-              title={isEn ? 'Replay gradual hotspot reveal' : 'Reproducir aparición gradual de focos'}
-              className="inline-flex min-h-[36px] sm:min-h-[32px] items-center gap-1.5 rounded-md border border-[#B8EE68]/40 bg-[#B8EE68]/15 px-2.5 py-1 text-xs font-medium text-[#B8EE68] transition-colors hover:bg-[#B8EE68]/25"
-            >
-              <Flame className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{isEn ? 'Reveal' : 'Animar'}</span>
             </button>
           )}
 
@@ -822,41 +755,25 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <details className="font-sans">
-            <summary className="min-h-7 cursor-pointer py-1 text-[#C8D3CE] hover:text-[#EFF5ED]">
-              {isEn ? 'Map options' : 'Opciones del mapa'}
-            </summary>
-            <button
-              type="button"
-              disabled={!selectedMonth || minMonth === maxMonth}
-              onClick={() => setIsPlayingTimeline((p) => !p)}
-              aria-pressed={isPlayingTimeline}
-              className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-xs font-medium transition-colors disabled:opacity-40 ${
-                isPlayingTimeline
-                  ? 'border-[#B8EE68]/50 bg-[#B8EE68]/20 text-[#B8EE68]'
-                  : 'border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/40'
-              }`}
-            >
-              {isPlayingTimeline ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-              <span>{isPlayingTimeline ? (isEn ? 'Pause' : 'Pausar') : (isEn ? 'Timelapse' : 'Recorrer')}</span>
-            </button>
-          </details>
+          <button
+            type="button"
+            disabled={!selectedMonth || minMonth === maxMonth}
+            onClick={alternarReproduccion}
+            aria-pressed={isPlayingTimeline}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-2.5 text-xs font-sans font-medium text-[#EFF5ED] hover:border-[#B8EE68]/40 disabled:opacity-40 aria-pressed:border-[#B8EE68]/50 aria-pressed:text-[#B8EE68]"
+          >
+            {isPlayingTimeline ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            {isPlayingTimeline
+              ? (isEn ? 'Pause playback' : 'Pausar reproducción')
+              : (isEn ? 'Play months' : 'Reproducir meses')}
+          </button>
           <span
             role="status"
-            title={
-              totalCellsCount !== null && realHotspots.length < totalCellsCount
-                ? isEn
-                  ? `Showing the ${realHotspots.length} cells with the most hot spots (of ${totalCellsCount} with ≥${MIN_FOCOS_MAPA})`
-                  : `Se muestran las ${realHotspots.length} celdas con más focos (de ${totalCellsCount} con ≥${MIN_FOCOS_MAPA})`
-                : undefined
-            }
             className={`tabular-nums text-xs text-[#C8D3CE] transition-opacity duration-200 ${
               isLoadingCells ? 'opacity-60' : 'opacity-100'
             }`}
           >
-            {totalCellsCount !== null
-              ? textoContador(realHotspots.length, totalCellsCount, isEn)
-              : cellsStatus}
+            {celdas.data && !cellsError ? textoContador(celdasVisibles.length, isEn) : cellsStatus}
           </span>
         </div>
       </div>
@@ -887,7 +804,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             <div className="mt-1 flex flex-col gap-1 font-mono text-xs">
               {TRAMOS_FOCOS.map((tramo) => (
                 <div key={tramo.desde} className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ background: tramo.color }} />
+                  <span className="h-2.5 w-2.5 rounded-sm" style={{ background: tramo.color }} />
                   <span className="text-[#EFF5ED]">{etiquetaTramo(tramo, isEn)}</span>
                 </div>
               ))}
@@ -899,7 +816,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               )}
               {capa === 'armonizado' && (
                 <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full border border-dashed border-[#EFF5ED]" />
+                  <span className="h-2.5 w-2.5 rounded-sm border border-dashed border-[#EFF5ED]" />
                   <span className="text-[#C8D3CE]">{isEn ? 'Estimated from MODIS' : 'Estimado desde MODIS'}</span>
                 </div>
               )}
@@ -910,7 +827,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               </span>
             </div>
             <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
-              {totalCellsCount !== null ? (isEn ? 'LIVE API' : 'API EN VIVO') : cellsStatus}
+              {celdas.data && !cellsError ? (isEn ? 'LIVE API' : 'API EN VIVO') : cellsStatus}
             </div>
           </div>
         )}

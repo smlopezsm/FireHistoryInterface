@@ -166,7 +166,8 @@ describe('provinciasLayer', () => {
   it('toggles selected state on click and clears on second click or background click', () => {
     const { map } = createMockMap();
     const onSelectProvincia = vi.fn();
-    attachProvinciasLayer(map as unknown as maplibregl.Map, { onSelectProvincia });
+    const sobreCelda = vi.fn().mockReturnValue(false);
+    attachProvinciasLayer(map as unknown as maplibregl.Map, { onSelectProvincia, sobreCelda });
 
     // First click selects province 1
     map.__emitLayer('click', PROVINCIAS_FILL_LAYER_ID, {
@@ -188,16 +189,14 @@ describe('provinciasLayer', () => {
     );
     expect(onSelectProvincia).toHaveBeenLastCalledWith(null);
 
-    // Background click from a hotspot marker must NOT deselect province
+    // El clic en una celda no debe cambiar la provincia.
     map.__emitLayer('click', PROVINCIAS_FILL_LAYER_ID, {
       features: [{ id: 2, properties: { provincia_id: '18' } }],
     });
     map.setFeatureState.mockClear();
     onSelectProvincia.mockClear();
-    map.__emitMap('click', {
-      point: { x: 10, y: 10 },
-      originalEvent: { target: { closest: (sel: string) => sel === '.hotspot-marker' } },
-    });
+    sobreCelda.mockReturnValueOnce(true);
+    map.__emitMap('click', { point: { x: 10, y: 10 } });
     expect(map.setFeatureState).not.toHaveBeenCalled();
     expect(onSelectProvincia).not.toHaveBeenCalled();
 
