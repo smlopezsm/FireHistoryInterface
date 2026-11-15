@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
 
         {/* Navegación central: Explorar / Calendario / La misión */}
         <nav
-          aria-label="Secciones principales"
+          aria-label={t('header.nav.ariaLabel')}
           className="hidden md:flex items-center gap-1 font-sans text-xs text-[#93A39C] rounded-md border border-[#21312D] bg-[#0D1816] p-1"
         >
           <button

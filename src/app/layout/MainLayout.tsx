@@ -286,7 +286,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
       </div>
 
       <aside
-        aria-label="Nota técnica de observación térmica"
+        aria-label={t('hero.scientificNoteAriaLabel')}
         className="flex items-start gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 text-xs text-[#93A39C]"
       >
         <Info className="h-4 w-4 shrink-0 text-[#68D9D0] mt-0.5" aria-hidden="true" />
