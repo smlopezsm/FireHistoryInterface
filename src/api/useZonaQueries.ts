@@ -1,6 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { ApiRequestError, getAnomalia, getCalendario, getSerie, type PeriodoParams } from './client';
-import type { AnomaliaResponse, CalendarioResponse, Granularidad, PedidoZona, SerieResponse } from './types';
+import {
+  ApiRequestError,
+  getAnomalia,
+  getCalendario,
+  getMapaCeldas,
+  getSerie,
+  type MapaCeldasParams,
+  type PeriodoParams,
+} from './client';
+import type { AnomaliaResponse, CalendarioResponse, Granularidad, MapaCeldas, PedidoZona, SerieResponse } from './types';
 
 const HORA = 1000 * 60 * 60;
 
@@ -58,6 +66,21 @@ export function useAnomalia(zona: PedidoZona | null, mes?: string) {
     queryKey: ['anomalia', zona, mes ?? null],
     queryFn: ({ signal }) => getAnomalia(zona!, mes ? { mes } : {}, signal),
     enabled: zona !== null,
+    staleTime: HORA,
+    retry: retryServidor,
+  });
+}
+
+/**
+ * Celdas del mapa para un mes. Con TanStack Query, volver a un mes ya visto sale de la
+ * caché (útil en el timelapse) y la petición que queda obsoleta se cancela con `signal`.
+ * `null` = todavía no hay parámetros (falta /metadata).
+ */
+export function useMapaCeldas(params: MapaCeldasParams | null) {
+  return useQuery<MapaCeldas, Error>({
+    queryKey: ['mapaCeldas', params],
+    queryFn: ({ signal }) => getMapaCeldas(params!, signal),
+    enabled: params !== null,
     staleTime: HORA,
     retry: retryServidor,
   });

@@ -118,6 +118,7 @@
     "spotsBtn": "Focos CSV"
   },
   "globe": {
+    "loadingMap": "Cargando mapa…",
     "title": "Globo Terráqueo 3D",
     "badge": "MapLibre 3D · IGN Argenmap",
     "spin": "Giro",

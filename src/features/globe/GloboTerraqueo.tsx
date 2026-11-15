@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getMapaCeldas, rangoDelMes, useMetadata, useProvincias, type GeoJSON } from '../../api';
+import { rangoDelMes, useMapaCeldas, useMetadata, useProvincias, type GeoJSON } from '../../api';
 import {
   MIN_FOCOS_MAPA,
   TRAMOS_FOCOS,
@@ -287,10 +287,27 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const selectedMonth = requestedMonth >= minMonth && requestedMonth <= maxMonth ? requestedMonth : maxMonth;
   const updateMonth = onMonthChange ?? setLocalMonth;
   const [isPlayingTimeline, setIsPlayingTimeline] = useState(!onMonthChange && !prefersReducedMotion);
-  const [isLoadingCells, setIsLoadingCells] = useState(false);
-  const [cellsError, setCellsError] = useState(false);
-  const [totalCellsCount, setTotalCellsCount] = useState<number | null>(null);
-  const [realHotspots, setRealHotspots] = useState<MarcadorCelda[]>([]);
+  // Celdas del mes con TanStack Query: caché por mes/zona/capa y cancelación de lo obsoleto.
+  const bboxParam = bbox.join(',');
+  const paramsCeldas = useMemo(() => {
+    if (!metadata) return null;
+    const { desde, hasta } = rangoDelMes(selectedMonth, metadata.fecha_min, metadata.fecha_max);
+    return { bbox: bboxParam, desde, hasta, capa: activeSensorFilter, min_focos: MIN_FOCOS_MAPA };
+  }, [metadata, selectedMonth, bboxParam, activeSensorFilter]);
+  const celdas = useMapaCeldas(paramsCeldas);
+  const isLoadingCells = celdas.isFetching;
+  const cellsError = celdas.isError;
+  const { marcadores: realHotspots, total: totalCellsCount } = useMemo((): {
+    marcadores: MarcadorCelda[];
+    total: number | null;
+  } => {
+    if (!celdas.data) return { marcadores: [], total: null };
+    return celdasAMarcadores(celdas.data.features, {
+      provinciaId: selectedProvinciaId,
+      dentro: geometriaZona ? (lng, lat) => isPointInGeometry(lng, lat, geometriaZona) : undefined,
+      nombres: nombresProvincias,
+    });
+  }, [celdas.data, selectedProvinciaId, geometriaZona, nombresProvincias]);
 
   const totalMonths = monthDiff(minMonth, maxMonth);
   const currentMonthIdx = monthDiff(minMonth, selectedMonth);
@@ -427,48 +444,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     });
   }, [realHotspots, isEn, activeSensorFilter]);
 
-  const bboxParam = bbox.join(',');
-
-  // Consulta de celdas activas a FireHistoryInterfaceAPI para el mes y zona seleccionados
-  useEffect(() => {
-    if (!metadata) return;
-    let isCancelled = false;
-    const { desde, hasta } = rangoDelMes(selectedMonth, metadata.fecha_min, metadata.fecha_max);
-    setIsLoadingCells(true);
-    setCellsError(false);
-    setTotalCellsCount(null);
-    setRealHotspots([]);
-
-    getMapaCeldas({
-      bbox: bboxParam,
-      desde,
-      hasta,
-      capa: activeSensorFilter,
-      min_focos: MIN_FOCOS_MAPA,
-    })
-      .then((fc) => {
-        if (isCancelled) return;
-        const { marcadores, total } = celdasAMarcadores(fc.features, {
-          provinciaId: selectedProvinciaId,
-          dentro: geometriaZona ? (lng, lat) => isPointInGeometry(lng, lat, geometriaZona) : undefined,
-          nombres: nombresProvincias,
-        });
-        setTotalCellsCount(total);
-        setRealHotspots(marcadores);
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setCellsError(true);
-        }
-      })
-      .finally(() => {
-        if (!isCancelled) setIsLoadingCells(false);
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [activeSensorFilter, selectedMonth, bboxParam, metadata, geometriaZona, selectedProvinciaId, nombresProvincias]);
 
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {

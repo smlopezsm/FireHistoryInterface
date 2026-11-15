@@ -108,7 +108,8 @@ describe('GloboTerraqueo 3D Component', () => {
         expect.objectContaining({
           desde: '2026-11-01',
           hasta: '2026-11-13',
-        })
+        }),
+        expect.any(AbortSignal)
       );
     });
 
@@ -121,7 +122,8 @@ describe('GloboTerraqueo 3D Component', () => {
         expect.objectContaining({
           desde: '2026-10-01',
           hasta: '2026-10-31',
-        })
+        }),
+        expect.any(AbortSignal)
       );
     });
   });
@@ -134,13 +136,14 @@ describe('GloboTerraqueo 3D Component', () => {
         geometry: { type: 'Polygon', coordinates: [[[-66, -33], [-65, -33], [-65, -34], [-66, -33]]] },
         properties: { cell_id: index, provincia_id, modis: 10, viirs: 25, estado: 'observado', valor: 25 },
       })),
-    }).mockRejectedValueOnce(new Error('Map data unavailable'));
+    }).mockRejectedValue(new Error('Map data unavailable'));
 
     renderGlobe({ selectedProvinciaId: '74' });
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1 (cells|celdas) · 2026-11/));
     fireEvent.click(screen.getByRole('button', { name: /Previous month|Mes anterior/i }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Hot spots unavailable|Focos no disponibles/));
+    // Los errores de red se reintentan 2 veces (retryServidor) antes de mostrarse.
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Hot spots unavailable|Focos no disponibles/), { timeout: 6000 });
     expect(screen.queryByText(/sample data|datos de muestra/i)).not.toBeInTheDocument();
   });
 
@@ -242,7 +245,8 @@ describe('GloboTerraqueo 3D Component', () => {
         expect.objectContaining({
           desde: '2000-11-01',
           hasta: '2000-11-30',
-        })
+        }),
+        expect.any(AbortSignal)
       );
     });
   });

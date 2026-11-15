@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import {
@@ -9,7 +9,11 @@ import {
   SeriesWidget,
   type Periodo,
 } from '../../features/dashboard';
-import { GloboTerraqueo } from '../../features/globe';
+import { CargarAlVer } from '../CargarAlVer';
+
+// El globo trae MapLibre (~300 kB gzip): se descarga recién cuando el mapa se acerca a la
+// pantalla, así no compite con la anomalía y el calendario en la carga inicial.
+const GloboTerraqueo = lazy(() => import('../../features/globe').then((m) => ({ default: m.GloboTerraqueo })));
 import {
   useAnomalia,
   useMetadata,
@@ -137,8 +141,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
     return [];
   }, [zona, apiProvincias]);
 
+  const esqueletoGlobo = (heightClass: string) => (
+    <div
+      className={`w-full ${heightClass} flex items-center justify-center bg-[#07100F] text-xs text-[#93A39C]`}
+      role="status"
+      aria-label={t('globe.loadingMap')}
+    >
+      {t('globe.loadingMap')}
+    </div>
+  );
+
   const globo = (heightClass: string) => (
-    <GloboTerraqueo
+    <CargarAlVer esqueleto={esqueletoGlobo(heightClass)}>
+      <Suspense fallback={esqueletoGlobo(heightClass)}>
+        <GloboTerraqueo
       center={zona.center}
       zoom={zona.zoom}
       bbox={zona.bbox}
@@ -150,7 +166,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod }) => {
       selectedProvinciaIds={selectedProvinciaIds}
       onSelectProvincia={handleSelectProvinciaFromMap}
       className={`w-full ${heightClass} rounded-none border-0`}
-    />
+        />
+      </Suspense>
+    </CargarAlVer>
   );
 
   const descargas = (className: string) => (
