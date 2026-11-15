@@ -118,6 +118,7 @@
     "spotsBtn": "Hot spots CSV"
   },
   "globe": {
+    "loadingMap": "Loading map…",
     "title": "3D Earth Globe",
     "badge": "MapLibre 3D · IGN Argenmap",
     "spin": "Spin",

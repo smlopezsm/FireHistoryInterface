@@ -9,7 +9,7 @@ describe('App Shell Layout & i18n (English Default)', () => {
     i18n.changeLanguage('en');
   });
 
-  it('renders header, main layout and footer in English by default', () => {
+  it('renders header, main layout and footer in English by default', async () => {
     render(
       <Providers>
         <App />
@@ -21,7 +21,8 @@ describe('App Shell Layout & i18n (English Default)', () => {
 
     // Check key widgets in main layout in English
     expect(screen.getAllByText(/Area Selection/i)[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/3D Earth Globe/i)[0]).toBeInTheDocument();
+    // El globo se carga de forma diferida (React.lazy).
+    expect((await screen.findAllByText(/3D Earth Globe/i))[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Monthly Anomaly/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Harmonized Calendar month × year/i)[0]).toBeInTheDocument();
 
