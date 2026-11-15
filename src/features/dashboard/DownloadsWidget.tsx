@@ -1,21 +1,27 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, FileSpreadsheet, Check } from "lucide-react";
+import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
+import { getCalendarioDownloadUrl, getFocosDownloadUrl, type Capa } from "../../api";
 
 interface DownloadsWidgetProps {
   zonaNombre: string;
   capa: string;
+  provincia_id?: string;
+  bbox?: [number, number, number, number];
   className?: string;
 }
 
-export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, capa, className = '' }) => {
+export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({
+  zonaNombre,
+  capa,
+  provincia_id,
+  bbox,
+  className = '',
+}) => {
   const { t } = useTranslation();
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  const handleDownload = (tipo: "calendario" | "focos") => {
-    setDownloading(tipo);
-
-    // Generar archivo CSV en memoria con metadatos de procedencia (docs/03 y docs/07)
+  const generateFallbackCsv = (tipo: "calendario" | "focos", filename: string) => {
     const timestamp = new Date().toISOString().slice(0, 10);
     const headers =
       tipo === "calendario"
@@ -43,17 +49,55 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute(
-      "download",
-      `fuego-continuo-${tipo}-${zonaNombre.toLowerCase().replace(/\s+/g, "-")}.csv`,
-    );
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
-    setTimeout(() => {
-      setDownloading(null);
-    }, 1500);
+  const handleDownload = async (tipo: "calendario" | "focos") => {
+    setDownloading(tipo);
+    const bboxStr = !provincia_id && bbox ? bbox.join(',') : undefined;
+    const filename = `fuego-continuo-${tipo}-${zonaNombre.toLowerCase().replace(/\s+/g, "-")}.csv`;
+
+    try {
+      const url =
+        tipo === "calendario"
+          ? getCalendarioDownloadUrl({
+              provincia_id,
+              bbox: bboxStr,
+              capa: capa as Capa,
+            })
+          : getFocosDownloadUrl({
+              provincia_id,
+              bbox: bboxStr,
+              desde: "2000-11-01",
+              hasta: "2026-11-13",
+              sensor: "todos",
+            });
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+    } catch {
+      // Si la API no está disponible o da error de red, usar generador local seguro
+      generateFallbackCsv(tipo, filename);
+    } finally {
+      setTimeout(() => {
+        setDownloading(null);
+      }, 1500);
+    }
   };
 
   return (
@@ -80,7 +124,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
           className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-sans text-xs font-medium text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors"
         >
           {downloading === "calendario" ? (
-            <Check className="h-3.5 w-3.5 text-[#B8EE68]" />
+            <Loader2 className="h-3.5 w-3.5 text-[#B8EE68] animate-spin" />
           ) : (
             <Download className="h-3.5 w-3.5 text-[#B8EE68]" />
           )}
@@ -94,7 +138,7 @@ export const DownloadsWidget: React.FC<DownloadsWidgetProps> = ({ zonaNombre, ca
           className="inline-flex items-center gap-1.5 rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-1.5 font-sans text-xs font-medium text-[#EFF5ED] hover:border-[#B8EE68]/40 hover:bg-[#1A332C]/40 transition-colors"
         >
           {downloading === "focos" ? (
-            <Check className="h-3.5 w-3.5 text-[#FF9C55]" />
+            <Loader2 className="h-3.5 w-3.5 text-[#FF9C55] animate-spin" />
           ) : (
             <Download className="h-3.5 w-3.5 text-[#FF9C55]" />
           )}

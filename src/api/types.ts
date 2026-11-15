@@ -13,6 +13,15 @@ export namespace GeoJSON {
     type: 'MultiPolygon';
     coordinates: number[][][][];
   }
+  export interface Feature<G = Geometry, P = Record<string, unknown>> {
+    type: 'Feature';
+    geometry: G;
+    properties: P;
+  }
+  export interface FeatureCollection<G = Geometry, P = Record<string, unknown>> {
+    type: 'FeatureCollection';
+    features: Feature<G, P>[];
+  }
 }
 
 export type Capa = 'armonizado' | 'modis' | 'viirs';
@@ -72,6 +81,13 @@ export type CategoriaAnomalia =
   | 'por_encima'
   | 'muy_por_encima';
 
+export interface HealthResponse {
+  estado: 'ok' | 'degradado';
+  datos_listos: boolean;
+  data_version: string | null;
+  fecha_max: string | null;
+}
+
 export interface AnomaliaResponse {
   mes: string;
   valor: number;
@@ -97,6 +113,8 @@ export interface Metadata {
     hasta: string | null;
   }[];
   fuentes: string[];
+  celdas_total?: number;
+  provincias_total?: number;
 }
 
 export interface ApiError {

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { MapPin, Pentagon, Compass, Crosshair } from "lucide-react";
+import { useProvincias } from "../../api";
 
 export interface ZoneItem {
   id: string;
@@ -8,6 +9,8 @@ export interface ZoneItem {
   region: string;
   center: [number, number]; // [lng, lat]
   zoom: number;
+  provincia_id?: string;
+  bbox?: [number, number, number, number];
 }
 
 export const PROVINCIAS_ARG: ZoneItem[] = [
@@ -17,6 +20,7 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "Nacional",
     center: [-64, -38],
     zoom: 2.2,
+    bbox: [-73.6, -55.1, -53.6, -21.8],
   },
   {
     id: "cordoba",
@@ -24,6 +28,8 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "Centro / Sierras",
     center: [-64.2, -31.4],
     zoom: 5.5,
+    provincia_id: "14",
+    bbox: [-65.8, -35.0, -61.7, -29.5],
   },
   {
     id: "san-luis",
@@ -31,6 +37,8 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "Cuyo",
     center: [-66.3, -33.3],
     zoom: 5.5,
+    provincia_id: "74",
+    bbox: [-67.4, -36.0, -64.9, -31.8],
   },
   {
     id: "corrientes",
@@ -38,6 +46,8 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "Litoral",
     center: [-58.8, -28.5],
     zoom: 5.5,
+    provincia_id: "18",
+    bbox: [-59.7, -30.7, -55.6, -27.2],
   },
   {
     id: "entre-rios",
@@ -45,6 +55,8 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "Litoral",
     center: [-59.8, -32.0],
     zoom: 5.5,
+    provincia_id: "30",
+    bbox: [-60.8, -34.0, -57.8, -30.1],
   },
   {
     id: "salta",
@@ -52,6 +64,8 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "NOA",
     center: [-65.4, -24.8],
     zoom: 5.2,
+    provincia_id: "66",
+    bbox: [-68.6, -26.4, -62.3, -22.0],
   },
   {
     id: "chubut",
@@ -59,6 +73,8 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "Patagonia",
     center: [-68.5, -43.8],
     zoom: 4.8,
+    provincia_id: "26",
+    bbox: [-72.2, -46.1, -65.0, -42.0],
   },
   {
     id: "la-pampa",
@@ -66,6 +82,8 @@ export const PROVINCIAS_ARG: ZoneItem[] = [
     region: "Pampeana",
     center: [-65.3, -37.2],
     zoom: 5.0,
+    provincia_id: "42",
+    bbox: [-68.3, -39.0, -63.4, -35.0],
   },
 ];
 
@@ -87,6 +105,38 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith("es"));
   const [showCoordinates, setShowCoordinates] = useState(false);
+  const { data: apiProvincias } = useProvincias();
+
+  const zonesList: ZoneItem[] = useMemo(() => {
+    if (!apiProvincias || apiProvincias.length === 0) {
+      return PROVINCIAS_ARG;
+    }
+
+    const nationalZone: ZoneItem = {
+      id: "arg",
+      name: isEn ? t("zone.allCountry") : "Argentina (Completa)",
+      region: isEn ? t("zone.national") : "Nacional",
+      center: [-64, -38],
+      zoom: 2.2,
+      bbox: [-73.6, -55.1, -53.6, -21.8],
+    };
+
+    const provZones: ZoneItem[] = apiProvincias.map((p) => {
+      const lng = Number(((p.bbox[0] + p.bbox[2]) / 2).toFixed(2));
+      const lat = Number(((p.bbox[1] + p.bbox[3]) / 2).toFixed(2));
+      return {
+        id: p.provincia_id,
+        provincia_id: p.provincia_id,
+        name: p.nombre,
+        region: p.region,
+        center: [lng, lat],
+        zoom: 5.5,
+        bbox: p.bbox,
+      };
+    });
+
+    return [nationalZone, ...provZones];
+  }, [apiProvincias, isEn, t]);
 
   const [lng, lat] = selectedZone.center;
   const latFormatted = `${Math.abs(lat).toFixed(2)}° ${lat < 0 ? "S" : "N"}`;
@@ -170,12 +220,12 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
             id="province-select"
             value={selectedZone.id}
             onChange={(e) => {
-              const found = PROVINCIAS_ARG.find((z) => z.id === e.target.value);
+              const found = zonesList.find((z) => z.id === e.target.value || z.provincia_id === e.target.value);
               if (found) onSelectZone(found);
             }}
             className="w-full rounded-md border border-[#21312D] bg-[#111E1B] px-3 py-2 font-sans text-xs font-medium text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none transition-colors"
           >
-            {PROVINCIAS_ARG.map((z) => {
+            {zonesList.map((z) => {
               const displayName =
                 z.id === "arg" && isEn ? t("zone.allCountry") : z.name;
               const displayRegion =

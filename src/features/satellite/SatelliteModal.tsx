@@ -1,15 +1,18 @@
-import React, { useRef } from 'react';
-import { useTranslation } from 'react-i18next';
-import { SatelliteViewer } from './SatelliteViewer';
-import { X, Orbit } from 'lucide-react';
-import { useDialogA11y } from '../../app/useDialogA11y';
+import React, { useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { SatelliteViewer } from "./SatelliteViewer";
+import { X, Orbit } from "lucide-react";
+import { useDialogA11y } from "../../app/useDialogA11y";
 
 interface SatelliteModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose }) => {
+export const SatelliteModal: React.FC<SatelliteModalProps> = ({
+  isOpen,
+  onClose,
+}) => {
   const { t } = useTranslation();
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -42,11 +45,14 @@ export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose 
               <Orbit className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <h2 id="satellite-modal-title" className="text-sm font-sans font-bold tracking-tight text-[#EFF5ED]">
-                {t('satelliteModal.title')}
+              <h2
+                id="satellite-modal-title"
+                className="text-sm font-sans font-bold tracking-tight text-[#EFF5ED]"
+              >
+                {t("satelliteModal.title")}
               </h2>
               <p className="text-xs text-[#93A39C] font-sans">
-                {t('satelliteModal.subtitle')}
+                {t("satelliteModal.subtitle")}
               </p>
             </div>
           </div>
@@ -55,7 +61,7 @@ export const SatelliteModal: React.FC<SatelliteModalProps> = ({ isOpen, onClose 
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            aria-label={t('satelliteModal.close')}
+            aria-label={t("satelliteModal.close")}
             className="rounded-md p-1.5 text-[#93A39C] transition-colors hover:bg-[#07100F] hover:text-[#EFF5ED] focus:outline-none focus:ring-2 focus:ring-[#B8EE68]"
           >
             <X className="h-5 w-5" aria-hidden="true" />

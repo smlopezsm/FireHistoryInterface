@@ -11,6 +11,10 @@ interface AnomalyWidgetProps {
   p25: number;
   p75: number;
   categoria: CategoriaAnomalia | null;
+  percentil?: number | null;
+  razon?: number | null;
+  anios_usados?: number;
+  isLoading?: boolean;
   className?: string;
 }
 
@@ -22,6 +26,9 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
   p25,
   p75,
   categoria,
+  percentil,
+  anios_usados,
+  isLoading = false,
   className = '',
 }) => {
   const { t, i18n } = useTranslation();
@@ -113,10 +120,11 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
                 {t('anomaly.label')} · {zonaNombre}
               </span>
               <span
-                className="rounded px-2 py-0.5 font-mono text-xs font-bold"
+                className="rounded px-2 py-0.5 font-mono text-xs font-bold flex items-center gap-1"
                 style={{ color: config.color, backgroundColor: `${config.color}20` }}
               >
-                {config.badge}
+                {isLoading && <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-ping" />}
+                <span>{config.badge}</span>
               </span>
               {categoria !== null && (
                 <span className="rounded bg-[#111E1B] border border-[#21312D] px-1.5 py-0.5 font-mono tabular-nums text-xs font-semibold text-[#EFF5ED]">
@@ -145,6 +153,25 @@ export const AnomalyWidget: React.FC<AnomalyWidgetProps> = ({
         <div className="text-[#93A39C]">
           {t('anomaly.range')} <span className="font-mono tabular-nums text-[#EFF5ED]">{p25} – {p75}</span>
         </div>
+        {percentil !== null && percentil !== undefined && (
+          <>
+            <div className="text-[#93A39C]">·</div>
+            <div className="text-[#93A39C]">
+              {Boolean(i18n?.language?.startsWith('es')) ? 'Percentil:' : 'Percentile:'}{' '}
+              <span className="font-mono tabular-nums text-[#68D9D0] font-semibold">{Math.round(percentil)}%</span>
+            </div>
+          </>
+        )}
+        {anios_usados !== undefined && (
+          <>
+            <div className="text-[#93A39C]">·</div>
+            <div className="text-[#93A39C]">
+              <span className="font-mono tabular-nums text-[#93A39C]">
+                ({anios_usados} {Boolean(i18n?.language?.startsWith('es')) ? 'años' : 'yrs'})
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

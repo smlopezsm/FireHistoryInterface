@@ -1,6 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Flame, Globe, HelpCircle, Orbit } from 'lucide-react';
+import { useMetadata } from '../../api';
+import { BackendHealthIndicator } from './BackendHealthIndicator';
 
 interface HeaderProps {
   onOpenMethod?: () => void;
@@ -9,6 +11,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }) => {
   const { t, i18n } = useTranslation();
+  const { data: metadata } = useMetadata();
   const isSpanish = Boolean(i18n?.language?.startsWith('es'));
 
   const toggleLanguage = () => {
@@ -44,8 +47,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
                 {t('header.title')}
               </h1>
               <span className="rounded border border-[#21312D] bg-[#111E1B] px-2 py-0.5 font-mono text-xs text-[#93A39C]">
-                <span className="hidden sm:inline">{t('header.badge')}</span>
-                <span className="inline sm:hidden">{t('header.badgeShort', { defaultValue: 'DEMO' })}</span>
+                {metadata?.factores_version ? (
+                  <>
+                    <span className="hidden sm:inline">NASA FIRMS · v{metadata.factores_version}</span>
+                    <span className="inline sm:hidden">v{metadata.factores_version}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">{t('header.badge')}</span>
+                    <span className="inline sm:hidden">{t('header.badgeShort', { defaultValue: 'DEMO' })}</span>
+                  </>
+                )}
               </span>
             </div>
             <p className="hidden text-xs text-[#93A39C] sm:block">
@@ -84,6 +96,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMethod, onOpenSatellites }
 
         {/* Acciones de cabecera */}
         <div className="flex items-center gap-2">
+          {/* Indicador de estado y telemetría del Backend */}
+          <BackendHealthIndicator />
+
+          <div className="hidden sm:block h-4 w-[1px] bg-[#21312D]" />
+
           {/* Visor 3D de Satélites NASA */}
           <button
             type="button"

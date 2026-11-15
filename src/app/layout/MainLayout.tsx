@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../features/dashboard';
 import { GloboTerraqueo } from '../../features/globe';
 import { SatelliteSchematic } from '../../features/satellite-schematic';
+import { useAnomalia } from '../../api';
 
 interface MainLayoutProps {
   onOpenMethod?: () => void;
@@ -24,11 +25,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const [selectedZone, setSelectedZone] = useState<ZoneItem>(PROVINCIAS_ARG[0]); // Argentina por defecto
   const [capa, setCapa] = useState<'armonizado' | 'modis' | 'viirs'>('armonizado');
 
-  const currentMonthName = Boolean(i18n?.language?.startsWith('es')) ? 'Septiembre' : 'September';
+  const isSpanish = Boolean(i18n?.language?.startsWith('es'));
+  const currentMonthName = isSpanish ? 'Septiembre' : 'September';
 
-  // Datos dinámicos contextuales según la provincia seleccionada
+  // Consulta en tiempo real de anomalía a FireHistoryInterfaceAPI
+  const bboxStr = !selectedZone.provincia_id && selectedZone.bbox ? selectedZone.bbox.join(',') : undefined;
+  const { data: apiAnomalia, isLoading: isLoadingAnomalia } = useAnomalia({
+    provincia_id: selectedZone.provincia_id,
+    bbox: bboxStr,
+  });
+
+  // Datos dinámicos contextuales según la provincia seleccionada (fallback offline)
   const getZoneAnomalyData = (zoneId: string) => {
     switch (zoneId) {
+      case '14':
       case 'cordoba':
         return {
           mes: currentMonthName,
@@ -37,7 +47,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           p25: 410,
           p75: 1250,
           categoria: 'muy_por_encima' as const,
+          percentil: 92,
+          razon: 2.0,
+          anios_usados: 24,
         };
+      case '18':
       case 'corrientes':
         return {
           mes: currentMonthName,
@@ -46,7 +60,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           p25: 750,
           p75: 1820,
           categoria: 'por_encima' as const,
+          percentil: 84,
+          razon: 1.65,
+          anios_usados: 24,
         };
+      case '30':
       case 'entre-rios':
         return {
           mes: currentMonthName,
@@ -55,7 +73,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           p25: 520,
           p75: 1480,
           categoria: 'normal' as const,
+          percentil: 52,
+          razon: 0.93,
+          anios_usados: 24,
         };
+      case '26':
       case 'chubut':
         return {
           mes: currentMonthName,
@@ -64,6 +86,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           p25: 40,
           p75: 160,
           categoria: 'por_debajo' as const,
+          percentil: 22,
+          razon: 0.39,
+          anios_usados: 24,
         };
       default: // Nacional 'arg' u otras
         return {
@@ -73,11 +98,42 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           p25: 5200,
           p75: 11400,
           categoria: 'por_encima' as const,
+          percentil: 78,
+          razon: 1.6,
+          anios_usados: 24,
         };
     }
   };
 
-  const anomalyData = getZoneAnomalyData(selectedZone.id);
+  const anomalyData = useMemo(() => {
+    if (apiAnomalia) {
+      const parts = apiAnomalia.mes.split('-');
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const monthNamesEs = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+      ];
+      const monthNamesEn = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+      ];
+      const monthName = isSpanish ? monthNamesEs[monthIdx] : monthNamesEn[monthIdx];
+      const formattedMonth = `${monthName} ${parts[0]}`;
+
+      return {
+        mes: formattedMonth,
+        valor: Math.round(apiAnomalia.valor),
+        mediana: Math.round(apiAnomalia.mediana ?? 0),
+        p25: Math.round(apiAnomalia.p25 ?? 0),
+        p75: Math.round(apiAnomalia.p75 ?? 0),
+        categoria: apiAnomalia.categoria,
+        percentil: apiAnomalia.percentil,
+        razon: apiAnomalia.razon,
+        anios_usados: apiAnomalia.anios_usados,
+      };
+    }
+    return getZoneAnomalyData(selectedZone.id);
+  }, [apiAnomalia, isSpanish, selectedZone.id]);
 
   return (
     <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 md:px-8 space-y-6">
@@ -111,6 +167,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <DownloadsWidget
               zonaNombre={selectedZone.name}
               capa={capa}
+              provincia_id={selectedZone.provincia_id}
+              bbox={selectedZone.bbox}
               className="border-t border-[#21312D]"
             />
           </section>
@@ -129,6 +187,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               p25={anomalyData.p25}
               p75={anomalyData.p75}
               categoria={anomalyData.categoria}
+              percentil={anomalyData.percentil}
+              razon={anomalyData.razon}
+              anios_usados={anomalyData.anios_usados}
+              isLoading={isLoadingAnomalia}
               className="rounded-none border-0 bg-transparent"
             />
 
@@ -137,6 +199,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               <CalendarHeatmapWidget
                 zonaNombre={selectedZone.name}
                 capa={capa}
+                provincia_id={selectedZone.provincia_id}
+                bbox={selectedZone.bbox}
                 className="rounded-none border-0 bg-transparent"
               />
             </div>
@@ -172,12 +236,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               p25={anomalyData.p25}
               p75={anomalyData.p75}
               categoria={anomalyData.categoria}
+              percentil={anomalyData.percentil}
+              razon={anomalyData.razon}
+              anios_usados={anomalyData.anios_usados}
+              isLoading={isLoadingAnomalia}
               className="rounded-none border-0 bg-transparent"
             />
             <div id="calendario-mobile" className="scroll-mt-20">
               <CalendarHeatmapWidget
                 zonaNombre={selectedZone.name}
                 capa={capa}
+                provincia_id={selectedZone.provincia_id}
+                bbox={selectedZone.bbox}
                 className="rounded-none border-0 bg-transparent"
               />
             </div>
@@ -186,6 +256,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           <DownloadsWidget
             zonaNombre={selectedZone.name}
             capa={capa}
+            provincia_id={selectedZone.provincia_id}
+            bbox={selectedZone.bbox}
             className="rounded-xl border border-[#21312D]"
           />
         </div>

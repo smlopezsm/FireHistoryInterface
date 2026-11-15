@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { getMapaCeldas } from '../../api';
 import {
   RotateCw,
   RefreshCw,
@@ -72,6 +73,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const [isUserInteracting, setIsUserInteracting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
+  const [realHotspots, setRealHotspots] = useState<typeof SAMPLE_HOTSPOTS | null>(null);
 
   // Sincronizar con prop externa
   useEffect(() => {
@@ -117,12 +119,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   }, []);
 
   // Actualizar marcadores de focos de calor según filtro
-  const renderHotspotMarkers = useCallback((map: mapboxgl.Map, filter: 'armonizado' | 'modis' | 'viirs') => {
+  const renderHotspotMarkers = useCallback((map: mapboxgl.Map, filter: 'armonizado' | 'modis' | 'viirs', customSpots?: typeof SAMPLE_HOTSPOTS) => {
     // Limpiar marcadores anteriores
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    const visibleHotspots = SAMPLE_HOTSPOTS.filter((h) => {
+    const spotsSource = customSpots || realHotspots || SAMPLE_HOTSPOTS;
+    const visibleHotspots = spotsSource.filter((h) => {
       if (filter === 'armonizado') return true;
       return h.sensor === filter;
     });
@@ -157,7 +160,58 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
       markersRef.current.push(marker);
     });
-  }, []);
+  }, [realHotspots, isEn]);
+
+  // Consulta opcional de celdas activas a FireHistoryInterfaceAPI
+  useEffect(() => {
+    let isCancelled = false;
+    getMapaCeldas({
+      bbox: '-73.6,-55.1,-53.6,-21.8',
+      desde: '2024-09-01',
+      hasta: '2024-09-30',
+      capa: activeSensorFilter,
+      min_focos: 10,
+    })
+      .then((fc) => {
+        if (isCancelled || !fc?.features || fc.features.length === 0) return;
+        const mapped = fc.features.slice(0, 30).map((f: any, idx: number) => {
+          const coords = f.geometry?.coordinates?.[0] || [];
+          let sumLng = 0;
+          let sumLat = 0;
+          coords.forEach(([clng, clat]: [number, number]) => {
+            sumLng += clng;
+            sumLat += clat;
+          });
+          const count = coords.length || 1;
+          const valor = f.properties?.valor ?? f.properties?.armonizado ?? 30;
+          const sensor = f.properties?.viirs ? 'viirs' : 'modis';
+          const provId = f.properties?.provincia_id;
+
+          return {
+            id: `real-${f.properties?.cell_id ?? idx}`,
+            lng: Number((sumLng / count).toFixed(4)),
+            lat: Number((sumLat / count).toFixed(4)),
+            sensor: sensor as 'viirs' | 'modis',
+            brightness: Math.min(420, Math.round(310 + valor * 1.5)),
+            province: provId ? `Prov. ${provId} (${Math.round(valor)} focos)` : `Celda ${f.properties?.cell_id ?? idx}`,
+          };
+        });
+
+        if (mapped.length > 0) {
+          setRealHotspots(mapped);
+          if (mapRef.current) {
+            renderHotspotMarkers(mapRef.current, activeSensorFilter, mapped);
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback silencioso a SAMPLE_HOTSPOTS
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeSensorFilter, renderHotspotMarkers]);
 
   // Inicializar Mapbox GL JS
   useEffect(() => {
