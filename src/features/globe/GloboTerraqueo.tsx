@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getMapaCeldas, useMetadata, useProvincias, type GeoJSON } from '../../api';
+import { getMapaCeldas, rangoDelMes, useMetadata, useProvincias, type GeoJSON } from '../../api';
 import {
   attachProvinciasLayer,
   PROVINCIAS_GEOJSON_URL,
@@ -31,14 +31,6 @@ const shiftMonth = (ym: string, delta: number): string => {
   const [y, m] = ym.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + delta, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-};
-
-const monthToDateRange = (ym: string, maxDate?: string): { desde: string; hasta: string } => {
-  const [y, m] = ym.split('-').map(Number);
-  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const monthEnd = `${ym}-${String(lastDay).padStart(2, '0')}`;
-  const hasta = maxDate && maxDate.startsWith(ym) && maxDate < monthEnd ? maxDate : monthEnd;
-  return { desde: `${ym}-01`, hasta };
 };
 
 const monthDiff = (fromYm: string, toYm: string): number => {
@@ -143,19 +135,14 @@ const SATELLITE_GLOBE_STYLE: maplibregl.StyleSpecification = {
   ],
 };
 
-// Puntos calientes representativos en Argentina (Córdoba, Delta del Paraná, Corrientes, San Luis, Salta, Chubut)
-const SAMPLE_HOTSPOTS = [
-  { id: 'f1', lng: -64.42, lat: -31.35, sensor: 'viirs', brightness: 345, province: 'Córdoba (Punilla)' },
-  { id: 'f2', lng: -64.55, lat: -31.60, sensor: 'viirs', brightness: 370, province: 'Córdoba (Calamuchita)' },
-  { id: 'f3', lng: -60.40, lat: -32.85, sensor: 'modis', brightness: 320, province: 'Entre Ríos (Delta)' },
-  { id: 'f4', lng: -60.25, lat: -33.10, sensor: 'modis', brightness: 315, province: 'Entre Ríos (Islas)' },
-  { id: 'f5', lng: -57.85, lat: -28.20, sensor: 'viirs', brightness: 360, province: 'Corrientes (Iberá)' },
-  { id: 'f6', lng: -58.20, lat: -28.75, sensor: 'modis', brightness: 330, province: 'Corrientes' },
-  { id: 'f7', lng: -66.15, lat: -33.15, sensor: 'viirs', brightness: 380, province: 'San Luis (Sierras)' },
-  { id: 'f8', lng: -64.80, lat: -24.20, sensor: 'viirs', brightness: 355, province: 'Salta (Orán)' },
-  { id: 'f9', lng: -71.30, lat: -42.80, sensor: 'modis', brightness: 310, province: 'Chubut (Cordillera)' },
-  { id: 'f10', lng: -65.20, lat: -37.10, sensor: 'viirs', brightness: 335, province: 'La Pampa' },
-];
+interface Hotspot {
+  id: string;
+  lng: number;
+  lat: number;
+  sensor: 'viirs' | 'modis';
+  brightness: number;
+  province: string;
+}
 
 interface GloboTerraqueoProps {
   className?: string;
@@ -164,7 +151,8 @@ interface GloboTerraqueoProps {
   zoom?: number;
   bbox?: [number, number, number, number];
   capa?: 'armonizado' | 'modis' | 'viirs';
-  externalMonth?: string;
+  month?: string;
+  onMonthChange?: (month: string) => void;
   geometriaZona?: GeoJSON.Polygon | GeoJSON.MultiPolygon;
   selectedProvinciaId?: string;
   selectedProvinciaIds?: string[];
@@ -178,7 +166,8 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   zoom = 2.0,
   bbox = [-73.6, -55.1, -53.6, -21.8],
   capa = 'armonizado',
-  externalMonth,
+  month,
+  onMonthChange,
   geometriaZona,
   selectedProvinciaId,
   selectedProvinciaIds,
@@ -186,7 +175,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
-  const { data: metadata } = useMetadata();
+  const { data: metadata, error: metadataError } = useMetadata();
   const { data: apiProvincias } = useProvincias(true);
   const minMonth = metadata?.fecha_min?.slice(0, 7) || '2000-11';
   const maxMonth = metadata?.fecha_max?.slice(0, 7) || '2026-11';
@@ -205,7 +194,6 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const onSelectProvinciaRef = useRef(onSelectProvincia);
   onSelectProvinciaRef.current = onSelectProvincia;
   const idleTimeoutRef = useRef<number | null>(null);
-  const userPickedMonthRef = useRef(false);
   const prevViewRef = useRef({ lng: center[0], lat: center[1], zoom });
 
   const [isLoaded, setIsLoaded] = useState(false);
@@ -284,37 +272,35 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   }, [mapStyleMode]);
 
   const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
-  const [selectedMonth, setSelectedMonth] = useState<string>(maxMonth);
-  const [isPlayingTimeline, setIsPlayingTimeline] = useState(!prefersReducedMotion);
+  const [localMonth, setLocalMonth] = useState<string | null>(null);
+  const requestedMonth = month ?? localMonth ?? maxMonth;
+  const selectedMonth = requestedMonth >= minMonth && requestedMonth <= maxMonth ? requestedMonth : maxMonth;
+  const updateMonth = onMonthChange ?? setLocalMonth;
+  const [isPlayingTimeline, setIsPlayingTimeline] = useState(!onMonthChange && !prefersReducedMotion);
   const [isLoadingCells, setIsLoadingCells] = useState(false);
+  const [cellsError, setCellsError] = useState(false);
   const [totalCellsCount, setTotalCellsCount] = useState<number | null>(null);
-  const [realHotspots, setRealHotspots] = useState<typeof SAMPLE_HOTSPOTS | null>(null);
+  const [realHotspots, setRealHotspots] = useState<Hotspot[]>([]);
 
-  const totalMonths = Math.max(1, monthDiff(minMonth, maxMonth));
-  const currentMonthIdx = Math.min(totalMonths, monthDiff(minMonth, selectedMonth));
+  const totalMonths = monthDiff(minMonth, maxMonth);
+  const currentMonthIdx = monthDiff(minMonth, selectedMonth);
+  const cellsStatus = metadataError || cellsError
+    ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
+    : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
 
-  useEffect(() => {
-    if (metadata?.fecha_max && !userPickedMonthRef.current && !externalMonth) {
-      setSelectedMonth(metadata.fecha_max.slice(0, 7));
-    }
-  }, [metadata?.fecha_max, externalMonth]);
-
-  useEffect(() => {
-    if (externalMonth) {
-      userPickedMonthRef.current = true;
-      setIsPlayingTimeline(false);
-      setSelectedMonth(externalMonth);
-    }
-  }, [externalMonth]);
+  const selectMonth = (nextMonth: string) => {
+    if (nextMonth < minMonth || nextMonth > maxMonth) return;
+    setIsPlayingTimeline(false);
+    updateMonth(nextMonth);
+  };
 
   useEffect(() => {
-    if (!isPlayingTimeline) return;
-    const timer = window.setInterval(() => {
-      userPickedMonthRef.current = true;
-      setSelectedMonth((prev) => (prev >= maxMonth ? minMonth : shiftMonth(prev, 1)));
+    if (!isPlayingTimeline || !metadata || minMonth === maxMonth) return;
+    const timer = window.setTimeout(() => {
+      updateMonth(selectedMonth >= maxMonth ? minMonth : shiftMonth(selectedMonth, 1));
     }, 2200);
-    return () => window.clearInterval(timer);
-  }, [isPlayingTimeline, minMonth, maxMonth]);
+    return () => window.clearTimeout(timer);
+  }, [isPlayingTimeline, metadata, selectedMonth, minMonth, maxMonth, updateMonth]);
 
   // Sincronizar con prop externa
   useEffect(() => {
@@ -361,18 +347,12 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   }, []);
 
   // Actualizar marcadores de focos de calor según filtro
-  const renderHotspotMarkers = useCallback((map: maplibregl.Map, filter: 'armonizado' | 'modis' | 'viirs', customSpots?: typeof SAMPLE_HOTSPOTS) => {
+  const renderHotspotMarkers = useCallback((map: maplibregl.Map) => {
     // Limpiar marcadores anteriores
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    const spotsSource = customSpots || realHotspots || SAMPLE_HOTSPOTS;
-    const visibleHotspots = spotsSource.filter((h) => {
-      if (filter === 'armonizado') return true;
-      return h.sensor === filter;
-    });
-
-    visibleHotspots.forEach((h, idx) => {
+    realHotspots.forEach((h, idx) => {
       const el = document.createElement('div');
       el.className = 'hotspot-marker';
 
@@ -446,9 +426,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
   // Consulta de celdas activas a FireHistoryInterfaceAPI para el mes y zona seleccionados
   useEffect(() => {
+    if (!metadata) return;
     let isCancelled = false;
-    const { desde, hasta } = monthToDateRange(selectedMonth, metadata?.fecha_max);
+    const { desde, hasta } = rangoDelMes(selectedMonth, metadata.fecha_min, metadata.fecha_max);
     setIsLoadingCells(true);
+    setCellsError(false);
+    setTotalCellsCount(null);
+    setRealHotspots([]);
 
     getMapaCeldas({
       bbox: bboxParam,
@@ -459,29 +443,30 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     })
       .then((fc) => {
         if (isCancelled) return;
-        const features = fc?.features || [];
+        const features = selectedProvinciaId
+          ? fc.features.filter(({ properties }) => properties.provincia_id === selectedProvinciaId)
+          : fc.features;
 
-        const mappedAll = features.map((f: any, idx: number) => {
+        const mappedAll = features.map((f) => {
           const coords = f.geometry?.coordinates?.[0] || [];
           let sumLng = 0;
           let sumLat = 0;
-          coords.forEach(([clng, clat]: [number, number]) => {
+          coords.forEach(([clng, clat]) => {
             sumLng += clng;
             sumLat += clat;
           });
           const count = coords.length || 1;
-          const valor = f.properties?.valor ?? f.properties?.armonizado ?? 30;
-          const sensor = f.properties?.viirs ? 'viirs' : 'modis';
-          const provId = f.properties?.provincia_id;
+          const { cell_id, provincia_id, viirs, valor } = f.properties;
+          const sensor = activeSensorFilter === 'armonizado' ? (viirs ? 'viirs' : 'modis') : activeSensorFilter;
 
           return {
-            id: `real-${f.properties?.cell_id ?? idx}`,
+            id: `real-${cell_id}`,
             lng: Number((sumLng / count).toFixed(4)),
             lat: Number((sumLat / count).toFixed(4)),
-            sensor: sensor as 'viirs' | 'modis',
+            sensor,
             brightness: Math.min(420, Math.round(310 + valor * 1.5)),
             valor,
-            province: provId ? `Prov. ${provId} (${Math.round(valor)} focos)` : `Celda ${f.properties?.cell_id ?? idx}`,
+            province: provincia_id ? `Prov. ${provincia_id} (${Math.round(valor)} focos)` : `Celda ${cell_id}`,
           };
         });
 
@@ -500,8 +485,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       })
       .catch(() => {
         if (!isCancelled) {
-          setTotalCellsCount(null);
-          setRealHotspots(null);
+          setCellsError(true);
         }
       })
       .finally(() => {
@@ -511,7 +495,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [activeSensorFilter, selectedMonth, bboxParam, metadata?.fecha_max, geometriaZona]);
+  }, [activeSensorFilter, selectedMonth, bboxParam, metadata, geometriaZona, selectedProvinciaId]);
 
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {
@@ -669,9 +653,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   // Actualizar marcadores al cambiar filtro de sensor o reiniciar animación
   useEffect(() => {
     if (mapRef.current && isLoaded) {
-      renderHotspotMarkers(mapRef.current, activeSensorFilter);
+      renderHotspotMarkers(mapRef.current);
     }
-  }, [activeSensorFilter, isLoaded, revealSeed, renderHotspotMarkers]);
+  }, [isLoaded, revealSeed, renderHotspotMarkers]);
 
   // Vuelo suave cuando cambian las coordenadas de selección externa
   useEffect(() => {
@@ -861,11 +845,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           <button
             type="button"
             disabled={selectedMonth <= minMonth}
-            onClick={() => {
-              userPickedMonthRef.current = true;
-              setIsPlayingTimeline(false);
-              setSelectedMonth((prev) => shiftMonth(prev, -1));
-            }}
+            onClick={() => selectMonth(shiftMonth(selectedMonth, -1))}
             aria-label={isEn ? 'Previous month' : 'Mes anterior'}
             className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
           >
@@ -876,23 +856,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             min={minMonth}
             max={maxMonth}
             value={selectedMonth}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              userPickedMonthRef.current = true;
-              setIsPlayingTimeline(false);
-              setSelectedMonth(e.target.value);
-            }}
+            onChange={(e) => selectMonth(e.target.value)}
             aria-label={isEn ? 'Select historical month' : 'Seleccionar mes histórico'}
             className="h-7 rounded border border-[#21312D] bg-[#111E1B] px-2 text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none [color-scheme:dark]"
           />
           <button
             type="button"
             disabled={selectedMonth >= maxMonth}
-            onClick={() => {
-              userPickedMonthRef.current = true;
-              setIsPlayingTimeline(false);
-              setSelectedMonth((prev) => shiftMonth(prev, 1));
-            }}
+            onClick={() => selectMonth(shiftMonth(selectedMonth, 1))}
             aria-label={isEn ? 'Next month' : 'Mes siguiente'}
             className="flex h-7 w-7 items-center justify-center rounded border border-[#21312D] bg-[#111E1B] text-[#EFF5ED] hover:border-[#B8EE68]/50 disabled:opacity-40"
           >
@@ -905,11 +876,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           min={0}
           max={totalMonths}
           value={currentMonthIdx}
-          onChange={(e) => {
-            userPickedMonthRef.current = true;
-            setIsPlayingTimeline(false);
-            setSelectedMonth(shiftMonth(minMonth, Number(e.target.value)));
-          }}
+          onChange={(e) => selectMonth(shiftMonth(minMonth, Number(e.target.value)))}
           aria-label={isEn ? 'Timeline slider' : 'Deslizador temporal'}
           className="h-1.5 flex-1 min-w-[110px] cursor-pointer accent-[#B8EE68]"
         />
@@ -929,13 +896,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
             <span>{isPlayingTimeline ? (isEn ? 'Pause' : 'Pausar') : (isEn ? 'Timelapse' : 'Recorrer')}</span>
           </button>
           <span
+            role="status"
             className={`min-w-[148px] text-center tabular-nums rounded border border-[#21312D] bg-[#0D1816] px-2 py-0.5 text-xs text-[#B8EE68] transition-opacity duration-200 ${
               isLoadingCells ? 'opacity-60' : 'opacity-100'
             }`}
           >
             {totalCellsCount !== null
               ? `${totalCellsCount} ${isEn ? 'cells' : 'celdas'} · ${selectedMonth}`
-              : `${selectedMonth} · DEMO`}
+              : cellsStatus}
           </span>
         </div>
       </div>
@@ -978,9 +946,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               </div>
             </div>
             <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
-              {realHotspots
-                ? (isEn ? 'LIVE API' : 'API EN VIVO')
-                : (isEn ? 'SAMPLE DATA' : 'DATOS DE MUESTRA')}
+              {totalCellsCount !== null ? (isEn ? 'LIVE API' : 'API EN VIVO') : cellsStatus}
             </div>
           </div>
         )}

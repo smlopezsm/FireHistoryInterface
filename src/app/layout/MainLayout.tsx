@@ -54,6 +54,7 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
   const [zona, setZona] = useState<ZonaSeleccionada>(ZONA_ARGENTINA);
   const [capa, setCapa] = useState<Capa>('armonizado');
   const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(null);
+  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(null);
 
   const { data: metadata } = useMetadata();
   const { data: apiProvincias } = useProvincias();
@@ -65,7 +66,11 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
   const periodoParams = periodoUsuario ?? {};
 
   // El mapa muestra un mes; por defecto el último mes completo.
-  const mesMapa = mesMax ? mesAnterior(mesMax) : null;
+  const mesPrevio = mesMax ? mesAnterior(mesMax) : null;
+  const mesInicialMapa = mesMin && mesPrevio && mesPrevio >= mesMin ? mesPrevio : mesMax;
+  const mesMapa = mesMapaUsuario && mesMin && mesMax && mesMapaUsuario >= mesMin && mesMapaUsuario <= mesMax
+    ? mesMapaUsuario
+    : mesInicialMapa ?? null;
 
   const pedido = useMemo(() => pedidoDeZona(zona), [zona]);
   const anomalia = useAnomalia(pedido);
@@ -138,7 +143,8 @@ export const MainLayout: React.FC<MainLayoutProps> = () => {
       zoom={zona.zoom}
       bbox={zona.bbox}
       capa={capa}
-      externalMonth={mesMapa ?? undefined}
+      month={mesMapa ?? undefined}
+      onMonthChange={setMesMapaUsuario}
       geometriaZona={zona.geometria}
       selectedProvinciaId={zona.provincia_id}
       selectedProvinciaIds={selectedProvinciaIds}
