@@ -20,24 +20,31 @@ import {
   type ZonaSeleccionada,
 } from '../api';
 
+import { CLAVE_PROVINCIA_CORDOBA, ID_CASO_CORDOBA, PASOS_CASO } from '../features/cordoba/caso';
+
+import { ID_CASO_PAMPA, PASOS_PAMPA } from '../features/pampa/caso';
+import type { GuiaActiva } from '../features/guiaEstado';
+
 export interface EstadoUrl {
   zona?: string;
   desde?: string;
   hasta?: string;
   capa?: Capa;
   mes?: string;
+  guia?: GuiaActiva;
 }
 
 const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
 const ZONA = /^(arg|prov:\d{2}|region:[\p{L} ]{2,30}|bbox:-?\d+(\.\d+)?(,-?\d+(\.\d+)?){3})$/u;
 const CAPAS: Capa[] = ['armonizado', 'modis', 'viirs'];
-const CLAVES = ['zona', 'desde', 'hasta', 'capa', 'mes'] as const;
+const CLAVES = ['zona', 'desde', 'hasta', 'capa', 'mes', 'caso', 'paso'] as const;
 
 export function leerEstado(busqueda: string): EstadoUrl {
   const q = new URLSearchParams(busqueda);
   const estado: EstadoUrl = {};
   const zona = q.get('zona');
-  if (zona && ZONA.test(zona)) estado.zona = zona;
+  if (zona === ID_CASO_CORDOBA) estado.zona = CLAVE_PROVINCIA_CORDOBA;
+  else if (zona && ZONA.test(zona)) estado.zona = zona;
   const desde = q.get('desde');
   const hasta = q.get('hasta');
   if (desde && hasta && MES.test(desde) && MES.test(hasta) && desde <= hasta) {
@@ -48,6 +55,13 @@ export function leerEstado(busqueda: string): EstadoUrl {
   if (capa && CAPAS.includes(capa)) estado.capa = capa;
   const mes = q.get('mes');
   if (mes && MES.test(mes)) estado.mes = mes;
+  const caso = q.get('caso');
+  const paso = q.get('paso');
+  if (caso === ID_CASO_CORDOBA) {
+    estado.guia = { caso, paso: PASOS_CASO.find((valor) => valor === paso) ?? 'calendario' };
+  } else if (caso === ID_CASO_PAMPA) {
+    estado.guia = { caso, paso: PASOS_PAMPA.find((valor) => valor === paso) ?? 'contexto' };
+  }
   return estado;
 }
 
@@ -62,6 +76,10 @@ export function escribirEstado(busqueda: string, estado: EstadoUrl): string {
   }
   if (estado.capa && estado.capa !== 'armonizado') q.set('capa', estado.capa);
   if (estado.mes) q.set('mes', estado.mes);
+  if (estado.guia) {
+    q.set('caso', estado.guia.caso);
+    q.set('paso', estado.guia.paso);
+  }
   // `:` y `,` son válidos en la query: se dejan legibles (prov:74, bbox:-66.6,-34,…).
   const texto = q.toString().replace(/%3A/gi, ':').replace(/%2C/gi, ',');
   return texto ? `?${texto}` : '';

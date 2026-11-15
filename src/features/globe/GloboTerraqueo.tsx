@@ -4,7 +4,7 @@ import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { formatMes } from '../../i18n/formatMes';
-import { ApiRequestError, rangoDelMes, useMapaCeldas, useMetadata, useProvincias, type GeoJSON, type BBox } from '../../api';
+import { ApiRequestError, BBOX_ARGENTINA, rangoDelMes, useMapaCeldas, useMetadata, useProvincias, type GeoJSON, type BBox } from '../../api';
 import {
   MIN_FOCOS_MAPA,
   TRAMOS_FOCOS,
@@ -12,8 +12,9 @@ import {
   etiquetaTramo,
   popupCeldaHtml,
   textoContador,
+  type CeldaMapa,
 } from './celdasMapa';
-import { celdaEnPunto, dibujarCeldas } from './celdasLayer';
+import { ID_CELDAS, celdaEnPunto, dibujarCeldas } from './celdasLayer';
 
 if (typeof maplibregl.setWorkerUrl === 'function') {
   maplibregl.setWorkerUrl(maplibreWorkerUrl);
@@ -171,6 +172,24 @@ function mostrarRectangulo(map: maplibregl.Map, limites: BBox | null) {
   });
 }
 
+const HISTORICAL_RASTER = 'historical-burned-area';
+
+function mostrarCapaHistorica(map: maplibregl.Map, tiles: string | undefined, bounds: BBox) {
+  const source = map.getSource(HISTORICAL_RASTER);
+  if (source && !tiles) {
+    map.removeLayer(HISTORICAL_RASTER);
+    map.removeSource(HISTORICAL_RASTER);
+  }
+  if (!tiles || source) return;
+  map.addSource(HISTORICAL_RASTER, { type: 'raster', tiles: [tiles], tileSize: 256, bounds });
+  map.addLayer({
+    id: HISTORICAL_RASTER,
+    type: 'raster',
+    source: HISTORICAL_RASTER,
+    paint: { 'raster-opacity': 0.8, 'raster-resampling': 'nearest' },
+  }, map.getLayer(ID_CELDAS) ? ID_CELDAS : undefined);
+}
+
 interface GloboTerraqueoProps {
   className?: string;
   onMapReady?: (map: maplibregl.Map) => void;
@@ -178,6 +197,11 @@ interface GloboTerraqueoProps {
   zoom?: number;
   bbox?: BBox;
   mostrarLimites?: boolean;
+  onInspectCell?: () => void;
+  estadoViirs?: 'cargando' | 'sin-datos';
+  historicalRasterTiles?: string;
+  historicalRasterSource?: string;
+  historicalRasterBounds?: BBox;
   mesDesde?: string;
   mesHasta?: string;
   capa?: 'armonizado' | 'modis' | 'viirs';
@@ -194,8 +218,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   onMapReady,
   center = [-64, -36], // Centrado en Argentina
   zoom = 2.0,
-  bbox = [-73.6, -55.1, -53.6, -21.8],
+  bbox = BBOX_ARGENTINA,
   mostrarLimites = false,
+  onInspectCell,
+  estadoViirs,
+  historicalRasterTiles,
+  historicalRasterSource,
+  historicalRasterBounds,
   mesDesde,
   mesHasta,
   capa = 'armonizado',
@@ -221,6 +250,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const limites = mostrarLimites ? bbox : null;
   const limitesRef = useRef(limites);
   limitesRef.current = limites;
+  const rasterHistoricoRef = useRef({ tiles: historicalRasterTiles, bounds: historicalRasterBounds ?? bbox });
+  rasterHistoricoRef.current = { tiles: historicalRasterTiles, bounds: historicalRasterBounds ?? bbox };
+  const [rasterHistoricoEstado, setRasterHistoricoEstado] = useState<'cargando' | 'listo' | 'error'>('cargando');
   const estiloListoRef = useRef(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -317,10 +349,10 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   // Celdas del mes con TanStack Query: caché por mes/zona/capa y cancelación de lo obsoleto.
   const bboxParam = bbox.join(',');
   const paramsCeldas = useMemo(() => {
-    if (!metadata || !selectedMonth) return null;
+    if (!metadata || !selectedMonth || estadoViirs) return null;
     const { desde, hasta } = rangoDelMes(selectedMonth, metadata.fecha_min, metadata.fecha_max);
     return { bbox: bboxParam, desde, hasta, capa, min_focos: MIN_FOCOS_MAPA };
-  }, [metadata, selectedMonth, bboxParam, capa]);
+  }, [metadata, selectedMonth, bboxParam, capa, estadoViirs]);
   const celdas = useMapaCeldas(paramsCeldas);
   const isLoadingCells = celdas.isFetching;
   const cellsError = celdas.isError;
@@ -334,15 +366,18 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     }),
     [celdas.data, capa, selectedProvinciaId, selectedProvinciaIds, geometriaZona, nombresProvincias],
   );
-  const opcionesCeldasRef = useRef({ celdasVisibles, capa, isEn });
-  opcionesCeldasRef.current = { celdasVisibles, capa, isEn };
+  const opcionesCeldasRef = useRef({ celdasVisibles, capa, isEn, onInspectCell });
+  opcionesCeldasRef.current = { celdasVisibles, capa, isEn, onInspectCell };
 
   const demasiadasCeldas = celdas.error instanceof ApiRequestError && celdas.error.status === 413;
-  const cellsStatus = demasiadasCeldas
-    ? (isEn ? 'Choose a smaller area' : 'Elegí una zona más chica')
-    : metadataError || cellsError
-      ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
-      : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
+  const viirsSinDatos = estadoViirs === 'sin-datos';
+  const cellsStatus = viirsSinDatos
+    ? (isEn ? 'VIIRS unavailable for this period' : 'VIIRS no disponible para este período')
+    : demasiadasCeldas
+      ? (isEn ? 'Choose a smaller area' : 'Elegí una zona más chica')
+      : metadataError || cellsError
+        ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
+        : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
 
   const selectMonth = (nextMonth: string) => {
     if (!minMonth || !maxMonth || nextMonth < minMonth || nextMonth > maxMonth) return;
@@ -373,14 +408,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       setIsPlayingTimeline(false);
       return;
     }
-    if (!isLoaded || isLoadingCells || !celdas.data) return;
+    if (!isLoaded || isLoadingCells || (!celdas.data && !viirsSinDatos)) return;
     const timer = window.setTimeout(() => {
       const siguiente = shiftMonth(selectedMonth, 1);
       mesEnReproduccion.current = siguiente;
       updateMonth(siguiente);
     }, 1400);
     return () => window.clearTimeout(timer);
-  }, [isPlayingTimeline, isLoaded, isLoadingCells, cellsError, celdas.data, selectedMonth, maxMonth, updateMonth]);
+  }, [isPlayingTimeline, isLoaded, isLoadingCells, cellsError, celdas.data, selectedMonth, maxMonth, updateMonth, viirsSinDatos]);
 
   // Rotación orbital (grados/segundo efectivos en ciclos de 1000 ms encadenados con moveend)
   const secondsPerRevolution = 150;
@@ -420,6 +455,27 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       setIsUserInteracting(false);
     }, 3500);
   }, []);
+
+  const abrirDetalleCelda = useCallback((map: maplibregl.Map, detalle: CeldaMapa['properties'], posicion: maplibregl.LngLatLike) => {
+    const { capa: actual, isEn: enIngles, onInspectCell: avisar } = opcionesCeldasRef.current;
+    popupRef.current?.remove();
+    popupRef.current = new maplibregl.Popup()
+      .setLngLat(posicion)
+      .setHTML(popupCeldaHtml(detalle, { capa: actual, isEn: enIngles }))
+      .addTo(map);
+    avisar?.();
+  }, []);
+
+  const abrirCeldaEjemplo = () => {
+    const map = mapRef.current;
+    if (!map || !celdasVisibles.length) return;
+    const { properties: celda } = celdasVisibles.reduce((mayor, item) =>
+      item.properties.valor > mayor.properties.valor ? item : mayor,
+    );
+    const posicion: [number, number] = [celda.lng, celda.lat];
+    map.jumpTo({ center: posicion });
+    abrirDetalleCelda(map, celda, posicion);
+  };
 
   // Inicializar MapLibre GL JS (sin token)
   useEffect(() => {
@@ -471,14 +527,21 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
           provinciasControllerRef.current.setSelectedProvincias(selectedProvinciaIdsRef.current);
         }
 
+        const historica = rasterHistoricoRef.current;
+        if (historica.tiles) mostrarCapaHistorica(map, historica.tiles, historica.bounds);
         dibujarCeldas(map, opcionesCeldasRef.current.celdasVisibles);
         if (limitesRef.current) mostrarRectangulo(map, limitesRef.current);
         setIsLoaded(true);
         if (onMapReady) onMapReady(map);
       });
 
-      map.on('error', () => {
-        // Evitar bloquear la UI por fallos transitorios de teselas externas
+      map.on('sourcedata', (evento) => {
+        if (evento.sourceId === HISTORICAL_RASTER && evento.sourceDataType === 'content' && evento.isSourceLoaded) {
+          setRasterHistoricoEstado((estado) => estado === 'error' ? estado : 'listo');
+        }
+      });
+      map.on('error', (evento) => {
+        if ('sourceId' in evento && evento.sourceId === HISTORICAL_RASTER) setRasterHistoricoEstado('error');
       });
 
       map.on('mousedown', handleInteractionStart);
@@ -489,15 +552,9 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       map.on('moveend', spinGlobe);
       map.on('click', (e: maplibregl.MapMouseEvent) => {
         const celdaId = celdaEnPunto(map, e.point);
-        const { celdasVisibles: visibles, capa: capaActual, isEn: enIngles } = opcionesCeldasRef.current;
         if (celdaId !== undefined) {
-          const detalle = visibles.find((feature) => feature.id === celdaId)?.properties;
-          if (!detalle) return;
-          popupRef.current?.remove();
-          popupRef.current = new maplibregl.Popup()
-            .setLngLat(e.lngLat)
-            .setHTML(popupCeldaHtml(detalle, { capa: capaActual, isEn: enIngles }))
-            .addTo(map);
+          const detalle = opcionesCeldasRef.current.celdasVisibles.find((feature) => feature.id === celdaId)?.properties;
+          if (detalle) abrirDetalleCelda(map, detalle, e.lngLat);
           return;
         }
 
@@ -531,12 +588,20 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       setHasError(true);
       setErrorMessage(err instanceof Error ? err.message : 'Error al inicializar MapLibre');
     }
-  }, [handleInteractionStart, handleInteractionEnd, spinGlobe, onMapReady]);
+  }, [handleInteractionStart, handleInteractionEnd, spinGlobe, onMapReady, abrirDetalleCelda]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (map && estiloListoRef.current) mostrarRectangulo(map, limites);
   }, [limites]);
+
+  useEffect(() => {
+    setRasterHistoricoEstado('cargando');
+    const map = mapRef.current;
+    if (map && estiloListoRef.current && (historicalRasterTiles || map.getSource(HISTORICAL_RASTER))) {
+      mostrarCapaHistorica(map, historicalRasterTiles, historicalRasterBounds ?? bbox);
+    }
+  }, [historicalRasterTiles, historicalRasterBounds, bbox]);
 
   // Las geometrías seleccionables vienen del mismo catálogo que usa el selector.
   useEffect(() => {
@@ -590,6 +655,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   }, [isLoaded, isSpinning, isUserInteracting, spinGlobe]);
 
   const handleToggleStyle = () => {
+    if (historicalRasterTiles) setRasterHistoricoEstado('cargando');
     const nextMode = mapStyleMode === 'ign' ? 'satellite' : 'ign';
     setMapStyleMode(nextMode);
     mapStyleModeRef.current = nextMode;
@@ -778,6 +844,15 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         </div>
       </div>
 
+      {onInspectCell && (
+        <div className="border-b border-[#21312D] px-4 py-1.5">
+          <button type="button" disabled={!isLoaded || !celdasVisibles.length} onClick={abrirCeldaEjemplo}
+            className="min-h-9 rounded-md border border-[#2A3F3A] px-2.5 text-sm text-[#B8EE68] hover:border-[#B8EE68] disabled:opacity-50">
+            {isEn ? 'Open an example cell' : 'Abrir una celda de ejemplo'}
+          </button>
+        </div>
+      )}
+
       {/* Viewport del Mapa 3D */}
       <div
         className="relative flex-1 w-full min-h-[220px]"
@@ -827,7 +902,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               </span>
             </div>
             <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
-              {celdas.data && !cellsError ? (isEn ? 'LIVE API' : 'API EN VIVO') : cellsStatus}
+              {celdas.data && !cellsError ? (isEn ? 'LIVE API' : 'API EN VIVO') : viirsSinDatos ? null : cellsStatus}
             </div>
           </div>
         )}
@@ -858,6 +933,13 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
         {/* Atribución oficial NASA Blue Marble */}
         <div className="absolute bottom-2 left-3 z-10 rounded border border-[#21312D] bg-[#07100F]/85 px-2 py-0.5 font-mono text-xs text-[#93A39C] backdrop-blur-md">
           {t('globe.attribution')}
+          {historicalRasterTiles && historicalRasterSource && (
+            <p>
+              <a className="text-[#EFF5ED] underline" href={historicalRasterSource} target="_blank" rel="noreferrer">CONAE · 1986–2024</a>
+              {rasterHistoricoEstado === 'cargando' && <span role="status"> · {isEn ? 'Loading historical layer…' : 'Cargando capa histórica…'}</span>}
+              {rasterHistoricoEstado === 'error' && <span role="status"> · {isEn ? 'CONAE layer unavailable' : 'Capa CONAE no disponible'}</span>}
+            </p>
+          )}
         </div>
       </div>
     </div>

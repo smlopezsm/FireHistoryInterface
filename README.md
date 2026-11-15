@@ -1,4 +1,4 @@
-# FireHistoryInterface
+# Fire History Interface
 
 Interfaz web del **calendario armonizado de focos de calor de Argentina (2000 → hoy)**, que combina MODIS y VIIRS en una sola escala (NASA Space Apps Challenge 2026: _Harmonization of MODIS and VIIRS Hot Spots_).
 

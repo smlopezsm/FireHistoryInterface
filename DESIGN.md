@@ -1,5 +1,5 @@
 ---
-name: FuegoContinuo
+name: Fire History Interface
 description: Harmonized satellite Earth observation system for MODIS and VIIRS active fire hot spots
 colors:
   primary: "#B8EE68"
@@ -94,13 +94,13 @@ components:
     padding: "8px 12px"
 ---
 
-# Design System: FuegoContinuo
+# Design System: Fire History Interface
 
 ## Overview
 
 **Creative North Star: "Orbital Control Room"**
 
-FuegoContinuo is an Earth observation command center designed to monitor, harmonize, and diagnose active fire hot spots across Argentina from 2000 to the present day. The interface evokes the quiet authority of an orbital flight operations room: deep cosmic void backgrounds (`#07100F`), dense telemetry surfaces (`#0D1816` and `#111E1B`), hairline wireframes (`#21312D`), and luminous focal indicators that cut through the darkness with purposeful scientific clarity.
+Fire History Interface is an Earth observation command center designed to monitor, harmonize, and diagnose active fire hot spots across Argentina from 2000 to the present day. The interface evokes the quiet authority of an orbital flight operations room: deep cosmic void backgrounds (`#07100F`), dense telemetry surfaces (`#0D1816` and `#111E1B`), hairline wireframes (`#21312D`), and luminous focal indicators that cut through the darkness with purposeful scientific clarity.
 
 Rather than resembling a generic SaaS dashboard or an exaggerated sci-fi neon interface, the design maintains strict editorial discipline. Every visual element serves an operational purpose: distinguishing spatial resolution regimes (MODIS 1 km vs. VIIRS 375 m), highlighting statistical anomalies against 24-year historical medians, and rendering uncertainty transparent through tactile hatched textures. 
 
@@ -177,7 +177,7 @@ The spatial layout is engineered around a standard **1440 px maximum desktop con
 
 ## Elevation & Depth
 
-FuegoContinuo adopts a **Tonal Layering & Crisp Wireframe** philosophy. Depth is communicated through subtle luminance stepping between surfaces and razor-sharp 1px structural borders, avoiding blurry or heavy drop shadows that muddy dark visual environments.
+Fire History Interface adopts a **Tonal Layering & Crisp Wireframe** philosophy. Depth is communicated through subtle luminance stepping between surfaces and razor-sharp 1px structural borders, avoiding blurry or heavy drop shadows that muddy dark visual environments.
 
 - **Level 0 (Base Canvas):** `#07100F` — Infinite void.
 - **Level 1 (Card / Sidebar Surfaces):** `#0D1816` with `1px solid #21312D` border — Recessed resting panels.
@@ -231,7 +231,7 @@ FuegoContinuo adopts a **Tonal Layering & Crisp Wireframe** philosophy. Depth is
 
 ### Navigation
 - **Style:** Compact sticky header (`h-14`), background `#07100F` with 80% opacity and `backdrop-blur-md`, bottom border `1px solid #21312D`.
-- **Typography:** Manrope 14px bold for brand title ("FuegoContinuo"); DM Sans 13px medium for navigation tabs.
+- **Typography:** Manrope 14px bold for brand title ("Fire History Interface"); DM Sans 13px medium for navigation tabs.
 - **Language Switcher:** Pill toggle (`EN` / `ES`) with active state highlighted in `#B8EE68` and dark text `#07100F`.
 
 ### Heatmap Grid Cell (Signature Component)

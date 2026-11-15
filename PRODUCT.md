@@ -23,7 +23,7 @@ Provide an immersive and scientific Earth observation interface to explore and d
 
 ## Positioning
 
-Unlike conventional satellite portals that present disjointed raw data or unnormalized multi-sensor overlays, FuegoContinuo provides end-to-end statistical harmonization between MODIS and VIIRS. It makes uncertainty transparent: pre-2012 data (prior to VIIRS launch) is explicitly communicated as estimated with 45° diagonal hatching, prediction intervals, and clear scientific disclaimers (a hot spot is a thermal anomaly detected in an observation cell, not necessarily an individual fire or its active perimeter).
+Unlike conventional satellite portals that present disjointed raw data or unnormalized multi-sensor overlays, Fire History Interface provides end-to-end statistical harmonization between MODIS and VIIRS. It makes uncertainty transparent: pre-2012 data (prior to VIIRS launch) is explicitly communicated as estimated with 45° diagonal hatching, prediction intervals, and clear scientific disclaimers (a hot spot is a thermal anomaly detected in an observation cell, not necessarily an individual fire or its active perimeter).
 
 ## Operating Context
 
@@ -44,7 +44,7 @@ Unlike conventional satellite portals that present disjointed raw data or unnorm
 
 ## Brand Commitments
 
-- **Name:** FuegoContinuo (NASA Space Apps Challenge 2026: Harmonization of MODIS and VIIRS Hot Spots).
+- **Name:** Fire History Interface (NASA Space Apps Challenge 2026: Harmonization of MODIS and VIIRS Hot Spots).
 - **Voice & Tone:** Editorial control room dark aesthetic, scientifically rigorous yet accessible, transparent, restrained, and purposeful.
 - **Palette:** Base `#07100F`, surfaces `#0D1816` / `#111E1B`, border `#21312D`, accent `#B8EE68` (lime), MODIS `#68D9D0` (cyan), VIIRS `#FF9C55` (orange), high intensity `#FF6759` (red).
 - **Institutional References:** NASA FIRMS (MODIS & VIIRS), NASA EOSDIS / Earth Observatory, NOAA JPSS, and IGN Argentina.
