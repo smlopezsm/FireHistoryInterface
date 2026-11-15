@@ -1,318 +1,238 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info } from 'lucide-react';
 import {
   ZoneSelectorWidget,
-  PROVINCIAS_ARG,
-  type ZoneItem,
   AnomalyWidget,
   CalendarHeatmapWidget,
   DownloadsWidget,
+  SeriesWidget,
+  type Periodo,
 } from '../../features/dashboard';
 import { GloboTerraqueo } from '../../features/globe';
-import { SatelliteSchematic } from '../../features/satellite-schematic';
-import { useAnomalia, useProvincias } from '../../api';
+import {
+  useAnomalia,
+  useMetadata,
+  useProvincias,
+  pedidoDeZona,
+  zonaDePoligono,
+  zoomParaBbox,
+  aMes,
+  mesAnterior,
+  ZONA_ARGENTINA,
+  type Capa,
+  type GeoJSON,
+  type ZonaSeleccionada,
+} from '../../api';
 
 interface MainLayoutProps {
   onOpenMethod?: () => void;
   onOpenSatellites?: () => void;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({
-  onOpenSatellites,
-}) => {
+/** true en escritorio (≥ 1024 px). Evita montar dos mapas a la vez. */
+function useIsDesktop() {
+  const query = '(min-width: 1024px)';
+  const get = () =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(query).matches
+      : true;
+  const [isDesktop, setIsDesktop] = useState(get);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia(query);
+    const onChange = () => setIsDesktop(mql.matches);
+    mql.addEventListener?.('change', onChange);
+    return () => mql.removeEventListener?.('change', onChange);
+  }, []);
+  return isDesktop;
+}
+
+export const MainLayout: React.FC<MainLayoutProps> = () => {
   const { t, i18n } = useTranslation();
-  const [selectedZone, setSelectedZone] = useState<ZoneItem>(PROVINCIAS_ARG[0]); // Argentina por defecto
-  const [capa, setCapa] = useState<'armonizado' | 'modis' | 'viirs'>('armonizado');
-  const [selectedMonth, setSelectedMonth] = useState<string | undefined>(undefined);
+  const isEn = !Boolean(i18n?.language?.startsWith('es'));
+  const isDesktop = useIsDesktop();
+
+  const [zona, setZona] = useState<ZonaSeleccionada>(ZONA_ARGENTINA);
+  const [capa, setCapa] = useState<Capa>('armonizado');
+  const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(null);
+  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(null);
+
+  const { data: metadata } = useMetadata();
   const { data: apiProvincias } = useProvincias();
+  const mesMin = metadata ? aMes(metadata.fecha_min) : undefined;
+  const mesMax = metadata ? aMes(metadata.fecha_max) : undefined;
+
+  // Sin elección del usuario, la API usa todo el registro por defecto.
+  const periodo: Periodo = periodoUsuario ?? { desde: mesMin ?? '2000-11', hasta: mesMax ?? '' };
+  const periodoParams = periodoUsuario ?? {};
+
+  // El mapa muestra un mes; por defecto el último mes completo.
+  const mesMapa = mesMapaUsuario ?? (mesMax ? mesAnterior(mesMax) : null);
+
+  const pedido = useMemo(() => pedidoDeZona(zona), [zona]);
+  const anomalia = useAnomalia(pedido);
+
+  const preliminar = Boolean(
+    metadata && anomalia.data && anomalia.data.mes > aMes(metadata.fecha_ultimo_sp),
+  );
+
+  const handlePoligono = (poligono: GeoJSON.Polygon) =>
+    setZona(zonaDePoligono(poligono, isEn ? 'Drawn area' : 'Zona dibujada', isEn ? 'Polygon' : 'Polígono'));
 
   const handleSelectProvinciaFromMap = useCallback(
     (provinciaId: string | null) => {
       if (!provinciaId) {
-        setSelectedZone(PROVINCIAS_ARG[0]);
+        setZona(ZONA_ARGENTINA);
         return;
       }
-
-      const apiMatch = apiProvincias?.find((p) => p.provincia_id === provinciaId);
-      if (apiMatch) {
-        const lng = Number(((apiMatch.bbox[0] + apiMatch.bbox[2]) / 2).toFixed(2));
-        const lat = Number(((apiMatch.bbox[1] + apiMatch.bbox[3]) / 2).toFixed(2));
-        setSelectedZone({
-          id: apiMatch.provincia_id,
-          provincia_id: apiMatch.provincia_id,
-          name: apiMatch.nombre,
-          region: apiMatch.region,
-          center: [lng, lat],
-          zoom: 5.5,
-          bbox: apiMatch.bbox,
+      const match = apiProvincias?.find((p) => p.provincia_id === provinciaId);
+      if (match) {
+        setZona({
+          id: match.provincia_id,
+          provincia_id: match.provincia_id,
+          nombre: match.nombre,
+          region: match.region,
+          center: [(match.bbox[0] + match.bbox[2]) / 2, (match.bbox[1] + match.bbox[3]) / 2],
+          zoom: zoomParaBbox(match.bbox),
+          bbox: match.bbox,
         });
-        return;
-      }
-
-      const fallbackMatch = PROVINCIAS_ARG.find((z) => z.provincia_id === provinciaId);
-      if (fallbackMatch) {
-        setSelectedZone(fallbackMatch);
+      } else {
+        setZona({
+          id: provinciaId,
+          provincia_id: provinciaId,
+          nombre: `Provincia ${provinciaId}`,
+          region: 'Argentina',
+          center: zona.center,
+          zoom: 5.5,
+        });
       }
     },
-    [apiProvincias]
+    [apiProvincias, zona.center]
   );
 
-  const isSpanish = Boolean(i18n?.language?.startsWith('es'));
-  const currentMonthName = isSpanish ? 'Septiembre' : 'September';
+  const zonaNombre =
+    zona.id === ZONA_ARGENTINA.id ? t('zone.allCountry') : zona.nombre;
 
-  // Consulta en tiempo real de anomalía a FireHistoryInterfaceAPI
-  const bboxStr = !selectedZone.provincia_id && selectedZone.bbox ? selectedZone.bbox.join(',') : undefined;
-  const { data: apiAnomalia, isLoading: isLoadingAnomalia } = useAnomalia({
-    provincia_id: selectedZone.provincia_id,
-    bbox: bboxStr,
-  });
+  const selector = (
+    <ZoneSelectorWidget
+      selectedZone={zona}
+      onSelectZone={setZona}
+      capa={capa}
+      onChangeCapa={setCapa}
+      periodo={periodo}
+      onChangePeriodo={setPeriodoUsuario}
+      mesMin={mesMin}
+      mesMax={mesMax}
+      className="border-b border-[#21312D]"
+    />
+  );
 
-  // Datos dinámicos contextuales según la provincia seleccionada (fallback offline)
-  const getZoneAnomalyData = (zoneId: string) => {
-    switch (zoneId) {
-      case '14':
-      case 'cordoba':
-        return {
-          mes: currentMonthName,
-          valor: 1845,
-          mediana: 920,
-          p25: 410,
-          p75: 1250,
-          categoria: 'muy_por_encima' as const,
-          percentil: 92,
-          razon: 2.0,
-          anios_usados: 24,
-        };
-      case '18':
-      case 'corrientes':
-        return {
-          mes: currentMonthName,
-          valor: 2310,
-          mediana: 1400,
-          p25: 750,
-          p75: 1820,
-          categoria: 'por_encima' as const,
-          percentil: 84,
-          razon: 1.65,
-          anios_usados: 24,
-        };
-      case '30':
-      case 'entre-rios':
-        return {
-          mes: currentMonthName,
-          valor: 980,
-          mediana: 1050,
-          p25: 520,
-          p75: 1480,
-          categoria: 'normal' as const,
-          percentil: 52,
-          razon: 0.93,
-          anios_usados: 24,
-        };
-      case '26':
-      case 'chubut':
-        return {
-          mes: currentMonthName,
-          valor: 35,
-          mediana: 90,
-          p25: 40,
-          p75: 160,
-          categoria: 'por_debajo' as const,
-          percentil: 22,
-          razon: 0.39,
-          anios_usados: 24,
-        };
-      default: // Nacional 'arg' u otras
-        return {
-          mes: currentMonthName,
-          valor: 14250,
-          mediana: 8900,
-          p25: 5200,
-          p75: 11400,
-          categoria: 'por_encima' as const,
-          percentil: 78,
-          razon: 1.6,
-          anios_usados: 24,
-        };
-    }
-  };
+  const globo = (heightClass: string) => (
+    <GloboTerraqueo
+      center={zona.center}
+      zoom={zona.zoom}
+      capa={capa}
+      mesMapa={mesMapa}
+      onChangeMesMapa={setMesMapaUsuario}
+      mesMin={mesMin}
+      mesMax={mesMax}
+      fechaMin={metadata?.fecha_min}
+      fechaMax={metadata?.fecha_max}
+      geometriaZona={zona.geometria}
+      onPoligonoDibujado={handlePoligono}
+      selectedProvinciaId={zona.provincia_id}
+      onSelectProvincia={handleSelectProvinciaFromMap}
+      className={`w-full ${heightClass} rounded-none border-0`}
+    />
+  );
 
-  const anomalyData = useMemo(() => {
-    if (apiAnomalia) {
-      const parts = apiAnomalia.mes.split('-');
-      const monthIdx = parseInt(parts[1], 10) - 1;
-      const monthNamesEs = [
-        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-      ];
-      const monthNamesEn = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December',
-      ];
-      const monthName = isSpanish ? monthNamesEs[monthIdx] : monthNamesEn[monthIdx];
-      const formattedMonth = `${monthName} ${parts[0]}`;
+  const descargas = (className: string) => (
+    <DownloadsWidget
+      zonaNombre={zonaNombre}
+      pedido={pedido}
+      capa={capa}
+      periodo={periodoParams}
+      mesMapa={mesMapa}
+      fechaMin={metadata?.fecha_min}
+      fechaMax={metadata?.fecha_max}
+      className={className}
+    />
+  );
 
-      return {
-        mes: formattedMonth,
-        valor: Math.round(apiAnomalia.valor),
-        mediana: Math.round(apiAnomalia.mediana ?? 0),
-        p25: Math.round(apiAnomalia.p25 ?? 0),
-        p75: Math.round(apiAnomalia.p75 ?? 0),
-        categoria: apiAnomalia.categoria,
-        percentil: apiAnomalia.percentil,
-        razon: apiAnomalia.razon,
-        anios_usados: apiAnomalia.anios_usados,
-      };
-    }
-    return getZoneAnomalyData(selectedZone.id);
-  }, [apiAnomalia, isSpanish, selectedZone.id]);
+  const serie = (className: string) => (
+    <div className={className}>
+      <SeriesWidget
+        zonaNombre={zonaNombre}
+        capa={capa}
+        pedido={pedido}
+        periodo={periodoParams}
+        fechaMin={metadata?.fecha_min}
+        fechaMax={metadata?.fecha_max}
+        className="bg-transparent"
+      />
+    </div>
+  );
+
+  const diagnostico = (
+    <>
+      <AnomalyWidget
+        zonaNombre={zonaNombre}
+        data={anomalia.data}
+        isLoading={anomalia.isLoading}
+        error={anomalia.error}
+        preliminar={preliminar}
+        className="rounded-none border-0 bg-transparent"
+      />
+      <div id="calendario" className="scroll-mt-20">
+        <CalendarHeatmapWidget
+          zonaNombre={zonaNombre}
+          capa={capa}
+          pedido={pedido}
+          periodo={periodoParams}
+          fechaUltimoSp={metadata?.fecha_ultimo_sp}
+          className="rounded-none border-0 bg-transparent"
+        />
+      </div>
+    </>
+  );
 
   return (
     <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 md:px-8 space-y-6">
-      {/* Zona Principal en Dos Columnas Integradas (Explorar) */}
       <div id="explorar" className="scroll-mt-20">
-        {/* Vista Escritorio (≥ 1024 px): 6 cols izquierda (Globo) / 6 cols derecha (Telemetría y Calendario) */}
-        <div className="hidden lg:grid lg:grid-cols-12 lg:gap-5 items-start">
-          {/* Columna Izquierda (6 de 12) - Etapa Cartográfica Unificada */}
-          <section
-            aria-label="Etapa de observación cartográfica"
-            className="lg:col-span-6 rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col"
-          >
-            {/* Barra superior de selección territorial y sensor */}
-            <ZoneSelectorWidget
-              selectedZone={selectedZone}
-              onSelectZone={setSelectedZone}
-              capa={capa}
-              onChangeCapa={setCapa}
-              className="border-b border-[#21312D]"
-            />
-
-            {/* Globo Terráqueo 3D interactivo con textura satelital y puntos calientes */}
-            <GloboTerraqueo
-              center={selectedZone.center}
-              zoom={selectedZone.zoom}
-              bbox={selectedZone.bbox}
-              capa={capa}
-              externalMonth={selectedMonth}
-              selectedProvinciaId={selectedZone.provincia_id}
-              onSelectProvincia={handleSelectProvinciaFromMap}
-              className="w-full h-[560px] xl:h-[620px] rounded-none border-0"
-            />
-
-            {/* Barra inferior de exportación de datos con procedencia */}
-            <DownloadsWidget
-              zonaNombre={selectedZone.name}
-              capa={capa}
-              provincia_id={selectedZone.provincia_id}
-              bbox={selectedZone.bbox}
-              className="border-t border-[#21312D]"
-            />
-          </section>
-
-          {/* Columna Derecha (6 de 12) - Muelle Integrado de Diagnóstico y Serie Temporal */}
-          <section
-            aria-label="Muelle de diagnóstico y serie temporal"
-            className="lg:col-span-6 rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]"
-          >
-            {/* Widget de Anomalía vs Mediana histórica */}
-            <AnomalyWidget
-              zonaNombre={selectedZone.name}
-              mes={anomalyData.mes}
-              valor={anomalyData.valor}
-              mediana={anomalyData.mediana}
-              p25={anomalyData.p25}
-              p75={anomalyData.p75}
-              categoria={anomalyData.categoria}
-              percentil={anomalyData.percentil}
-              razon={anomalyData.razon}
-              anios_usados={anomalyData.anios_usados}
-              isLoading={isLoadingAnomalia}
-              className="rounded-none border-0 bg-transparent"
-            />
-
-            {/* Calendario Armonizado mes × año con patrón de rayado en datos estimados */}
-            <div id="calendario" className="scroll-mt-20">
-              <CalendarHeatmapWidget
-                zonaNombre={selectedZone.name}
-                capa={capa}
-                provincia_id={selectedZone.provincia_id}
-                bbox={selectedZone.bbox}
-                selectedZone={selectedZone}
-                onSelectZone={setSelectedZone}
-                selectedMonth={selectedMonth}
-                onSelectMonth={setSelectedMonth}
-                className="rounded-none border-0 bg-transparent"
-              />
-            </div>
-          </section>
-        </div>
-
-        {/* Vista Móvil (< 1024 px): Flujo vertical limpio e integrado */}
-        <div className="flex flex-col gap-4 lg:hidden">
-          {/* Módulo cartográfico móvil */}
-          <div className="rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
-            <ZoneSelectorWidget
-              selectedZone={selectedZone}
-              onSelectZone={setSelectedZone}
-              capa={capa}
-              onChangeCapa={setCapa}
-              className="border-b border-[#21312D]"
-            />
-            <GloboTerraqueo
-              center={selectedZone.center}
-              zoom={selectedZone.zoom}
-              bbox={selectedZone.bbox}
-              capa={capa}
-              externalMonth={selectedMonth}
-              selectedProvinciaId={selectedZone.provincia_id}
-              onSelectProvincia={handleSelectProvinciaFromMap}
-              className="w-full h-[420px] rounded-none border-0"
-            />
+        {isDesktop ? (
+          <div className="grid grid-cols-12 gap-5 items-start">
+            <section
+              aria-label="Etapa de observación cartográfica"
+              className="col-span-7 rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col"
+            >
+              {selector}
+              {globo('h-[560px] xl:h-[620px]')}
+              {descargas('border-t border-[#21312D]')}
+            </section>
+            <section
+              aria-label="Muelle de diagnóstico y serie temporal"
+              className="col-span-5 rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]"
+            >
+              {diagnostico}
+            </section>
+            {serie('col-span-12 rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden')}
           </div>
-
-          {/* Muelle de telemetría y calendario móvil */}
-          <div className="rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]">
-            <AnomalyWidget
-              zonaNombre={selectedZone.name}
-              mes={anomalyData.mes}
-              valor={anomalyData.valor}
-              mediana={anomalyData.mediana}
-              p25={anomalyData.p25}
-              p75={anomalyData.p75}
-              categoria={anomalyData.categoria}
-              percentil={anomalyData.percentil}
-              razon={anomalyData.razon}
-              anios_usados={anomalyData.anios_usados}
-              isLoading={isLoadingAnomalia}
-              className="rounded-none border-0 bg-transparent"
-            />
-            <div id="calendario-mobile" className="scroll-mt-20">
-              <CalendarHeatmapWidget
-                zonaNombre={selectedZone.name}
-                capa={capa}
-                provincia_id={selectedZone.provincia_id}
-                bbox={selectedZone.bbox}
-                selectedZone={selectedZone}
-                onSelectZone={setSelectedZone}
-                selectedMonth={selectedMonth}
-                onSelectMonth={setSelectedMonth}
-                className="rounded-none border-0 bg-transparent"
-              />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl border border-[#21312D] bg-[#07100F] overflow-hidden flex flex-col">
+              {selector}
+              {globo('h-[420px]')}
             </div>
+            <div className="rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden flex flex-col divide-y divide-[#21312D]">
+              {diagnostico}
+            </div>
+            {serie('rounded-xl border border-[#21312D] bg-[#0D1816] overflow-hidden')}
+            {descargas('rounded-xl border border-[#21312D]')}
           </div>
-
-          <DownloadsWidget
-            zonaNombre={selectedZone.name}
-            capa={capa}
-            provincia_id={selectedZone.provincia_id}
-            bbox={selectedZone.bbox}
-            className="rounded-xl border border-[#21312D]"
-          />
-        </div>
+        )}
       </div>
 
-      {/* Nota Científica aclaratoria sobre qué es un punto caliente */}
       <aside
         aria-label="Nota técnica de observación térmica"
         className="flex items-start gap-3 rounded-xl border border-[#21312D] bg-[#0D1816] p-4 text-xs text-[#93A39C]"
@@ -324,10 +244,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         </p>
       </aside>
 
-      {/* Centro de atención para el satélite (Hero Centerpiece) */}
-      <section id="la-mision" className="scroll-mt-20" aria-label="Sección de arquitectura de satélites orbitales">
-        <SatelliteSchematic onOpen3D={onOpenSatellites} />
-      </section>
     </main>
   );
 };
