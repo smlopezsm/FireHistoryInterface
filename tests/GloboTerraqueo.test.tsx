@@ -79,6 +79,7 @@ describe('GloboTerraqueo 3D Component', () => {
     expect(screen.getAllByText(/MapLibre 3D/i)[0]).toBeInTheDocument();
     expect(screen.getAllByTitle(/Replay gradual hotspot reveal|Reproducir aparición gradual/i)[0]).toBeInTheDocument();
     expect(screen.getAllByTitle(/Recenter on Argentina|Centrar en Argentina/i)[0]).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pause|Pausar/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('initializes MapLibre 3D globe immediately without requiring an access token', async () => {

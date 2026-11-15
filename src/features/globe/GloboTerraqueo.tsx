@@ -179,7 +179,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
 
   const [activeSensorFilter, setActiveSensorFilter] = useState<'armonizado' | 'modis' | 'viirs'>(capa);
   const [selectedMonth, setSelectedMonth] = useState<string>(maxMonth);
-  const [isPlayingTimeline, setIsPlayingTimeline] = useState(false);
+  const [isPlayingTimeline, setIsPlayingTimeline] = useState(!prefersReducedMotion);
   const [isLoadingCells, setIsLoadingCells] = useState(false);
   const [totalCellsCount, setTotalCellsCount] = useState<number | null>(null);
   const [realHotspots, setRealHotspots] = useState<typeof SAMPLE_HOTSPOTS | null>(null);
@@ -198,7 +198,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     const timer = window.setInterval(() => {
       userPickedMonthRef.current = true;
       setSelectedMonth((prev) => (prev >= maxMonth ? minMonth : shiftMonth(prev, 1)));
-    }, 1600);
+    }, 2200);
     return () => window.clearInterval(timer);
   }, [isPlayingTimeline, minMonth, maxMonth]);
 
@@ -265,7 +265,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       const isViirs = h.sensor === 'viirs';
       const isExtreme = h.brightness > 360;
       const color = isExtreme ? '#FF6759' : isViirs ? '#FF9C55' : '#68D9D0';
-      const delayMs = Math.min(idx * 45, 2200);
+      const delayMs = Math.min(idx * 35, 1100);
 
       el.innerHTML = `
         <div class="hotspot-appear relative flex items-center justify-center cursor-pointer" style="animation-delay: ${delayMs}ms;">
