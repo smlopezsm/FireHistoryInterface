@@ -66,7 +66,9 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
   const [contRef, W] = useAncho<HTMLDivElement>();
   const H = W < 640 ? 200 : 260;
 
-  const { data, isLoading, isFetching, error } = useSerie(pedido, { ...periodo, capa, granularidad });
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useSerie(pedido, { ...periodo, capa, granularidad });
+  // Curva de la consulta anterior (solo si cambió la granularidad): se ve atenuada.
+  const desactualizado = isPlaceholderData;
   const puntos = useMemo(() => data?.puntos ?? [], [data]);
   const color = COLOR_CAPA[capa];
 
@@ -154,7 +156,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
     : '';
 
   return (
-    <div role="region" aria-label={isEn ? 'Time series' : 'Serie temporal'} aria-busy={isLoading} className={`p-4 text-[#EFF5ED] ${className}`}>
+    <div role="region" aria-label={isEn ? 'Time series' : 'Serie temporal'} aria-busy={isLoading || isFetching} className={`p-4 text-[#EFF5ED] ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#21312D] pb-3">
         <div className="flex min-w-0 items-center gap-2">
           <LineChart className="h-4 w-4 shrink-0 text-[#B8EE68]" aria-hidden="true" />
@@ -193,7 +195,7 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
         {isLoading && (
           <div className="flex items-center justify-center gap-2 text-xs text-[#93A39C]" style={{ height: H }}>
             <Loader2 className="h-4 w-4 animate-spin text-[#B8EE68]" />
-            {isEn ? 'Loading series…' : 'Cargando serie…'}
+            {isEn ? `Loading ${zonaNombre}…` : `Cargando ${zonaNombre}…`}
           </div>
         )}
 
@@ -202,7 +204,8 @@ export const SeriesWidget: React.FC<SeriesWidgetProps> = ({
             width={W}
             height={H}
             viewBox={`0 0 ${W} ${H}`}
-            className="block select-none"
+            className={`block select-none transition-opacity duration-150 ${desactualizado ? 'opacity-40' : ''}`}
+            data-desactualizado={desactualizado ? 'true' : undefined}
             onMouseMove={onMove}
             onMouseLeave={() => setHoverIdx(null)}
             role="img"
