@@ -4,6 +4,7 @@ import '../src/i18n';
 import { Providers } from '../src/app/providers';
 import * as api from '../src/api/client';
 import { GloboTerraqueo } from '../src/features/globe/GloboTerraqueo';
+import type { ComponentProps } from 'react';
 
 // Mock maplibre-gl para entorno jsdom
 vi.mock('maplibre-gl', () => {
@@ -45,10 +46,10 @@ vi.mock('maplibre-gl', () => {
 });
 
 describe('GloboTerraqueo 3D Component', () => {
-  const renderGlobe = () =>
+  const renderGlobe = (props: ComponentProps<typeof GloboTerraqueo> = {}) =>
     render(
       <Providers>
-        <GloboTerraqueo />
+        <GloboTerraqueo {...props} />
       </Providers>
     );
 
@@ -99,6 +100,7 @@ describe('GloboTerraqueo 3D Component', () => {
 
   it('queries latest month from metadata and navigates to previous historical month', async () => {
     renderGlobe();
+    expect(api.getMapaCeldas).not.toHaveBeenCalled();
 
     await waitFor(() => {
       expect(api.getMapaCeldas).toHaveBeenCalledWith(
@@ -109,6 +111,7 @@ describe('GloboTerraqueo 3D Component', () => {
       );
     });
 
+    expect(api.getMapaCeldas).toHaveBeenCalledTimes(1);
     const prevBtn = screen.getByRole('button', { name: /Previous month|Mes anterior/i });
     fireEvent.click(prevBtn);
 
@@ -120,6 +123,24 @@ describe('GloboTerraqueo 3D Component', () => {
         })
       );
     });
+  });
+
+  it('keeps only cells assigned to the selected province and reports API errors', async () => {
+    vi.mocked(api.getMapaCeldas).mockResolvedValueOnce({
+      type: 'FeatureCollection',
+      features: ['74', '42'].map((provincia_id, index) => ({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[[-66, -33], [-65, -33], [-65, -34], [-66, -33]]] },
+        properties: { cell_id: index, provincia_id, modis: 10, viirs: 25, estado: 'observado', valor: 25 },
+      })),
+    }).mockRejectedValueOnce(new Error('Map data unavailable'));
+
+    renderGlobe({ selectedProvinciaId: '74' });
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1 (cells|celdas) · 2026-11/));
+    fireEvent.click(screen.getByRole('button', { name: /Previous month|Mes anterior/i }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Hot spots unavailable|Focos no disponibles/));
+    expect(screen.queryByText(/sample data|datos de muestra/i)).not.toBeInTheDocument();
   });
 
   it('allows user to toggle auto-rotation in satellite mode and stops animation when paused', async () => {
