@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { MapPin, Pentagon, Compass, Crosshair, Loader2, AlertCircle, CalendarRange } from "lucide-react";
+import { MapPin, Compass, Crosshair, Loader2, AlertCircle, CalendarRange } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useProvincias,
@@ -156,14 +156,6 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
             <Compass className="h-3.5 w-3.5" aria-hidden="true" />
             <span>{t("zone.latlon")}</span>
           </button>
-
-          <span
-            className="hidden sm:inline-flex items-center gap-1 rounded-md bg-[#111E1B] text-[#687771] border border-[#21312D] px-2 py-1 font-mono text-xs"
-            title={isEn ? "Draw a polygon on the map to query a custom area" : "Dibujá un polígono en el mapa para consultar una zona propia"}
-          >
-            <Pentagon className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{selectedZone.geometria ? (isEn ? "Polygon" : "Polígono") : "GeoJSON"}</span>
-          </span>
         </div>
       </div>
 
