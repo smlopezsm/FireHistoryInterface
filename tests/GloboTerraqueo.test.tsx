@@ -3,42 +3,51 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '../src/i18n';
 import { GloboTerraqueo } from '../src/features/globe/GloboTerraqueo';
 
-// Mock mapbox-gl para entorno jsdom
-vi.mock('mapbox-gl', () => {
-  return {
-    default: {
-      accessToken: '',
-      Map: vi.fn().mockImplementation(() => ({
-        on: vi.fn(),
-        remove: vi.fn(),
-        setFog: vi.fn(),
-        getZoom: vi.fn().mockReturnValue(2),
-        getCenter: vi.fn().mockReturnValue({ lng: -64, lat: -36 }),
-        easeTo: vi.fn(),
-        flyTo: vi.fn(),
-        zoomIn: vi.fn(),
-        zoomOut: vi.fn(),
-      })),
-    },
-  };
+// Mock maplibre-gl para entorno jsdom
+vi.mock('maplibre-gl', () => {
+  const Map = vi.fn().mockImplementation(() => ({
+    on: vi.fn(),
+    remove: vi.fn(),
+    setProjection: vi.fn(),
+    getZoom: vi.fn().mockReturnValue(2),
+    getCenter: vi.fn().mockReturnValue({ lng: -64, lat: -36 }),
+    easeTo: vi.fn(),
+    flyTo: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+  }));
+  const Marker = vi.fn().mockImplementation(() => ({
+    setLngLat: vi.fn().mockReturnThis(),
+    setPopup: vi.fn().mockReturnThis(),
+    addTo: vi.fn().mockReturnThis(),
+    remove: vi.fn(),
+  }));
+  const Popup = vi.fn().mockImplementation(() => ({
+    setHTML: vi.fn().mockReturnThis(),
+  }));
+  return { Map, Marker, Popup, default: { Map, Marker, Popup } };
 });
 
 describe('GloboTerraqueo 3D Component', () => {
-  it('renders 3D globe header with title and badges', () => {
+  it('renders 3D globe header with title and MapLibre badge', () => {
     render(<GloboTerraqueo />);
 
     expect(screen.getAllByText(/3D Earth Globe|Globo Terráqueo 3D/i)[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/Mapbox Satellite/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/MapLibre 3D/i)[0]).toBeInTheDocument();
     expect(screen.getAllByTitle(/auto-rotation|rotación automática/i)[0]).toBeInTheDocument();
     expect(screen.getAllByTitle(/Recenter on Argentina|Centrar en Argentina/i)[0]).toBeInTheDocument();
   });
 
-  it('renders token configuration prompt when token is not present in environment', () => {
+  it('initializes MapLibre 3D globe immediately without requiring an access token', async () => {
+    const maplibregl = await import('maplibre-gl');
     render(<GloboTerraqueo />);
 
-    expect(screen.getByText(/Mapbox GL JS Token|Token de Mapbox GL JS/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('pk.eyJ1Ijoi...')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Initialize 3D Globe|Inicializar Globo 3D/i })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('pk.eyJ1Ijoi...')).not.toBeInTheDocument();
+    expect(maplibregl.Map).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cooperativeGestures: true,
+      })
+    );
   });
 
   it('allows user to toggle auto-rotation button', () => {
@@ -71,22 +80,6 @@ describe('GloboTerraqueo 3D Component', () => {
     } finally {
       window.matchMedia = originalMatchMedia;
     }
-  });
-
-  it('configures mapbox Map with cooperativeGestures: true upon initialization', async () => {
-    const mapboxgl = (await import('mapbox-gl')).default;
-    render(<GloboTerraqueo />);
-
-    const tokenInput = screen.getByPlaceholderText('pk.eyJ1Ijoi...');
-    fireEvent.change(tokenInput, { target: { value: 'pk.mocked-valid-token' } });
-    const initBtn = screen.getByRole('button', { name: /Initialize 3D Globe|Inicializar Globo 3D/i });
-    fireEvent.click(initBtn);
-
-    expect(mapboxgl.Map).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cooperativeGestures: true,
-      })
-    );
   });
 
   it('ensures control buttons meet minimum touch target size classes', () => {

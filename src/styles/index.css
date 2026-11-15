@@ -79,3 +79,13 @@ h1, h2, h3, h4, .font-title {
     scroll-behavior: auto !important;
   }
 }
+
+.maplibregl-popup-content {
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.maplibregl-popup-tip {
+  display: none !important;
+}
