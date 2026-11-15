@@ -8,12 +8,20 @@ import {
   PRODUCTO_CONAE, type PasoCordoba,
 } from './caso';
 import { PasoGuiado, claseBotonPrincipalGuia } from './PasoGuiado';
+import { PASOS_PAMPA } from '../pampa/caso';
+import { pasosPampa } from '../pampa/pasos';
+import type { GuiaActiva } from '../guiaEstado';
 import { useDialogA11y } from '../../app/useDialogA11y';
 
 interface Props {
-  paso: PasoCordoba | null;
+  guia: GuiaActiva | null;
   guideButtonRef: RefObject<HTMLButtonElement>;
-  onPaso: (paso: PasoCordoba | null) => void;
+  harmonizationButtonRef: RefObject<HTMLButtonElement>;
+  onGuia: (guia: GuiaActiva | null) => void;
+  metodoAbierto: boolean;
+  onOpenMethod?: () => void;
+  onChangeCapa: (capa: Capa) => void;
+  versionFactores?: string;
   mes: string | null;
   capa: Capa;
   celdaAbierta: boolean;
@@ -27,8 +35,9 @@ const INVITACION_VISTA = 'fuegocontinuo-invitacion-cordoba';
 const boton = 'inline-flex min-h-10 w-fit items-center rounded-md border border-[#2A3F3A] px-3 py-2 text-sm font-medium text-[#EFF5ED] hover:border-[#B8EE68] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#B8EE68]';
 const enlace = 'text-[#B8EE68] underline underline-offset-4 hover:text-[#CBF58C]';
 
-export function ExperienciaCordoba({
-  paso, guideButtonRef, onPaso, mes, capa, celdaAbierta, datoMes, anomalia, mostrarConae, onVerEstimacion,
+export function ExperienciaGuiada({
+  guia, guideButtonRef, harmonizationButtonRef, onGuia, metodoAbierto, onOpenMethod,
+  onChangeCapa, versionFactores, mes, capa, celdaAbierta, datoMes, anomalia, mostrarConae, onVerEstimacion,
 }: Props) {
   const { t, i18n } = useTranslation();
   const es = Boolean(i18n?.language?.startsWith('es'));
@@ -37,6 +46,7 @@ export function ExperienciaCordoba({
   });
   const [leyendaDisponible, setLeyendaDisponible] = useState(true);
   const devolverFoco = useRef(false);
+  const ultimaGuia = useRef<GuiaActiva['caso']>();
   const guardarEleccion = useCallback(() => {
     setInvitacion(false);
     try { localStorage.setItem(INVITACION_VISTA, '1'); } catch { /* El almacenamiento puede estar deshabilitado. */ }
@@ -47,34 +57,36 @@ export function ExperienciaCordoba({
   }, [guardarEleccion]);
   const iniciar = () => {
     guardarEleccion();
-    onPaso('calendario');
+    onGuia({ caso: 'sierras-cordoba', paso: 'calendario' });
   };
   const salir = useCallback(() => {
     cerrarInvitacion();
-    onPaso(null);
-  }, [cerrarInvitacion, onPaso]);
+    onGuia(null);
+  }, [cerrarInvitacion, onGuia]);
 
-  const mostrarDialogo = !paso && invitacion;
+  const mostrarDialogo = !guia && invitacion;
   const { containerRef } = useDialogA11y({ isOpen: mostrarDialogo, onClose: cerrarInvitacion });
 
   useEffect(() => {
-    if (paso && invitacion) guardarEleccion();
-    if (!paso && !invitacion && devolverFoco.current) {
-      guideButtonRef.current?.focus({ preventScroll: true });
+    if (guia) ultimaGuia.current = guia.caso;
+    if (guia && invitacion) guardarEleccion();
+    if (!guia && !invitacion && devolverFoco.current) {
+      const boton = ultimaGuia.current === 'la-pampa' ? harmonizationButtonRef : guideButtonRef;
+      boton.current?.focus({ preventScroll: true });
       devolverFoco.current = false;
     }
-  }, [paso, invitacion, guardarEleccion, guideButtonRef]);
+  }, [guia, invitacion, guardarEleccion, guideButtonRef, harmonizationButtonRef]);
 
   useEffect(() => {
-    if (!paso) return;
+    if (!guia || metodoAbierto) return;
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) salir();
     };
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
-  }, [paso, salir]);
+  }, [guia, metodoAbierto, salir]);
 
-  if (!paso) {
+  if (!guia) {
     if (!mostrarDialogo || typeof document === 'undefined') return null;
     return createPortal(
       <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#010807]/80 p-4 backdrop-blur-sm">
@@ -103,7 +115,10 @@ export function ExperienciaCordoba({
     );
   }
 
-  const indice = PASOS_CASO.indexOf(paso);
+  if (metodoAbierto) return null;
+
+  const esPampa = guia.caso === 'la-pampa';
+  const indice = esPampa ? PASOS_PAMPA.indexOf(guia.paso) : PASOS_CASO.indexOf(guia.paso);
   const formato = new Intl.NumberFormat(es ? 'es-AR' : 'en-US', { maximumFractionDigits: 1 });
   const episodio = mes === MES_EPISODIO && datoMes?.periodo === MES_EPISODIO ? datoMes : undefined;
   const estimado = mes === MES_ESTIMADO && datoMes?.periodo === MES_ESTIMADO ? datoMes : undefined;
@@ -141,7 +156,7 @@ export function ExperienciaCordoba({
         )}
         {id === 'armonizacion' && (
           <>
-            <p>{es ? 'Armonizado usa el VIIRS de referencia cuando hay observaciones y aplica el método de FuegoContinuo sobre MODIS cuando corresponde. En la comparación histórica, la mediana describe un septiembre típico entre los años usados como referencia.' : 'Harmonized uses the reference VIIRS when observations are available and applies FuegoContinuo’s method to MODIS where applicable. In the historical comparison, the median describes a typical September among reference years.'}</p>
+            <p>{es ? 'Armonizado usa el VIIRS de referencia cuando hay observaciones y aplica el método de Fire History Interface sobre MODIS cuando corresponde. En la comparación histórica, la mediana describe un septiembre típico entre los años usados como referencia.' : 'Harmonized uses the reference VIIRS when observations are available and applies Fire History Interface’s method to MODIS where applicable. In the historical comparison, the median describes a typical September among reference years.'}</p>
             {comparacion && comparacion.mediana !== null && (
               <p>{es ? 'Septiembre de 2020 en Córdoba' : 'September 2020 in Córdoba Province'} · <strong>{formato.format(comparacion.valor)}</strong> {es ? 'focos armonizados' : 'harmonized hot spots'} · {es ? 'mediana' : 'median'} <strong>{formato.format(comparacion.mediana)}</strong> ({comparacion.anios_usados} {es ? 'años de referencia' : 'reference years'}).</p>
             )}
@@ -178,23 +193,35 @@ export function ExperienciaCordoba({
   const posiciones: Record<PasoCordoba, Step['placement']> = {
     calendario: 'left', mapa: 'right', sensores: 'bottom', armonizacion: 'left', recurrencia: 'right',
   };
-  const steps: Step[] = PASOS_CASO.map((id, index) => ({
+  const pasosCordoba: Step[] = PASOS_CASO.map((id, index) => ({
     id,
     target: objetivos[id],
-    placement: pantallaEstrecha ? 'bottom' : posiciones[id],
+    placement: posiciones[id],
+    title: tituloPaso[index],
+    content: contenido(id),
+  }));
+
+  const pasos = esPampa ? pasosPampa({
+    es, mes, capa, datoMes, celdaAbierta, version: versionFactores, onChangeCapa, onOpenMethod,
+  }) : pasosCordoba;
+  const nombreCaso = esPampa ? (es ? 'Caso La Pampa' : 'La Pampa case') : (es ? 'Caso Córdoba' : 'Córdoba case');
+  const steps: Step[] = pasos.map((paso, i) => ({
+    ...paso,
+    placement: pantallaEstrecha ? 'bottom' : paso.placement,
     title: (
       <span className="block space-y-1 text-left">
-        <span className="block text-xs font-normal text-[#C8D3CE]">{es ? 'Caso Córdoba' : 'Córdoba case'} · {index + 1}/{PASOS_CASO.length}</span>
-        <span className="font-title text-lg font-semibold">{tituloPaso[index]}</span>
+        <span className="block text-xs font-normal text-[#C8D3CE]">{nombreCaso} · {i + 1}/{pasos.length}</span>
+        <span className="font-title text-lg font-semibold">{paso.title}</span>
       </span>
     ),
-    content: contenido(id),
+    content: <div className="space-y-2 text-left text-sm leading-relaxed text-[#C8D3CE]">{paso.content}</div>,
   }));
 
   const movimientoReducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   return (
     <Joyride
+      key={guia.caso}
       run
       continuous
       initialStepIndex={indice}
@@ -230,8 +257,13 @@ export function ExperienciaCordoba({
         if (evento.type === EVENTS.TOUR_END) {
           salir();
         } else if (evento.type === EVENTS.STEP_BEFORE) {
-          const siguiente = PASOS_CASO[evento.index];
-          if (siguiente && siguiente !== paso) onPaso(siguiente);
+          if (guia.caso === 'la-pampa') {
+            const paso = PASOS_PAMPA[evento.index];
+            if (paso && paso !== guia.paso) onGuia({ caso: guia.caso, paso });
+          } else {
+            const paso = PASOS_CASO[evento.index];
+            if (paso && paso !== guia.paso) onGuia({ caso: guia.caso, paso });
+          }
         }
       }}
     />

@@ -17,6 +17,7 @@ export const App: React.FC = () => {
   return (
     <div className="flex min-h-screen flex-col bg-[#07100F] text-[#EFF5ED] selection:bg-[#B8EE68] selection:text-[#07100F]">
       <MainLayout
+        metodoAbierto={isMethodOpen}
         onOpenMethod={() => setIsMethodOpen(true)}
         onOpenSatellites={() => setIsSatellitesOpen(true)}
       />

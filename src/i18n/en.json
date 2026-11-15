@@ -1,4 +1,8 @@
 {
+  "pampa": {
+    "guideLink": "Learn how data are harmonized",
+    "provinceUnavailable": "This province is unavailable in the API catalog."
+  },
   "cordoba": {
     "guideLink": "Learn with the Córdoba case",
     "invitationTitle": "Would you like a guided tour?",
@@ -9,8 +13,8 @@
     "provinceUnavailable": "Córdoba is unavailable in the API province catalog."
   },
   "header": {
-    "title": "FuegoContinuo",
-    "subtitle": "Harmonization of MODIS and VIIRS hot spots in Argentina (2000 → today).",
+    "title": "Fire History Interface",
+    "subtitle": "MODIS & VIIRS hot spots · Argentina, 2000 → now",
     "nav": {
       "calendar": "Calendar",
       "mission": "The mission"

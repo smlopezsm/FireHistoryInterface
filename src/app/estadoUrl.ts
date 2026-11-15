@@ -20,7 +20,10 @@ import {
   type ZonaSeleccionada,
 } from '../api';
 
-import { CLAVE_PROVINCIA_CORDOBA, ID_CASO_CORDOBA, PASOS_CASO, type PasoCordoba } from '../features/cordoba/caso';
+import { CLAVE_PROVINCIA_CORDOBA, ID_CASO_CORDOBA, PASOS_CASO } from '../features/cordoba/caso';
+
+import { ID_CASO_PAMPA, PASOS_PAMPA } from '../features/pampa/caso';
+import type { GuiaActiva } from '../features/guiaEstado';
 
 export interface EstadoUrl {
   zona?: string;
@@ -28,7 +31,7 @@ export interface EstadoUrl {
   hasta?: string;
   capa?: Capa;
   mes?: string;
-  pasoCordoba?: PasoCordoba;
+  guia?: GuiaActiva;
 }
 
 const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -52,9 +55,12 @@ export function leerEstado(busqueda: string): EstadoUrl {
   if (capa && CAPAS.includes(capa)) estado.capa = capa;
   const mes = q.get('mes');
   if (mes && MES.test(mes)) estado.mes = mes;
-  if (q.get('caso') === ID_CASO_CORDOBA) {
-    const paso = q.get('paso');
-    estado.pasoCordoba = PASOS_CASO.find((valor) => valor === paso) ?? 'calendario';
+  const caso = q.get('caso');
+  const paso = q.get('paso');
+  if (caso === ID_CASO_CORDOBA) {
+    estado.guia = { caso, paso: PASOS_CASO.find((valor) => valor === paso) ?? 'calendario' };
+  } else if (caso === ID_CASO_PAMPA) {
+    estado.guia = { caso, paso: PASOS_PAMPA.find((valor) => valor === paso) ?? 'contexto' };
   }
   return estado;
 }
@@ -70,9 +76,9 @@ export function escribirEstado(busqueda: string, estado: EstadoUrl): string {
   }
   if (estado.capa && estado.capa !== 'armonizado') q.set('capa', estado.capa);
   if (estado.mes) q.set('mes', estado.mes);
-  if (estado.pasoCordoba) {
-    q.set('caso', ID_CASO_CORDOBA);
-    q.set('paso', estado.pasoCordoba);
+  if (estado.guia) {
+    q.set('caso', estado.guia.caso);
+    q.set('paso', estado.guia.paso);
   }
   // `:` y `,` son válidos en la query: se dejan legibles (prov:74, bbox:-66.6,-34,…).
   const texto = q.toString().replace(/%3A/gi, ':').replace(/%2C/gi, ',');

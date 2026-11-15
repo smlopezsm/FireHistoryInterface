@@ -1,4 +1,8 @@
 {
+  "pampa": {
+    "guideLink": "Aprendé cómo se armonizan los datos",
+    "provinceUnavailable": "Esta provincia no figura en el catálogo de la API."
+  },
   "cordoba": {
     "guideLink": "Aprendé con el caso de Córdoba",
     "invitationTitle": "¿Querés explorar con una guía?",
@@ -9,8 +13,8 @@
     "provinceUnavailable": "Córdoba no figura en el catálogo de provincias de la API."
   },
   "header": {
-    "title": "FuegoContinuo",
-    "subtitle": "Armonización de puntos calientes MODIS y VIIRS en Argentina (2000 → hoy).",
+    "title": "Fire History Interface",
+    "subtitle": "Focos MODIS y VIIRS · Argentina, 2000 → hoy",
     "nav": {
       "calendar": "Calendario",
       "mission": "La misión"

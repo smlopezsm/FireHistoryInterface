@@ -26,6 +26,14 @@ describe('leerEstado', () => {
   it('descarta un rango invertido', () => {
     expect(leerEstado('?desde=2024-01&hasta=2018-01')).toEqual({});
   });
+
+  it('resuelve el paso inicial de cada guía y conserva enlaces de Córdoba', () => {
+    expect(leerEstado('?caso=la-pampa&paso=calendario').guia).toEqual({ caso: 'la-pampa', paso: 'contexto' });
+    expect(leerEstado('?zona=sierras-cordoba&caso=sierras-cordoba&paso=calendario')).toEqual({
+      zona: 'prov:14',
+      guia: { caso: 'sierras-cordoba', paso: 'calendario' },
+    });
+  });
 });
 
 describe('escribirEstado', () => {
@@ -44,6 +52,14 @@ describe('escribirEstado', () => {
     });
     expect(new URLSearchParams(q).get('zona')).toBe('region:Cuyo');
     expect(leerEstado(q)).toEqual({ zona: 'region:Cuyo', desde: '2018-01', hasta: '2024-12', capa: 'viirs', mes: '2024-08' });
+  });
+
+  it('conserva la vista de La Pampa al compartir y salir de la guía', () => {
+    const vista = { zona: 'prov:42', desde: '2000-11', hasta: '2001-01', capa: 'viirs', mes: '2001-01' } as const;
+    const guia = { caso: 'la-pampa', paso: 'viirs' } as const;
+    const q = escribirEstado('?lang=es', { ...vista, guia });
+    expect(leerEstado(q)).toEqual({ ...vista, guia });
+    expect(leerEstado(escribirEstado(q, vista))).toEqual(vista);
   });
 });
 

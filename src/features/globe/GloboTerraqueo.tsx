@@ -198,6 +198,7 @@ interface GloboTerraqueoProps {
   bbox?: BBox;
   mostrarLimites?: boolean;
   onInspectCell?: () => void;
+  estadoViirs?: 'cargando' | 'sin-datos';
   historicalRasterTiles?: string;
   historicalRasterSource?: string;
   historicalRasterBounds?: BBox;
@@ -220,6 +221,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   bbox = BBOX_ARGENTINA,
   mostrarLimites = false,
   onInspectCell,
+  estadoViirs,
   historicalRasterTiles,
   historicalRasterSource,
   historicalRasterBounds,
@@ -347,10 +349,10 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   // Celdas del mes con TanStack Query: caché por mes/zona/capa y cancelación de lo obsoleto.
   const bboxParam = bbox.join(',');
   const paramsCeldas = useMemo(() => {
-    if (!metadata || !selectedMonth) return null;
+    if (!metadata || !selectedMonth || estadoViirs) return null;
     const { desde, hasta } = rangoDelMes(selectedMonth, metadata.fecha_min, metadata.fecha_max);
     return { bbox: bboxParam, desde, hasta, capa, min_focos: MIN_FOCOS_MAPA };
-  }, [metadata, selectedMonth, bboxParam, capa]);
+  }, [metadata, selectedMonth, bboxParam, capa, estadoViirs]);
   const celdas = useMapaCeldas(paramsCeldas);
   const isLoadingCells = celdas.isFetching;
   const cellsError = celdas.isError;
@@ -368,11 +370,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   opcionesCeldasRef.current = { celdasVisibles, capa, isEn, onInspectCell };
 
   const demasiadasCeldas = celdas.error instanceof ApiRequestError && celdas.error.status === 413;
-  const cellsStatus = demasiadasCeldas
-    ? (isEn ? 'Choose a smaller area' : 'Elegí una zona más chica')
-    : metadataError || cellsError
-      ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
-      : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
+  const viirsSinDatos = estadoViirs === 'sin-datos';
+  const cellsStatus = viirsSinDatos
+    ? (isEn ? 'VIIRS unavailable for this period' : 'VIIRS no disponible para este período')
+    : demasiadasCeldas
+      ? (isEn ? 'Choose a smaller area' : 'Elegí una zona más chica')
+      : metadataError || cellsError
+        ? (isEn ? 'Hot spots unavailable' : 'Focos no disponibles')
+        : (isEn ? 'Loading hot spots…' : 'Cargando focos…');
 
   const selectMonth = (nextMonth: string) => {
     if (!minMonth || !maxMonth || nextMonth < minMonth || nextMonth > maxMonth) return;
@@ -403,14 +408,14 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       setIsPlayingTimeline(false);
       return;
     }
-    if (!isLoaded || isLoadingCells || !celdas.data) return;
+    if (!isLoaded || isLoadingCells || (!celdas.data && !viirsSinDatos)) return;
     const timer = window.setTimeout(() => {
       const siguiente = shiftMonth(selectedMonth, 1);
       mesEnReproduccion.current = siguiente;
       updateMonth(siguiente);
     }, 1400);
     return () => window.clearTimeout(timer);
-  }, [isPlayingTimeline, isLoaded, isLoadingCells, cellsError, celdas.data, selectedMonth, maxMonth, updateMonth]);
+  }, [isPlayingTimeline, isLoaded, isLoadingCells, cellsError, celdas.data, selectedMonth, maxMonth, updateMonth, viirsSinDatos]);
 
   // Rotación orbital (grados/segundo efectivos en ciclos de 1000 ms encadenados con moveend)
   const secondsPerRevolution = 150;
@@ -897,7 +902,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
               </span>
             </div>
             <div className="mt-1 border-t border-[#21312D] pt-1 font-mono text-xs text-[#B8EE68]">
-              {celdas.data && !cellsError ? (isEn ? 'LIVE API' : 'API EN VIVO') : cellsStatus}
+              {celdas.data && !cellsError ? (isEn ? 'LIVE API' : 'API EN VIVO') : viirsSinDatos ? null : cellsStatus}
             </div>
           </div>
         )}

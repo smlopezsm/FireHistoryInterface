@@ -70,7 +70,7 @@ export const BackendHealthIndicator: React.FC = () => {
 
   return (
     <div
-      className="relative inline-flex items-center"
+      className="inline-flex items-center sm:relative"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocus={handleMouseEnter}
@@ -83,7 +83,7 @@ export const BackendHealthIndicator: React.FC = () => {
         aria-expanded={isOpen}
         aria-label={`${isSpanish ? 'Estado del backend' : 'Backend status'}: ${statusLabel}`}
         title={`${statusLabel}${metadata?.factores_version && isOnline ? ` · v${metadata.factores_version}` : ''}`}
-        className="group inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#21312D] bg-[#0D1816] transition-all hover:border-[#2A3F3A] hover:bg-[#111E1B] focus:outline-none focus:ring-1 focus:ring-[#B8EE68]"
+        className="group inline-flex h-9 w-8 items-center justify-center rounded-md border border-[#21312D] bg-[#0D1816] transition-all hover:border-[#2A3F3A] hover:bg-[#111E1B] focus:outline-none focus:ring-1 focus:ring-[#B8EE68] sm:w-9"
       >
         {/* Indicador LED con animación de pulso cuando está online */}
         <span className="relative flex h-2.5 w-2.5 items-center justify-center">
@@ -104,8 +104,7 @@ export const BackendHealthIndicator: React.FC = () => {
       {isOpen && (
         <div
           role="tooltip"
-          className="absolute right-0 top-full mt-2 z-50 w-80 rounded-lg border border-[#21312D] bg-[#07100F]/95 p-3.5 shadow-2xl backdrop-blur-md text-xs text-[#EFF5ED] animate-fade-in"
-          style={{ minWidth: '300px' }}
+          className="absolute right-3 top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-[#21312D] bg-[#07100F]/95 p-3.5 text-xs text-[#EFF5ED] shadow-2xl backdrop-blur-md animate-fade-in sm:right-0"
         >
           {/* Cabecera del estado */}
           <div className="flex items-center justify-between border-b border-[#21312D] pb-2.5">

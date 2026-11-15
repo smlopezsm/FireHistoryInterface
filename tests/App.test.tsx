@@ -18,7 +18,7 @@ describe('App Shell Layout & i18n (English Default)', () => {
     );
 
     // Header title
-    expect(screen.getByRole('heading', { level: 1, name: 'FuegoContinuo' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Fire History Interface' })).toBeInTheDocument();
 
     // Check key widgets in main layout in English
     expect(screen.getByRole('combobox', { name: 'Area' })).toBeInTheDocument();

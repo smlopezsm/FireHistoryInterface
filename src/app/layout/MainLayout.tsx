@@ -12,10 +12,10 @@ import {
 import { claveDeZona, escribirEstado, leerEstado, zonaDeClave } from '../estadoUrl';
 import { CargarAlVer } from '../CargarAlVer';
 import { Header } from './Header';
-import { ExperienciaCordoba } from '../../features/cordoba/ExperienciaCordoba';
+import { ExperienciaGuiada } from '../../features/cordoba/ExperienciaGuiada';
+import { seleccionDeGuia, type GuiaActiva } from '../../features/guiaEstado';
 import {
-  CLAVE_PROVINCIA_CORDOBA, EXTENSION_CONAE, MES_ESTIMADO, PERIODO_ESTIMADO, PERIODO_EPISODIO, PRODUCTO_CONAE,
-  TESELAS_CONAE, seleccionDelPaso, type PasoCordoba,
+  EXTENSION_CONAE, MES_ESTIMADO, PERIODO_ESTIMADO, PRODUCTO_CONAE, TESELAS_CONAE,
 } from '../../features/cordoba/caso';
 
 // El globo trae MapLibre (~300 kB gzip): se descarga recién cuando el mapa se acerca a la
@@ -38,34 +38,40 @@ import {
 } from '../../api';
 
 interface MainLayoutProps {
+  metodoAbierto?: boolean;
   onOpenMethod?: () => void;
   onOpenSatellites?: () => void;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSatellites }) => {
+export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSatellites, metodoAbierto = false }) => {
   const { t } = useTranslation();
 
   // Estado inicial desde la URL (docs/02 §6): se puede compartir y sobrevive a recargar.
   const [inicial] = useState(() => (typeof window !== 'undefined' ? leerEstado(window.location.search) : {}));
-  const [pasoCordoba, setPasoCordoba] = useState<PasoCordoba | null>(inicial.pasoCordoba ?? null);
+  const [guia, setGuia] = useState<GuiaActiva | null>(inicial.guia ?? null);
+  const seleccionInicial = inicial.guia ? seleccionDeGuia(inicial.guia) : null;
+  const pasoCordoba = guia?.caso === 'sierras-cordoba' ? guia.paso : null;
+  const pasoPampa = guia?.caso === 'la-pampa' ? guia.paso : null;
+  const claveGuia = guia ? seleccionDeGuia(guia).zona : null;
   const guiaRef = useRef<HTMLButtonElement>(null);
+  const pampaRef = useRef<HTMLButtonElement>(null);
   const [celdaAbierta, setCeldaAbierta] = useState(false);
   const [conaeVisible, setConaeVisible] = useState(false);
   const [errorCaso, setErrorCaso] = useState(false);
   const [zona, setZona] = useState<ZonaSeleccionada>(() => zonaDeClave(inicial.zona ?? 'arg', []) ?? ZONA_ARGENTINA);
   // Las provincias y regiones de la URL requieren el catálogo.
   const [zonaPendiente, setZonaPendiente] = useState(() => {
-    const clave = inicial.pasoCordoba ? CLAVE_PROVINCIA_CORDOBA : inicial.zona;
+    const clave = seleccionInicial?.zona ?? inicial.zona;
     return clave?.startsWith('prov:') || clave?.startsWith('region:') ? clave : null;
   });
   const [escalaFija, setEscalaFija] = useState(false);
   const [capa, setCapa] = useState<Capa>(inicial.capa ??
-    (inicial.pasoCordoba && !inicial.zona ? seleccionDelPaso(inicial.pasoCordoba).capa : 'armonizado'),
+    (!inicial.zona ? seleccionInicial?.capa : undefined) ?? 'armonizado',
   );
   const [periodoUsuario, setPeriodoUsuario] = useState<Periodo | null>(
-    inicial.desde && inicial.hasta ? { desde: inicial.desde, hasta: inicial.hasta } : inicial.pasoCordoba ? PERIODO_EPISODIO : null
+    inicial.desde && inicial.hasta && inicial.guia?.caso !== 'la-pampa' ? { desde: inicial.desde, hasta: inicial.hasta } : seleccionInicial?.periodo ?? null
   );
-  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(inicial.mes ?? (inicial.pasoCordoba ? seleccionDelPaso(inicial.pasoCordoba).mes : null));
+  const [mesMapaUsuario, setMesMapaUsuario] = useState<string | null>(inicial.mes ?? seleccionInicial?.mes ?? null);
 
   const { data: metadata, isError: metadataError } = useMetadata();
   const { data: apiProvincias, isError: provinciasError } = useProvincias();
@@ -92,12 +98,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSate
     if (!zonaPendiente || (!apiProvincias && !provinciasError)) return;
     const resuelta = zonaDeClave(zonaPendiente, apiProvincias ?? []);
     if (resuelta) setZona(resuelta);
-    else if (pasoCordoba && zonaPendiente === CLAVE_PROVINCIA_CORDOBA) {
-      setPasoCordoba(null);
+    else if (claveGuia && zonaPendiente === claveGuia) {
+      setGuia(null);
       setErrorCaso(true);
     }
     setZonaPendiente(null);
-  }, [zonaPendiente, apiProvincias, provinciasError, pasoCordoba]);
+  }, [zonaPendiente, apiProvincias, provinciasError, claveGuia]);
 
   useEffect(() => {
     if (!metadata) return;
@@ -105,23 +111,25 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSate
     if (mesMapaUsuario && !mesEnRango) setMesMapaUsuario(null);
   }, [metadata, fueraDeDatos, mesMapaUsuario, mesEnRango]);
 
-  const cambiarPasoCordoba = (paso: PasoCordoba | null) => {
-    setPasoCordoba(paso);
+  const cambiarGuia = (siguiente: GuiaActiva | null) => {
+    setGuia(siguiente);
     setConaeVisible(false);
     setCeldaAbierta(false);
-    if (!paso) return;
-    const seleccion = seleccionDelPaso(paso);
-    const provincia = zonaDeClave(CLAVE_PROVINCIA_CORDOBA, apiProvincias ?? []);
+    if (!siguiente) return;
+    const seleccion = seleccionDeGuia(siguiente);
+    const provincia = zonaDeClave(seleccion.zona, apiProvincias ?? []);
     if (provincia) {
       setZonaPendiente(null);
       setZona(provincia);
     } else {
-      setZonaPendiente(CLAVE_PROVINCIA_CORDOBA);
+      setZonaPendiente(seleccion.zona);
     }
     setErrorCaso(false);
-    setPeriodoUsuario(PERIODO_EPISODIO);
+    setPeriodoUsuario(seleccion.periodo);
     setCapa(seleccion.capa);
-    setMesMapaUsuario(seleccion.mes);
+    if (siguiente.caso !== 'la-pampa' || guia?.caso !== 'la-pampa') {
+      setMesMapaUsuario(seleccion.mes);
+    }
   };
 
   const verEstimacionCordoba = () => {
@@ -131,13 +139,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSate
   };
 
   const cambiarPeriodo = (siguiente: Periodo) => {
-    if (pasoCordoba) cambiarPasoCordoba(null);
+    if (guia) cambiarGuia(null);
     setPeriodoUsuario(siguiente);
     setMesMapaUsuario((mes) => mes && mes >= siguiente.desde && mes <= siguiente.hasta ? mes : null);
   };
 
   const cambiarZona = (siguiente: ZonaSeleccionada) => {
-    if (pasoCordoba) cambiarPasoCordoba(null);
+    if (guia) cambiarGuia(null);
     setZonaPendiente(null);
     setZona(siguiente);
   };
@@ -151,18 +159,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSate
       hasta: periodoElegido?.hasta,
       capa,
       mes: (metadata ? mesEnRango : mesMapaUsuario) ?? undefined,
-      pasoCordoba: pasoCordoba ?? undefined,
+      guia: guia ?? undefined,
     });
     if (query !== window.location.search) {
       window.history.replaceState(window.history.state, '', `${window.location.pathname}${query}${window.location.hash}`);
     }
-  }, [zona, zonaPendiente, periodoElegido, capa, mesMapaUsuario, mesEnRango, metadata, pasoCordoba]);
+  }, [zona, zonaPendiente, periodoElegido, capa, mesMapaUsuario, mesEnRango, metadata, guia]);
 
   const pedido = useMemo(() => (zonaPendiente ? null : pedidoDeZona(zona)), [zona, zonaPendiente]);
   const anomalia = useAnomalia(mesMapa ? pedido : null, mesMapa ?? undefined);
-  const detalleCordoba = useCalendario(pasoCordoba && mesMapa ? pedido : null, { ...periodoParams, capa });
-  const mesCordoba = detalleCordoba.data?.meses.find((punto) => punto.periodo === mesMapa);
-  const abrirCeldaCordoba = useCallback(() => setCeldaAbierta(true), []);
+  const detalleMes = useCalendario((guia || capa === 'viirs') && mesMapa ? pedido : null, { ...periodoParams, capa });
+  const datoMes = detalleMes.data?.meses.find((punto) => punto.periodo === mesMapa);
+  const estadoViirs = capa !== 'viirs' ? undefined
+    : detalleMes.isLoading ? 'cargando'
+    : datoMes?.viirs === null ? 'sin-datos'
+    : undefined;
+  const marcarCeldaAbierta = useCallback(() => setCeldaAbierta(true), []);
 
   const preliminar = Boolean(
     metadata && anomalia.data && anomalia.data.mes > aMes(metadata.fecha_ultimo_sp),
@@ -240,7 +252,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSate
             zoom={zona.zoom}
             bbox={zona.bbox}
             mostrarLimites={zonaPorCoordenadas}
-            onInspectCell={pasoCordoba === 'mapa' ? abrirCeldaCordoba : undefined}
+            onInspectCell={pasoCordoba === 'mapa' || pasoPampa === 'modis' ? marcarCeldaAbierta : undefined}
+            estadoViirs={estadoViirs}
             historicalRasterTiles={conaeVisible ? TESELAS_CONAE : undefined}
             historicalRasterSource={PRODUCTO_CONAE}
             historicalRasterBounds={EXTENSION_CONAE}
@@ -252,7 +265,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSate
             geometriaZona={zona.geometria}
             selectedProvinciaId={zona.provincia_id}
             selectedProvinciaIds={selectedProvinciaIds}
-            onSelectProvincia={pasoCordoba ? undefined : handleSelectProvinciaFromMap}
+            onSelectProvincia={guia ? undefined : handleSelectProvinciaFromMap}
             className="flex-1 rounded-none border-0"
           />
         </Suspense>
@@ -319,20 +332,27 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenMethod, onOpenSate
       <Header
         onOpenMethod={onOpenMethod}
         onOpenSatellites={onOpenSatellites}
-        onStartGuide={() => cambiarPasoCordoba('calendario')}
+        onStartGuide={() => cambiarGuia({ caso: 'sierras-cordoba', paso: 'calendario' })}
+        onStartHarmonization={() => cambiarGuia({ caso: 'la-pampa', paso: 'contexto' })}
+        harmonizationButtonRef={pampaRef}
         guideButtonRef={guiaRef}
       />
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 md:px-8 space-y-6">
         <div id="explorar" className="scroll-mt-20 space-y-4">
-          {errorCaso && <p role="alert" className="text-sm text-[#FF9C55]">{t('cordoba.provinceUnavailable')}</p>}
-          <ExperienciaCordoba
-            paso={pasoCordoba}
+          {errorCaso && <p role="alert" className="text-sm text-[#FF9C55]">{t('pampa.provinceUnavailable')}</p>}
+          <ExperienciaGuiada
+            guia={guia}
             guideButtonRef={guiaRef}
-            onPaso={cambiarPasoCordoba}
+            harmonizationButtonRef={pampaRef}
+            onGuia={cambiarGuia}
+            metodoAbierto={metodoAbierto}
+            onOpenMethod={onOpenMethod}
+            onChangeCapa={setCapa}
+            versionFactores={metadata?.factores_version}
             mes={mesMapa}
             capa={capa}
             celdaAbierta={celdaAbierta}
-            datoMes={mesCordoba}
+            datoMes={datoMes}
             anomalia={anomalia.data}
             mostrarConae={conaeVisible}
             onVerEstimacion={verEstimacionCordoba}
