@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { MapPin, Compass, Crosshair, Loader2, AlertCircle, CalendarRange } from "lucide-react";
+import { MapPin, Compass, Crosshair, Loader2, AlertCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useProvincias,
@@ -15,14 +15,11 @@ import {
   type ZonaSeleccionada,
 } from "../../api";
 import { CoordinateForm } from "./CoordinateForm";
+import { PeriodRangePicker, type Periodo } from "./PeriodRangePicker";
 
 /** @deprecated usar ZonaSeleccionada */
 export type ZoneItem = ZonaSeleccionada;
-
-export interface Periodo {
-  desde: string; // YYYY-MM
-  hasta: string; // YYYY-MM
-}
+export type { Periodo };
 
 interface ZoneSelectorWidgetProps {
   selectedZone: ZonaSeleccionada;
@@ -110,15 +107,6 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
   const [lng, lat] = selectedZone.center;
   const latFormatted = `${Math.abs(lat).toFixed(2)}° ${lat < 0 ? "S" : "N"}`;
   const lngFormatted = `${Math.abs(lng).toFixed(2)}° ${lng < 0 ? "W" : "E"}`;
-
-  const setDesde = (v: string) => {
-    if (!v) return;
-    onChangePeriodo({ desde: v, hasta: v > periodo.hasta ? v : periodo.hasta });
-  };
-  const setHasta = (v: string) => {
-    if (!v) return;
-    onChangePeriodo({ desde: v < periodo.desde ? v : periodo.desde, hasta: v });
-  };
 
   return (
     <div
@@ -258,40 +246,14 @@ export const ZoneSelectorWidget: React.FC<ZoneSelectorWidgetProps> = ({
         </div>
 
         {/* Período del calendario y la serie (YYYY-MM) */}
-        <div className="md:col-span-12 flex flex-wrap items-center gap-2 font-sans text-xs">
-          <CalendarRange className="h-3.5 w-3.5 text-[#93A39C]" aria-hidden="true" />
-          <span className="font-medium text-[#93A39C]">{isEn ? "Period" : "Período"}</span>
-          <label className="flex items-center gap-1 text-[#93A39C]">
-            <span>{isEn ? "from" : "desde"}</span>
-            <input
-              type="month"
-              value={periodo.desde}
-              min={mesMin}
-              max={mesMax}
-              onChange={(e) => setDesde(e.target.value)}
-              className="rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-mono text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none [color-scheme:dark]"
-            />
-          </label>
-          <label className="flex items-center gap-1 text-[#93A39C]">
-            <span>{isEn ? "to" : "hasta"}</span>
-            <input
-              type="month"
-              value={periodo.hasta}
-              min={mesMin}
-              max={mesMax}
-              onChange={(e) => setHasta(e.target.value)}
-              className="rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 font-mono text-xs text-[#EFF5ED] focus:border-[#B8EE68] focus:outline-none [color-scheme:dark]"
-            />
-          </label>
-          {mesMin && mesMax && (periodo.desde !== mesMin || periodo.hasta !== mesMax) && (
-            <button
-              type="button"
-              onClick={() => onChangePeriodo({ desde: mesMin, hasta: mesMax })}
-              className="rounded-md border border-[#21312D] bg-[#111E1B] px-2 py-1 text-[#93A39C] hover:text-[#EFF5ED]"
-            >
-              {isEn ? "Full range" : "Todo el registro"}
-            </button>
-          )}
+        <div className="md:col-span-12">
+          <PeriodRangePicker
+            periodo={periodo}
+            onChangePeriodo={onChangePeriodo}
+            mesMin={mesMin}
+            mesMax={mesMax}
+            isEn={isEn}
+          />
         </div>
       </div>
 
