@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getMapaCeldas, useMetadata, type GeoJSON } from '../../api';
+import { getMapaCeldas, useMetadata, useProvincias, type GeoJSON } from '../../api';
 import {
   attachProvinciasLayer,
   PROVINCIAS_GEOJSON_URL,
@@ -153,6 +153,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
   const { t, i18n } = useTranslation();
   const isEn = !Boolean(i18n?.language?.startsWith('es'));
   const { data: metadata } = useMetadata();
+  const { data: apiProvincias } = useProvincias(true);
   const minMonth = metadata?.fecha_min?.slice(0, 7) || '2000-11';
   const maxMonth = metadata?.fecha_max?.slice(0, 7) || '2026-11';
 
@@ -481,9 +482,32 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
     }
   }, [handleInteractionStart, handleInteractionEnd, spinGlobe, onMapReady]);
 
-  // Cargar GeoJSON estático de provincias desde public/ (sin depender del backend)
+  // Cargar geometrías de provincias desde el backend local (con fallback al GeoJSON estático)
   useEffect(() => {
     if (!isLoaded || !provinciasControllerRef.current) return;
+
+    const apiFeatures = (apiProvincias ?? [])
+      .filter((p) => Boolean(p.geometria && p.geometria.type))
+      .map((p) => ({
+        type: 'Feature' as const,
+        geometry: p.geometria as GeoJSON.Geometry,
+        properties: {
+          provincia_id: p.provincia_id,
+          nombre: p.nombre,
+        },
+      }));
+
+    if (apiFeatures.length > 0) {
+      const fc: GeoJSON.FeatureCollection<GeoJSON.Geometry, ProvinciaFeatureProperties> = {
+        type: 'FeatureCollection',
+        features: apiFeatures,
+      };
+      provinciasGeoJSONRef.current = fc;
+      provinciasControllerRef.current.setGeoJSON(fc);
+      provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
+      return;
+    }
+
     if (provinciasGeoJSONRef.current) {
       provinciasControllerRef.current.setGeoJSON(provinciasGeoJSONRef.current);
       provinciasControllerRef.current.setSelectedProvincia(selectedProvinciaIdRef.current ?? null);
@@ -504,7 +528,7 @@ export const GloboTerraqueo: React.FC<GloboTerraqueoProps> = ({
       });
 
     return () => controller.abort();
-  }, [isLoaded]);
+  }, [isLoaded, apiProvincias]);
 
   // Sincronizar selección externa (ZoneSelectorWidget) con el estado GPU del mapa
   useEffect(() => {
